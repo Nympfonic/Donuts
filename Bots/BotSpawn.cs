@@ -250,7 +250,7 @@ namespace Donuts
 #endif
             EPlayerSide side = GetSideForWildSpawnType(wildSpawnType, WildSpawnType.pmcUSEC, WildSpawnType.pmcBEAR);
             var cancellationTokenSource = AccessTools.Field(typeof(BotSpawner), "_cancellationTokenSource").GetValue(botSpawnerClass) as CancellationTokenSource;
-            BotDifficulty botDifficulty = GetBotDifficulty(wildSpawnType, WildSpawnType.pmcUSEC, WildSpawnType.pmcBEAR);
+			BotDifficulty botDifficulty = GetBotDifficulty(wildSpawnType);
 
             var cachedBotGroup = DonutsBotPrep.FindCachedBots(wildSpawnType, botDifficulty, count);
             if (cachedBotGroup == null)
@@ -293,7 +293,7 @@ namespace Donuts
         {
             EPlayerSide side = GetSideForWildSpawnType(wildSpawnType, WildSpawnType.pmcUSEC, WildSpawnType.pmcBEAR);
             var cancellationTokenSource = AccessTools.Field(typeof(BotSpawner), "_cancellationTokenSource").GetValue(botSpawnerClass) as CancellationTokenSource;
-            BotDifficulty botDifficulty = GetBotDifficulty(wildSpawnType, WildSpawnType.pmcUSEC, WildSpawnType.pmcBEAR);
+			BotDifficulty botDifficulty = GetBotDifficulty(wildSpawnType);
             var BotCacheDataList = DonutsBotPrep.GetWildSpawnData(wildSpawnType, botDifficulty);
 
             await SpawnBotFromCacheOrCreateNew(BotCacheDataList, wildSpawnType, side, botCreator, botSpawnerClass, coordinate, cancellationTokenSource, botDifficulty, botWave, zone, coordinates, cancellationToken);
@@ -318,78 +318,41 @@ namespace Donuts
 
         #region botHelperMethods
 
-        #region botDifficulty
-        internal static BotDifficulty GetBotDifficulty(WildSpawnType wildSpawnType, WildSpawnType sptUsec, WildSpawnType sptBear)
+		private static BotDifficulty GetBotDifficulty(WildSpawnType wildSpawnType)
         {
             if (wildSpawnType == WildSpawnType.assault)
             {
-                return grabSCAVDifficulty();
+				return GetBotDifficulty(botDifficultiesSCAV.Value);
             }
-            else if (wildSpawnType == WildSpawnType.pmcUSEC || wildSpawnType == WildSpawnType.pmcBEAR || wildSpawnType == WildSpawnType.pmcBot)
+			else if (wildSpawnType == WildSpawnType.pmcUSEC ||
+				wildSpawnType == WildSpawnType.pmcBEAR ||
+				wildSpawnType == WildSpawnType.pmcBot)
             {
-                return grabPMCDifficulty();
+				return GetBotDifficulty(botDifficultiesPMC.Value);
             }
             else
             {
-                return grabOtherDifficulty();
+				return GetBotDifficulty(botDifficultiesOther.Value);
             }
         }
 
-        internal static BotDifficulty grabPMCDifficulty()
+		private static BotDifficulty GetBotDifficulty(string settingValue)
         {
-            switch (botDifficultiesPMC.Value.ToLower())
+			var difficultyLower = settingValue.ToLower();
+			switch (difficultyLower)
             {
                 case "asonline":
-                    BotDifficulty[] randomDifficulty = { BotDifficulty.easy, BotDifficulty.normal, BotDifficulty.hard };
+					BotDifficulty[] randomDifficulty = [BotDifficulty.easy, BotDifficulty.normal, BotDifficulty.hard];
                     return randomDifficulty[UnityEngine.Random.Range(0, 3)];
                 case "easy":
-                    return BotDifficulty.easy;
                 case "normal":
-                    return BotDifficulty.normal;
                 case "hard":
-                    return BotDifficulty.hard;
                 case "impossible":
-                    return BotDifficulty.impossible;
-                default:
-                    return BotDifficulty.normal;
+					if (!Enum.TryParse<BotDifficulty>(difficultyLower, out var result))
+        {
+						goto default;
             }
-        }
-
-        internal static BotDifficulty grabSCAVDifficulty()
-        {
-            switch (botDifficultiesSCAV.Value.ToLower())
-            {
-                case "asonline":
-                    BotDifficulty[] randomDifficulty = { BotDifficulty.easy, BotDifficulty.normal, BotDifficulty.hard };
-                    return randomDifficulty[UnityEngine.Random.Range(0, 3)];
-                case "easy":
-                    return BotDifficulty.easy;
-                case "normal":
-                    return BotDifficulty.normal;
-                case "hard":
-                    return BotDifficulty.hard;
-                case "impossible":
-                    return BotDifficulty.impossible;
-                default:
-                    return BotDifficulty.normal;
-            }
-        }
-
-        internal static BotDifficulty grabOtherDifficulty()
-        {
-            switch (botDifficultiesOther.Value.ToLower())
-            {
-                case "asonline":
-                    BotDifficulty[] randomDifficulty = { BotDifficulty.easy, BotDifficulty.normal, BotDifficulty.hard };
-                    return randomDifficulty[UnityEngine.Random.Range(0, 3)];
-                case "easy":
-                    return BotDifficulty.easy;
-                case "normal":
-                    return BotDifficulty.normal;
-                case "hard":
-                    return BotDifficulty.hard;
-                case "impossible":
-                    return BotDifficulty.impossible;
+					return result;
                 default:
                     return BotDifficulty.normal;
             }
@@ -480,7 +443,7 @@ namespace Donuts
 
         internal static async UniTask CreateNewBot(WildSpawnType wildSpawnType, EPlayerSide side, IBotCreator ibotCreator, BotSpawner botSpawnerClass, Vector3 coordinate, CancellationTokenSource cancellationTokenSource, string zone, List<Vector3> coordinates, CancellationToken cancellationToken)
         {
-            BotDifficulty botdifficulty = GetBotDifficulty(wildSpawnType, WildSpawnType.pmcUSEC, WildSpawnType.pmcBEAR);
+			BotDifficulty botdifficulty = GetBotDifficulty(wildSpawnType);
 
             IProfileData botData = new IProfileData(side, wildSpawnType, botdifficulty, 0f, null);
             BotCreationDataClass bot = await BotCreationDataClass.Create(botData, ibotCreator, 1, botSpawnerClass);
