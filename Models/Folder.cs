@@ -13,6 +13,6 @@ namespace Donuts.Models
 		public string RandomScenarioConfig { get; set; }
 		// FIXME
 		//[JsonProperty("presets")]
-		public List<Presets> Presets { get; set; }
+		public List<Preset> Presets { get; set; }
 	}
 }
