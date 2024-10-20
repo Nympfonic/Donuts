@@ -2,11 +2,8 @@
 
 namespace Donuts.Models
 {
-    internal class FightLocations
-    {
-        public List<Entry> Locations
-        {
-            get; set;
-        }
-    }
+	public class FightLocations
+	{
+		public List<Entry> Locations { get; set; }
+	}
 }
