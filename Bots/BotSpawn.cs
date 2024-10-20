@@ -69,16 +69,21 @@ namespace Donuts
                     return;
                 }
             }
+				catch (OperationCanceledException) {}
+			}
 
-            DonutComponent.Logger.LogDebug($"All coordinates in zone {zone} failed for this spawn, skipping this spawn");
+			DonutsComponent.Logger.LogDebug($"All coordinates in zone {zone} failed for this spawn, skipping this spawn");
         }
 
-        internal static async UniTask ActivateStartingBots(BotCreationDataClass botCacheElement, WildSpawnType wildSpawnType, EPlayerSide side, IBotCreator ibotCreator,
-            BotSpawner botSpawnerClass, Vector3 spawnPosition, BotDifficulty botDifficulty, int maxCount, string zone, CancellationToken cancellationToken)
+		private static async UniTask ActivateStartingBots(BotCreationDataClass botCacheElement, BotSpawner botSpawner, Vector3 spawnPosition, BotDifficulty botDifficulty,
+			int maxCount, string zone, CancellationToken ct)
         {
             if (botCacheElement != null)
             {
-                var closestBotZone = botSpawnerClass.GetClosestZone(spawnPosition, out _);
+				DonutsComponent.Logger.LogError("Attempted to spawn a group bot but the botCacheElement was null.");
+				return;
+			}
+			var closestBotZone = botSpawner.GetClosestZone(spawnPosition, out _);
                 var closestCorePoint = GetClosestCorePoint(spawnPosition);
                 botCacheElement.AddPosition(spawnPosition, closestCorePoint.Id);
 
@@ -87,14 +92,10 @@ namespace Donuts
                                 $"of side: {botCacheElement.Side} and difficulty: {botDifficulty} in spawn zone: {zone}");
 #endif
 
-                var cancellationTokenSource = AccessTools.Field(typeof(BotSpawner), "_cancellationTokenSource").GetValue(botSpawnerClass) as CancellationTokenSource;
-                await ActivateBot(closestBotZone, botCacheElement, cancellationTokenSource, cancellationToken);
+			//var botSpawnerCts = ReflectionCache.BotSpawner_cancellationTokenSource_Field.GetValue(botSpawnerClass) as CancellationTokenSource;
+			//CancellationTokenSource.CreateLinkedTokenSource(ct, botSpawnerCts.Token);
+			await ActivateBot(botSpawner, closestBotZone, botCacheElement, ct);
             }
-            else
-            {
-                DonutComponent.Logger.LogError("Attempted to spawn a group bot but the botCacheElement was null.");
-            }
-        }
 
         internal static async UniTask SpawnBots(BotWave botWave, string zone, Vector3 coordinate, string wildSpawnType, List<Vector3> coordinates, CancellationToken cancellationToken)
         {
@@ -485,16 +486,14 @@ namespace Donuts
             }
         }
 
-        internal static async UniTask ActivateBot(BotZone botZone, BotCreationDataClass botData, CancellationTokenSource cancellationTokenSource, CancellationToken cancellationToken)
-        {
-            CreateBotCallbackWrapper createBotCallbackWrapper = new CreateBotCallbackWrapper
+		private static async UniTask ActivateBot(BotSpawner botSpawner, BotZone botZone, BotCreationDataClass botData, CancellationToken ct)
             {
-                botData = botData
-            };
+			CreateBotCallbackWrapper createBotCallbackWrapper = new(botData);
+			GetBotsGroupWrapper getGroupWrapper = new(botSpawner);
+			var groupAction = new Func<BotOwner, BotZone, BotsGroup>(getGroupWrapper.GetGroupAndSetEnemies);
+			var callback = new Action<BotOwner>(createBotCallbackWrapper.CreateBotCallback);
 
-            GetGroupWrapper getGroupWrapper = new GetGroupWrapper();
-
-            botCreator.ActivateBot(botData, botZone, false, new Func<BotOwner, BotZone, BotsGroup>(getGroupWrapper.GetGroupAndSetEnemies), new Action<BotOwner>(createBotCallbackWrapper.CreateBotCallback), cancellationTokenSource.Token);
+			botCreator.ActivateBot(botData, botZone, false, groupAction, callback, ct);
             await ClearBotCacheAfterActivation(botData);
         }
 
