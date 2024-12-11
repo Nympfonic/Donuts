@@ -1,21 +1,21 @@
-﻿using System.Reflection;
+﻿using EFT;
+using HarmonyLib;
 using SPT.Reflection.Patching;
-using EFT;
+using System.Reflection;
 
-namespace Donuts.Patches
+namespace Donuts.Patches;
+
+internal class BotMemoryAddEnemyPatch : ModulePatch
 {
-    internal class BotMemoryAddEnemyPatch : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod() => typeof(BotMemoryClass).GetMethod("AddEnemy");
-        [PatchPrefix]
-        public static bool PatchPrefix(IPlayer enemy)
-        {
-            if (enemy == null || (enemy.IsAI && enemy.AIData?.BotOwner?.GetPlayer == null))
-            {
-                return false;
-            }
+	protected override MethodBase GetTargetMethod() => AccessTools.Method(typeof(BotMemoryClass), nameof(BotMemoryClass.AddEnemy));
 
-            return true;
-        }
-    }
+	[PatchPrefix]
+	private static bool PatchPrefix(IPlayer enemy)
+	{
+		if (enemy == null || (enemy.IsAI && enemy.AIData?.BotOwner?.GetPlayer == null))
+		{
+			return false;
+		}
+		return true;
+	}
 }
