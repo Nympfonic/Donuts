@@ -1,18 +1,29 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+[JsonObject]
+public class Folder
 {
-	public class Folder
-	{
-		public string Name { get; set; }
-		public int Weight { get; set; }
-		public bool RandomSelection { get; set; }
-		public BotLimitPresets PMCBotLimitPresets { get; set; }
-		public BotLimitPresets SCAVBotLimitPresets { get; set; }
-		public string RandomScenarioConfig { get; set; }
-		// FIXME
-		//[JsonProperty("presets")]
-		public List<Preset> Presets { get; set; }
-	}
+	[JsonProperty("name")]
+	public string Name { get; set; }
+	
+	[JsonProperty("weight")]
+	public int Weight { get; set; }
+	
+	[JsonProperty("randomSelection")]
+	public bool RandomSelection { get; set; }
+	
+	[JsonProperty("pmcBotLimitPresets")]
+	public BotLimitPresets PMCBotLimitPresets { get; set; }
+	
+	[JsonProperty("scavBotLimitPresets")]
+	public BotLimitPresets SCAVBotLimitPresets { get; set; }
+	
+	[JsonProperty("randomScenarioConfig")]
+	public string RandomScenarioConfig { get; set; }
+	
+	[JsonProperty("presets")]
+	public List<Preset> Presets { get; set; }
 }
