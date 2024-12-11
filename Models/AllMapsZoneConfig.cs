@@ -2,45 +2,49 @@
 using System.Collections.Generic;
 using System.IO;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+[JsonObject]
+public class AllMapsZoneConfig
 {
-	public class AllMapsZoneConfig
+	[JsonProperty("maps")]
+	public Dictionary<string, MapZoneConfig> Maps { get; set; } = [];
+
+	public static AllMapsZoneConfig LoadFromDirectory(string directoryPath)
 	{
-		public Dictionary<string, MapZoneConfig> Maps { get; set; } = [];
+		var allMapsConfig = new AllMapsZoneConfig();
+		string[] files = Directory.GetFiles(directoryPath, "*.json");
 
-		public static AllMapsZoneConfig LoadFromDirectory(string directoryPath)
+		foreach (string file in files)
 		{
-			var allMapsConfig = new AllMapsZoneConfig();
-			var files = Directory.GetFiles(directoryPath, "*.json");
+			string json = File.ReadAllText(file);
+			var mapConfig = JsonConvert.DeserializeObject<MapZoneConfig>(json);
+			if (mapConfig == null) continue;
 
-			foreach (var file in files)
+			InitializeMapConfig(allMapsConfig, mapConfig);
+		}
+		return allMapsConfig;
+	}
+
+	private static void InitializeMapConfig(AllMapsZoneConfig allMapsConfig, MapZoneConfig mapConfig)
+	{
+		string mapName = mapConfig.MapName;
+		if (!allMapsConfig.Maps.ContainsKey(mapName))
+		{
+			allMapsConfig.Maps[mapName] = new MapZoneConfig
 			{
-				var jsonString = File.ReadAllText(file);
-				var mapConfig = JsonConvert.DeserializeObject<MapZoneConfig>(jsonString);
+				MapName = mapName,
+				Zones = []
+			};
+		}
 
-				if (mapConfig == null) continue;
-
-				if (!allMapsConfig.Maps.ContainsKey(mapConfig.MapName))
-				{
-					allMapsConfig.Maps[mapConfig.MapName] = new MapZoneConfig
-					{
-						MapName = mapConfig.MapName,
-						Zones = []
-					};
-				}
-
-				foreach (var zone in mapConfig.Zones)
-				{
-					if (!allMapsConfig.Maps[mapConfig.MapName].Zones.ContainsKey(zone.Key))
-					{
-						allMapsConfig.Maps[mapConfig.MapName].Zones[zone.Key] = [];
-					}
-
-					allMapsConfig.Maps[mapConfig.MapName].Zones[zone.Key].AddRange(zone.Value);
-				}
+		foreach (KeyValuePair<string, List<Position>> zone in mapConfig.Zones)
+		{
+			if (!allMapsConfig.Maps[mapName].Zones.ContainsKey(zone.Key))
+			{
+				allMapsConfig.Maps[mapName].Zones[zone.Key] = [];
 			}
-
-			return allMapsConfig;
+			allMapsConfig.Maps[mapName].Zones[zone.Key].AddRange(zone.Value);
 		}
 	}
 }
