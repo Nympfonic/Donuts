@@ -1,14 +1,16 @@
 ﻿using System.Reflection;
-using SPT.Reflection.Patching;
+using Donuts.Bots;
 using EFT;
+using HarmonyLib;
+using SPT.Reflection.Patching;
 
-namespace Donuts.Patches
+namespace Donuts.Patches;
+
+internal class BotProfilePreparationHook : ModulePatch
 {
-    internal class BotProfilePreparationHook : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod() => typeof(BotsController).GetMethod(nameof(BotsController.AddActivePLayer));
+	protected override MethodBase GetTargetMethod() =>
+		AccessTools.Method(typeof(BotsController), nameof(BotsController.AddActivePLayer));
 
-        [PatchPrefix]
-        public static void PatchPrefix() => DonutsBotPrep.Enable();
-    }
+	[PatchPrefix]
+	private static void PatchPrefix() => DonutsRaidManager.Enable();
 }
