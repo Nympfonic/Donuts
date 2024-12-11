@@ -1,8 +1,13 @@
-﻿namespace Donuts.Models
+﻿using Newtonsoft.Json;
+
+namespace Donuts.Models;
+
+[JsonObject]
+public class MapBotConfig
 {
-	public class MapBotConfig
-	{
-		public BotConfig PMC { get; set; }
-		public BotConfig SCAV { get; set; }
-	}
+	[JsonProperty("PMC")]
+	public BotConfig Pmc { get; set; }
+	
+	[JsonProperty("SCAV")]
+	public BotConfig Scav { get; set; }
 }
