@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+[JsonObject]
+public class StartingBotConfig
 {
-	public class StartingBotConfig
-	{
-		public Dictionary<string, MapBotConfig> Maps { get; set; }
-	}
+	[JsonProperty("maps")]
+	public Dictionary<string, MapBotConfig> Maps { get; set; }
 }
