@@ -1,55 +1,54 @@
 ﻿using UnityEngine;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+public class HotspotTimer(Entry hotspot)
 {
-	public class HotspotTimer(Entry hotspot)
+	private float _timer = 0f;
+	private float _cooldownTimer = 0f;
+
+	public Entry Hotspot => hotspot;
+	public bool OnCooldown { get; private set; } = false;
+	public int TimesSpawned { get; private set; } = 0;
+
+	public void UpdateTimer()
 	{
-		private float timer = 0f;
-		private float cooldownTimer = 0f;
-
-		public Entry Hotspot => hotspot;
-		public bool OnCooldown { get; private set; } = false;
-		public int TimesSpawned { get; private set; } = 0;
-
-		public void UpdateTimer()
+		_timer += Time.deltaTime;
+		if (OnCooldown)
 		{
-			timer += Time.deltaTime;
-			if (OnCooldown)
+			_cooldownTimer += Time.deltaTime;
+			if (_cooldownTimer >= DefaultPluginVars.coolDownTimer.Value)
 			{
-				cooldownTimer += Time.deltaTime;
-				if (cooldownTimer >= DefaultPluginVars.coolDownTimer.Value)
-				{
-					OnCooldown = false;
-					cooldownTimer = 0f;
-					TimesSpawned = 0;
-				}
+				OnCooldown = false;
+				_cooldownTimer = 0f;
+				TimesSpawned = 0;
 			}
 		}
+	}
 
-		public float GetTimer() => timer;
+	public float GetTimer() => _timer;
 
-		public bool ShouldSpawn()
+	public bool ShouldSpawn()
+	{
+		if (OnCooldown)
 		{
-			if (OnCooldown)
-			{
-				return false;
-			}
-
-			if (hotspot.IgnoreTimerFirstSpawn)
-			{
-				hotspot.IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
-				return true;
-			}
-
-			return timer >= hotspot.BotTimerTrigger;
+			return false;
 		}
 
-		public void ResetTimer() => timer = 0f;
-
-		public void TriggerCooldown()
+		if (hotspot.IgnoreTimerFirstSpawn)
 		{
-			OnCooldown = true;
-			cooldownTimer = 0f;
+			hotspot.IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
+			return true;
 		}
+
+		return _timer >= hotspot.BotTimerTrigger;
+	}
+
+	public void ResetTimer() => _timer = 0f;
+
+	public void TriggerCooldown()
+	{
+		OnCooldown = true;
+		_cooldownTimer = 0f;
 	}
 }
