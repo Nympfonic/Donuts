@@ -1,52 +1,47 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using Donuts;
+﻿using EFT;
 using HarmonyLib;
 using SPT.Reflection.Patching;
+using System;
+using System.Reflection;
 
-namespace dvize.Donuts.Patches
+namespace Donuts.Patches;
+
+internal class PlayerFireControlPatchGetter : ModulePatch
 {
-    internal class PlayerFireControlPatchGetter : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
-            var playerType = typeof(EFT.Player.FirearmController);
-            return AccessTools.PropertyGetter(playerType, "IsTriggerPressed");
-        }
+	protected override MethodBase GetTargetMethod()
+	{
+		Type playerType = typeof(Player.FirearmController);
+		return AccessTools.PropertyGetter(playerType, nameof(Player.FirearmController.IsTriggerPressed));
+	}
 
-        [PatchPrefix]
-        public static bool PrefixGet(ref bool __result)
-        {
-            if (DefaultPluginVars.showGUI)
-            {
-                __result = false;
-                return false;
-            }
-            return true; // Continue with the original getter
-        }
-    }
+	[PatchPrefix]
+	private static bool PatchPrefix(ref bool __result)
+	{
+		if (DefaultPluginVars.ShowGUI)
+		{
+			__result = false;
+			return false;
+		}
+		return true; // Continue with the original getter
+	}
+}
 
-    internal class PlayerFireControlPatchSetter : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
-            var playerType = typeof(EFT.Player.FirearmController);
-            return AccessTools.PropertySetter(playerType, "IsTriggerPressed");
-        }
+internal class PlayerFireControlPatchSetter : ModulePatch
+{
+	protected override MethodBase GetTargetMethod()
+	{
+		Type playerType = typeof(Player.FirearmController);
+		return AccessTools.PropertySetter(playerType, nameof(Player.FirearmController.IsTriggerPressed));
+	}
 
-        [PatchPrefix]
-        public static bool PrefixSet(ref bool value)
-        {
-            if (DefaultPluginVars.showGUI)
-            {
-                value = false;
-                return false;
-            }
-            return true; // Continue with the original setter
-        }
-    }
+	[PatchPrefix]
+	private static bool PatchPrefix(ref bool value)
+	{
+		if (DefaultPluginVars.ShowGUI)
+		{
+			value = false;
+			return false;
+		}
+		return true; // Continue with the original setter
+	}
 }
