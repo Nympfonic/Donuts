@@ -1,8 +1,13 @@
-﻿namespace Donuts.Models
+﻿using Newtonsoft.Json;
+
+namespace Donuts.Models;
+
+[JsonObject]
+public class Preset
 {
-	public class Preset
-	{
-		public string Name { get; set; }
-		public int Weight { get; set; }
-	}
+	[JsonProperty("name")]
+	public string Name { get; set; }
+	
+	[JsonProperty("weight")]
+	public int Weight { get; set; }
 }
