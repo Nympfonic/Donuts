@@ -1,13 +1,23 @@
+using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+[JsonObject]
+public class BotConfig
 {
-	public class BotConfig
-	{
-		public int MinCount { get; set; }
-		public int MaxCount { get; set; }
-		public int MinGroupSize { get; set; }
-		public int MaxGroupSize { get; set; }
-		public List<string> Zones { get; set; }
-	}
+	[JsonProperty("minCount")]
+	public int MinCount { get; set; }
+	
+	[JsonProperty("maxCount")]
+	public int MaxCount { get; set; }
+	
+	[JsonProperty("minGroupSize")]
+	public int MinGroupSize { get; set; }
+	
+	[JsonProperty("maxGroupSize")]
+	public int MaxGroupSize { get; set; }
+	
+	[JsonProperty("zones")]
+	public List<string> Zones { get; set; }
 }
