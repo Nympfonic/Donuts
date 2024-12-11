@@ -1,10 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+[JsonObject]
+public class MapBotWaves
 {
-	public class MapBotWaves
-	{
-		public List<BotWave> PMC { get; set; }
-		public List<BotWave> SCAV { get; set; }
-	}
+	[JsonProperty("PMC")]
+	public List<BotWave> Pmc { get; set; }
+	
+	[JsonProperty("SCAV")]
+	public List<BotWave> Scav { get; set; }
 }

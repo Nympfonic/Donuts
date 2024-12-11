@@ -16,8 +16,8 @@ public class BotWavesConfig
 	{
 		foreach (MapBotWaves map in Maps.Values)
 		{
-			map.SCAV = EnsureUniqueGroupNums(map.SCAV);
-			map.PMC = EnsureUniqueGroupNums(map.PMC);
+			map.Scav = EnsureUniqueGroupNums(map.Scav);
+			map.Pmc = EnsureUniqueGroupNums(map.Pmc);
 		}
 	}
 	
