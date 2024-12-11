@@ -10,30 +10,30 @@ public class DisablePatchAttribute : Attribute;
 
 public static class ModulePatchManager
 {
-	private static readonly Dictionary<Type, ModulePatch> _patches = [];
+	private static readonly List<ModulePatch> _patches = [];
 
 	static ModulePatchManager()
 	{
-		IEnumerable<Type> patchTypes = Assembly.GetExecutingAssembly().GetTypes();
-		foreach (Type patch in patchTypes)
+		IEnumerable<Type> currentAssemblyTypes = Assembly.GetExecutingAssembly().GetTypes();
+		foreach (Type type in currentAssemblyTypes)
 		{
-			if (patch.BaseType == typeof(ModulePatch) &&
-				patch.GetCustomAttribute(typeof(DisablePatchAttribute)) == null)
+			if (type.BaseType == typeof(ModulePatch) &&
+				type.GetCustomAttribute(typeof(DisablePatchAttribute)) == null)
 			{
-				_patches[patch] = (ModulePatch)Activator.CreateInstance(patch);
+				_patches.Add((ModulePatch)Activator.CreateInstance(type));
 			}
 		}
 	}
 	
 	public static void EnablePatches()
 	{
-		foreach (ModulePatch patch in _patches.Values)
+		foreach (ModulePatch patch in _patches)
 			patch.Enable();
 	}
 
 	public static void DisablePatches()
 	{
-		foreach (ModulePatch patch in _patches.Values)
+		foreach (ModulePatch patch in _patches)
 			patch.Disable();
 	}
 }
