@@ -1,10 +1,14 @@
+using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+[JsonObject]
+public class MapZoneConfig
 {
-	public class MapZoneConfig
-	{
-		public string MapName { get; set; }
-		public Dictionary<string, List<Position>> Zones { get; set; }
-	}
+	[JsonProperty("mapName")]
+	public string MapName { get; set; }
+	
+	[JsonProperty("zones")]
+	public Dictionary<string, List<Position>> Zones { get; set; }
 }
