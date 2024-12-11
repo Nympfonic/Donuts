@@ -1,16 +1,15 @@
-using System.Collections.Generic;
 using EFT;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Donuts.Models;
 
-public class BotSpawnInfo(WildSpawnType botType, int groupSize, List<Vector3> coordinates,
-	BotDifficulty difficulty, EPlayerSide faction, string zone)
+public class BotSpawnInfo(PrepBotInfo botInfo, string zone, List<Vector3> spawnPoints)
 {
-	public WildSpawnType BotType { get; set; } = botType;
-	public int GroupSize { get; set; } = groupSize;
-	public List<Vector3> Coordinates { get; set; } = coordinates;
-	public BotDifficulty Difficulty { get; set; } = difficulty;
-	public EPlayerSide Faction { get; set; } = faction;
-	public string Zone { get; set; } = zone;
+	public WildSpawnType BotType { get; } = botInfo.SpawnType;
+	public int GroupSize { get; } = botInfo.GroupSize;
+	public List<Vector3> Coordinates { get; } = spawnPoints;
+	public BotDifficulty Difficulty { get; } = botInfo.Difficulty;
+	public EPlayerSide Faction { get; } = botInfo.Side;
+	public string Zone { get; } = zone;
 }
