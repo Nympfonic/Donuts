@@ -52,13 +52,11 @@ internal class MainSettingsGeneralPage : ISettingsPage
 		if (_scenariosLoaded)
 		{
 			_pmcScenarioSelectionIndex = Dropdown(pmcScenarioSelection, _pmcScenarioSelectionIndex);
-			pmcScenarioSelection.Value =
-				pmcScenarioSelection.Options[_pmcScenarioSelectionIndex];
+			pmcScenarioSelection.Value = pmcScenarioSelection.Options[_pmcScenarioSelectionIndex];
 			GUILayout.Space(10);
 
 			_scavScenarioSelectionIndex = Dropdown(scavScenarioSelection, _scavScenarioSelectionIndex);
-			scavScenarioSelection.Value =
-				scavScenarioSelection.Options[_scavScenarioSelectionIndex];
+			scavScenarioSelection.Value = scavScenarioSelection.Options[_scavScenarioSelectionIndex];
 		}
 		else
 		{
@@ -83,6 +81,7 @@ internal class MainSettingsGeneralPage : ISettingsPage
 				_pmcScenarioSelectionIndex = 0;
 			}
 		}
+		else _pmcScenarioSelectionIndex = 0;
 
 		if (HaveScavScenarioSelectionOptions())
 		{
@@ -95,6 +94,7 @@ internal class MainSettingsGeneralPage : ISettingsPage
 				_scavScenarioSelectionIndex = 0;
 			}
 		}
+		else _scavScenarioSelectionIndex = 0;
 
 		_scenariosLoaded = HavePmcScenarioSelectionOptions() && HaveScavScenarioSelectionOptions();
 #if DEBUG
@@ -102,6 +102,6 @@ internal class MainSettingsGeneralPage : ISettingsPage
 #endif
 	}
 
-	private static bool HavePmcScenarioSelectionOptions() => pmcScenarioSelection.Options?.Length > 0;
-	private static bool HaveScavScenarioSelectionOptions() => scavScenarioSelection.Options?.Length > 0;
+	private static bool HavePmcScenarioSelectionOptions() => pmcScenarioSelection?.Options?.Length > 0;
+	private static bool HaveScavScenarioSelectionOptions() => scavScenarioSelection?.Options?.Length > 0;
 }
