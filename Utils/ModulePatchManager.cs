@@ -36,4 +36,28 @@ public static class ModulePatchManager
 		foreach (ModulePatch patch in _patches)
 			patch.Disable();
 	}
+
+	public static void EnablePatch<T>() where T : ModulePatch
+	{
+		foreach (ModulePatch patch in _patches)
+		{
+			if (_patches.GetType() == typeof(T))
+			{
+				patch.Enable();
+				return;
+			}
+		}
+	}
+
+	public static void DisablePatch<T>() where T : ModulePatch
+	{
+		foreach (ModulePatch patch in _patches)
+		{
+			if (_patches.GetType() == typeof(T))
+			{
+				patch.Disable();
+				return;
+			}
+		}
+	}
 }
