@@ -8,7 +8,7 @@ using System.Reflection;
 namespace Donuts.Patches;
 
 [UsedImplicitly]
-internal class BotProfilePreparationHook : ModulePatch
+internal class EnableRaidManagerPatch : ModulePatch
 {
 	protected override MethodBase GetTargetMethod() =>
 		AccessTools.Method(typeof(BotsController), nameof(BotsController.AddActivePLayer));

@@ -12,7 +12,7 @@ namespace Donuts.Patches;
 /// Re-initializes each new game
 /// </summary>
 [UsedImplicitly]
-internal class GameWorldOnGameStartedPatch : ModulePatch
+internal class StartSpawningRaidManagerPatch : ModulePatch
 {
 	protected override MethodBase GetTargetMethod() => AccessTools.Method(typeof(GameWorld), nameof(GameWorld.OnGameStarted));
 
