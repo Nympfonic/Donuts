@@ -13,7 +13,8 @@ public class PluginGUIComponent : MonoBehaviour
 	//private bool _stylesInitialized = false;
 
 	private ISettingsPage _settingsPage;
-	
+	private static bool _stylesInitialized;
+
 	// InitializeStyles static properties
 	internal static GUIStyle WindowStyle { get; private set; }
 	internal static GUIStyle LabelStyle { get; private set; }
@@ -32,13 +33,17 @@ public class PluginGUIComponent : MonoBehaviour
 
 	private void Awake()
 	{
-		InitializeStyles();
-
 		_settingsPage = new DonutsSettingsPage();
 	}
 
 	private void OnGUI()
 	{
+		if (!_stylesInitialized)
+		{
+			InitializeStyles();
+			_stylesInitialized = true;
+		}
+		
 		if (!DefaultPluginVars.ShowGUI)
 		{
 			return;
