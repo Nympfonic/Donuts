@@ -1,6 +1,7 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
 using Cysharp.Threading.Tasks;
+using Donuts.Patches;
 using Donuts.Tools;
 using Donuts.Utils;
 using EFT;
@@ -108,6 +109,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		IsBotPreparationComplete = false;
 		base.Awake();
 		
+		ModulePatchManager.EnablePatch<StartSpawningRaidManagerPatch>();
+		
 		// TODO: In future release, make services for Bosses, special bots, and event bots. SWAG will become obsolete.
 
 		_gameWorld = Singleton<GameWorld>.Instance;
@@ -144,7 +147,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		//InitializeBotLimits(selectionName, _mapLocation);
 
-		await CreateServices();
+		if (!await TryCreateDataServices(DefaultPluginVars.forceAllBotType.Value))
+		{
+			ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
+		}
 
 		IsBotPreparationComplete = true;
 	}
