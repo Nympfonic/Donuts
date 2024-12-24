@@ -1,29 +1,31 @@
-﻿using System.Collections.Generic;
-using System.Reflection;
-using SPT.Reflection.Patching;
-using EFT;
+﻿using EFT;
 using HarmonyLib;
-using UnityEngine;
+using JetBrains.Annotations;
+using SPT.Reflection.Patching;
+using System.Collections.Generic;
+using System.Reflection;
 
-namespace Donuts.Patches
+namespace Donuts.Patches;
+
+[UsedImplicitly]
+internal class CoverPointMasterNullRef : ModulePatch
 {
-    internal class CoverPointMasterNullRef : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
+	private static readonly List<CustomNavigationPoint> _emptyNavPoints = [];
+	
+	protected override MethodBase GetTargetMethod()
+	{
+		return AccessTools.Method(typeof(CoverPointMaster), nameof(CoverPointMaster.GetClosePoints));
+	}
 
-            return AccessTools.Method(typeof(CoverPointMaster), nameof(CoverPointMaster.GetClosePoints));
-        }
+	[PatchPrefix]
+	private static bool PatchPrefix(BotOwner bot, ref List<CustomNavigationPoint> __result)
+	{
+		if (bot == null || bot.Covers == null)
+		{
+			__result = _emptyNavPoints; // Return an empty list or handle as needed
+			return false;
+		}
 
-        [PatchPrefix]
-        public static bool Prefix(Vector3 pos, BotOwner bot, float dist, ref List<CustomNavigationPoint> __result)
-        {
-            if (bot == null || bot.Covers == null)
-            {
-                __result = new List<CustomNavigationPoint>(); // Return an empty list or handle as needed
-                return false;
-            }
-            return true; 
-        }
-    }
+		return true;
+	}
 }

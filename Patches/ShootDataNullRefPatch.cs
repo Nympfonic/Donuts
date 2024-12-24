@@ -1,42 +1,38 @@
-﻿using System.Reflection;
-using SPT.Reflection.Patching;
-using EFT;
+﻿using EFT;
 using HarmonyLib;
-using UnityEngine;
+using JetBrains.Annotations;
+using SPT.Reflection.Patching;
+using System.Reflection;
 
-namespace Donuts.Patches
+namespace Donuts.Patches;
+
+[UsedImplicitly]
+internal class ShootDataNullRefPatch : ModulePatch
 {
-    internal class ShootDataNullRefPatch : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
+	protected override MethodBase GetTargetMethod() => AccessTools.Method(typeof(ShootData), nameof(ShootData.method_0));
 
-            return AccessTools.Method(typeof(ShootData), nameof(ShootData.method_0));
-        }
+	[PatchPrefix]
+	private static bool PatchPrefix(ShootData __instance, BotOwner ____owner)
+	{
+		// Check for null references in necessary fields
+		if (____owner == null)
+		{
+#if DEBUG
+			DonutsPlugin.Logger.LogError(string.Format("BotOwner ID {0} -> ShootData.method_0(): _owner is null.",
+				____owner.Id.ToString()));
+#endif
+			return false;
+		}
 
-        [PatchPrefix]
-        private static bool Prefix(ShootData __instance, BotOwner ____owner)
-        {
-            // Check for null references in necessary fields
-            if (____owner == null)
-            {
-                Debug.LogError("ShootData.method_0(): _owner is null.");
-                return false;
-            }
+		if (____owner.WeaponRoot == null)
+		{
+#if DEBUG
+			DonutsPlugin.Logger.LogError(string.Format(
+				"BotOwner ID {0} -> ShootData.method_0(): _owner.WeaponRoot is null.", ____owner.Id.ToString()));
+#endif
+			return false;
+		}
 
-            if (____owner.WeaponRoot == null)
-            {
-                Debug.LogError("ShootData.method_0(): _owner.WeaponRoot is null.");
-                return false;
-            }
-
-            if (____owner.Position == null)
-            {
-                Debug.LogError("ShootData.method_0(): _owner.Position is null.");
-                return false;
-            }
-
-            return true;
-        }
-    }
+		return true;
+	}
 }

@@ -16,10 +16,10 @@ public class Folder
 	public bool RandomSelection { get; set; }
 	
 	[JsonProperty("pmcBotLimitPresets")]
-	public BotLimitPresets PMCBotLimitPresets { get; set; }
+	public BotLimitPresets PmcBotLimitPresets { get; set; }
 	
 	[JsonProperty("scavBotLimitPresets")]
-	public BotLimitPresets SCAVBotLimitPresets { get; set; }
+	public BotLimitPresets ScavBotLimitPresets { get; set; }
 	
 	[JsonProperty("randomScenarioConfig")]
 	public string RandomScenarioConfig { get; set; }

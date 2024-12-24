@@ -17,9 +17,9 @@ public class Position
 	[JsonProperty("z")]
 	public float z { get; set; }
 
-	public Vector3 ToVector3()
+	public static implicit operator Vector3(Position p)
 	{
-		_internalVector.Set(x, y, z);
-		return _internalVector;
+		p._internalVector.Set(p.x, p.y, p.z);
+		return p._internalVector;
 	}
 }

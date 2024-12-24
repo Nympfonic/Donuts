@@ -1,233 +1,235 @@
-﻿using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using BepInEx.Logging;
-using EFT;
-using EFT.Communications;
-using Newtonsoft.Json;
-using UnityEngine;
-using Donuts.Models;
+﻿using BepInEx.Logging;
+using Comfort.Common;
 using Cysharp.Threading.Tasks;
+using Donuts.Bots;
+using Donuts.Models;
+using Donuts.Utils;
+using EFT;
+using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using UnityEngine;
 using static Donuts.DefaultPluginVars;
 
-#pragma warning disable IDE0007, IDE0044
+namespace Donuts.Tools;
 
-namespace Donuts
+internal static class EditorFunctions
 {
-    internal class EditorFunctions
-    {
-        internal static ManualLogSource Logger
-        {
-            get; private set;
-        }
+	private static readonly ManualLogSource _logger;
+	
+	internal static FightLocations FightLocations { get; } = new()
+	{
+		Locations = []
+	};
+	internal static FightLocations SessionLocations { get; } = new()
+	{
+		Locations = []
+	};
+	
+	private static readonly Dictionary<int, List<HotspotTimer>> _groupedHotspotTimers = [];
 
-        public EditorFunctions()
-        {
-            Logger ??= BepInEx.Logging.Logger.CreateLogSource(nameof(EditorFunctions));
-        }
+	static EditorFunctions()
+	{
+		_logger = BepInEx.Logging.Logger.CreateLogSource(nameof(EditorFunctions));
+	}
 
-        internal static void DeleteSpawnMarker()
-        {
-            // Check if any of the required objects are null
-            if (Donuts.DonutComponent.gameWorld == null)
-            {
-                Logger.LogDebug("IBotGame Not Instantiated or gameWorld is null.");
-                return;
-            }
+	internal static void Dispose()
+	{
+		_groupedHotspotTimers.Clear();
+	}
 
-            //need to be able to see it to delete it
-            if (DebugGizmos.Value)
-            {
-                //temporarily combine fightLocations and sessionLocations so i can find the closest entry
-                var combinedLocations = Donuts.DonutComponent.fightLocations.Locations.Concat(Donuts.DonutComponent.sessionLocations.Locations).ToList();
+	internal static void DeleteSpawnMarker()
+	{
+		if (!Singleton<GameWorld>.Instantiated) return;
+			
+		GameWorld gameWorld = Singleton<GameWorld>.Instance;
 
-                // if for some reason its empty already return
-                if (combinedLocations.Count == 0)
-                {
-                    return;
-                }
+		// Need to be able to see it to delete it
+		if (!DebugGizmos.Value) return;
+		// Temporarily combine fightLocations and sessionLocations to find the closest entry
+		List<Entry> combinedLocations = [
+			..FightLocations.Locations,
+			..SessionLocations.Locations
+		];
 
-                // Get the closest spawn marker to the player
-                var closestEntry = combinedLocations.OrderBy(x => Vector3.Distance(Donuts.DonutComponent.gameWorld.MainPlayer.Position, new Vector3(x.Position.x, x.Position.y, x.Position.z))).FirstOrDefault();
+		// If for some reason its empty already then return
+		if (combinedLocations.Count == 0) return;
 
-                // Check if the closest entry is null
-                if (closestEntry == null)
-                {
-                    var displayMessageNotificationMethod = Gizmos.GetDisplayMessageNotificationMethod();
-                    if (displayMessageNotificationMethod != null)
-                    {
-                        var txt = $"Donuts: The Spawn Marker could not be deleted because closest entry could not be found";
-                        displayMessageNotificationMethod.Invoke(null, new object[] { txt, ENotificationDurationType.Long, ENotificationIconType.Default, Color.grey });
-                    }
-                    return;
-                }
+		(var closestSqrMagnitude, Entry closestEntry) = (float.MaxValue, null);
+		foreach (Entry entry in combinedLocations)
+		{
+			float sqrMagnitude = (entry.Position - ((IPlayer)gameWorld.MainPlayer).Position).sqrMagnitude;
+			if (sqrMagnitude < closestSqrMagnitude)
+			{
+				closestSqrMagnitude = sqrMagnitude;
+				closestEntry = entry;
+			}
+		}
 
-                // Remove the entry from the list if the distance from the player is less than 5m
-                if (Vector3.Distance(Donuts.DonutComponent.gameWorld.MainPlayer.Position, new Vector3(closestEntry.Position.x, closestEntry.Position.y, closestEntry.Position.z)) < 5f)
-                {
-                    // check which list the entry is in and remove it from that list
-                    if (Donuts.DonutComponent.fightLocations.Locations.Count > 0 &&
-                        Donuts.DonutComponent.fightLocations.Locations.Contains(closestEntry))
-                    {
-                        Donuts.DonutComponent.fightLocations.Locations.Remove(closestEntry);
-                    }
-                    else if (Donuts.DonutComponent.sessionLocations.Locations.Count > 0 &&
-                        Donuts.DonutComponent.sessionLocations.Locations.Contains(closestEntry))
-                    {
-                        Donuts.DonutComponent.sessionLocations.Locations.Remove(closestEntry);
-                    }
+		// Check if the closest entry is null
+		if (closestEntry == null)
+		{
+			const string closestEntryNullMsg = "Donuts: The Spawn Marker could not be deleted because closest entry could not be found";
+			DonutsHelper.DisplayNotification(closestEntryNullMsg, Color.gray);
+			return;
+		}
 
-                    // Remove the timer if it exists from the list of hotspotTimer in DonutComponent.groupedHotspotTimers[closestEntry.GroupNum]
-                    if (Donuts.DonutComponent.groupedHotspotTimers.ContainsKey(closestEntry.GroupNum))
-                    {
-                        var timerList = Donuts.DonutComponent.groupedHotspotTimers[closestEntry.GroupNum];
-                        var timer = timerList.FirstOrDefault(x => x.Hotspot == closestEntry);
+		if ((closestEntry.Position - ((IPlayer)gameWorld.MainPlayer).Position).sqrMagnitude > 25f)
+			return;
+			
+		// Remove the entry from the list if the distance from the player is less than 5m
+		// Check which list the entry is in and remove it from that list
+		if (FightLocations.Locations.Count > 0 &&
+		    FightLocations.Locations.Contains(closestEntry))
+		{
+			FightLocations.Locations.Remove(closestEntry);
+		}
+		else if (SessionLocations.Locations.Count > 0 &&
+		         SessionLocations.Locations.Contains(closestEntry))
+		{
+			SessionLocations.Locations.Remove(closestEntry);
+		}
 
-                        if (timer != null)
-                        {
-                            timerList.Remove(timer);
-                        }
-                        else
-                        {
-                            // Handle the case where no timer was found
-                            Logger.LogDebug("Donuts: No matching timer found to delete.");
-                        }
-                    }
-                    else
-                    {
-                        Logger.LogDebug("Donuts: GroupNum does not exist in groupedHotspotTimers.");
-                    }
+		// Remove the timer if it exists from the list of hotspotTimer in
+		// DonutComponent.groupedHotspotTimers[closestEntry.GroupNum]
+		if (!_groupedHotspotTimers.TryGetValue(closestEntry.GroupNum, out List<HotspotTimer> timerList))
+		{
+			_logger.LogDebug("GroupNum does not exist in groupedHotspotTimers.");
+		}
+		else
+		{
+			HotspotTimer timer = null;
+			foreach (HotspotTimer t in timerList)
+			{
+				if (t.Hotspot == closestEntry)
+				{
+					timer = t;
+					break;
+				}
+			}
 
-                    // Display a message to the player
-                    var displayMessageNotificationMethod = Gizmos.GetDisplayMessageNotificationMethod();
-                    if (displayMessageNotificationMethod != null)
-                    {
-                        var txt = $"Donuts: Spawn Marker Deleted for \n {closestEntry.Name}\n SpawnType: {closestEntry.WildSpawnType}\n Position: {closestEntry.Position.x}, {closestEntry.Position.y}, {closestEntry.Position.z}";
-                        displayMessageNotificationMethod.Invoke(null, new object[] { txt, ENotificationDurationType.Long, ENotificationIconType.Default, Color.yellow });
-                    }
+			if (timer != null)
+			{
+				timerList.Remove(timer);
+			}
+			else
+			{
+				// Handle the case where no timer was found
+				_logger.LogDebug("No matching timer found to delete.");
+			}
+		}
 
-                    // Edit the DonutComponent.drawnCoordinates and gizmoSpheres list to remove the objects
-                    var coordinate = new Vector3(closestEntry.Position.x, closestEntry.Position.y, closestEntry.Position.z);
-                    if (Gizmos.gizmoMarkers.TryRemove(coordinate, out var sphere))
-                    {
-                        GameWorld.Destroy(sphere);
-                    }
-                }
-            }
-        }
+		// Display a message to the player
+		string spawnMarkerDeletedMsg =
+			string.Format("Spawn Marker Deleted for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", closestEntry.Name,
+				closestEntry.WildSpawnType, closestEntry.Position.x.ToString(CultureInfo.InvariantCulture),
+				closestEntry.Position.y.ToString(CultureInfo.InvariantCulture),
+				closestEntry.Position.z.ToString(CultureInfo.InvariantCulture));
+		DonutsHelper.DisplayNotification(spawnMarkerDeletedMsg, Color.yellow);
 
-        internal static void CreateSpawnMarker()
-        {
-            // Check if any of the required objects are null
-            if (DonutComponent.gameWorld == null)
-            {
-                Logger.LogDebug("IBotGame Not Instantiated or gameWorld is null.");
-                return;
-            }
+		// Edit the DonutComponent.drawnCoordinates and gizmoSpheres list to remove the objects
+		if (DonutsGizmos.GizmoMarkers.TryRemove(closestEntry.Position, out GameObject sphere))
+		{
+			Object.Destroy(sphere);
+		}
+	}
 
-            // Create new Donuts.Entry
-            Entry newEntry = new Entry
-            {
-                Name = spawnName.Value,
-                GroupNum = groupNum.Value,
-                MapName = DonutsBotPrep.maplocation,
-                WildSpawnType = wildSpawns.Value,
-                MinDistance = minSpawnDist.Value,
-                MaxDistance = maxSpawnDist.Value,
-                MaxRandomNumBots = maxRandNumBots.Value,
-                SpawnChance = spawnChance.Value,
-                BotTimerTrigger = botTimerTrigger.Value,
-                BotTriggerDistance = botTriggerDistance.Value,
-                Position = new Position
-                {
-                    x = DonutComponent.gameWorld.MainPlayer.Position.x,
-                    y = DonutComponent.gameWorld.MainPlayer.Position.y,
-                    z = DonutComponent.gameWorld.MainPlayer.Position.z
-                },
+	internal static void CreateSpawnMarker()
+	{
+		// Check if any of the required objects are null
+		if (!Singleton<GameWorld>.Instantiated)
+		{
+			_logger.LogDebug("IBotGame Not Instantiated or gameWorld is null.");
+			return;
+		}
+			
+		GameWorld gameWorld = Singleton<GameWorld>.Instance;
+		IPlayer mainPlayer = gameWorld.MainPlayer;
 
-                MaxSpawnsBeforeCoolDown = maxSpawnsBeforeCooldown.Value,
-                IgnoreTimerFirstSpawn = ignoreTimerFirstSpawn.Value,
-                MinSpawnDistanceFromPlayer = minSpawnDistanceFromPlayer.Value
-            };
+		// Create new Donuts.Entry
+		Entry newEntry = new()
+		{
+			Name = spawnName.Value,
+			GroupNum = groupNum.Value,
+			MapName = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+			WildSpawnType = wildSpawns.Value,
+			MinDistance = minSpawnDist.Value,
+			MaxDistance = maxSpawnDist.Value,
+			MaxRandomNumBots = maxRandNumBots.Value,
+			SpawnChance = spawnChance.Value,
+			BotTimerTrigger = botTimerTrigger.Value,
+			BotTriggerDistance = botTriggerDistance.Value,
+			Position = new Position
+			{
+				x = mainPlayer.Position.x,
+				y = mainPlayer.Position.y,
+				z = mainPlayer.Position.z
+			},
+			MaxSpawnsBeforeCoolDown = maxSpawnsBeforeCooldown.Value,
+			IgnoreTimerFirstSpawn = ignoreTimerFirstSpawn.Value,
+			MinSpawnDistanceFromPlayer = minSpawnDistanceFromPlayer.Value
+		};
 
-            // Add new entry to sessionLocations.Locations list since we adding new ones
+		// Add new entry to sessionLocations.Locations list since we're adding new ones
+		SessionLocations.Locations.Add(newEntry);
 
-            // Check if Locations is null
-            DonutComponent.sessionLocations.Locations ??= new List<Entry>();
+		// Make it testable immediately by adding the timer needed to the groupnum in DonutComponent.groupedHotspotTimers
+		if (!_groupedHotspotTimers.ContainsKey(newEntry.GroupNum))
+		{
+			// Create a new list for the groupnum and add the timer to it
+			_groupedHotspotTimers.Add(newEntry.GroupNum, []);
+		}
 
-            DonutComponent.sessionLocations.Locations.Add(newEntry);
+		// Create a new timer for the entry and add it to the list
+		var timer = new HotspotTimer(newEntry);
+		_groupedHotspotTimers[newEntry.GroupNum].Add(timer);
 
-            // make it testable immediately by adding the timer needed to the groupnum in DonutComponent.groupedHotspotTimers
-            if (!DonutComponent.groupedHotspotTimers.ContainsKey(newEntry.GroupNum))
-            {
-                //create a new list for the groupnum and add the timer to it
-                DonutComponent.groupedHotspotTimers.Add(newEntry.GroupNum, new List<HotspotTimer>());
-            }
+		string msg = string.Format("Donuts: Wrote Entry for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", newEntry.Name,
+			newEntry.WildSpawnType, newEntry.Position.x.ToString(CultureInfo.InvariantCulture),
+			newEntry.Position.y.ToString(CultureInfo.InvariantCulture),
+			newEntry.Position.z.ToString(CultureInfo.InvariantCulture));
+		DonutsHelper.DisplayNotification(msg, Color.yellow);
+	}
 
-            //create a new timer for the entry and add it to the list
-            var timer = new HotspotTimer(newEntry);
-            DonutComponent.groupedHotspotTimers[newEntry.GroupNum].Add(timer);
+	internal static async UniTask WriteToJsonFileAsync(string directoryPath)
+	{
+		if (!Singleton<GameWorld>.Instantiated) return;
 
-            var txt = $"Donuts: Wrote Entry for {newEntry.Name}\n SpawnType: {newEntry.WildSpawnType}\n Position: {newEntry.Position.x}, {newEntry.Position.y}, {newEntry.Position.z}";
-            var displayMessageNotificationMethod = Gizmos.GetDisplayMessageNotificationMethod();
-            if (displayMessageNotificationMethod != null)
-            {
-                displayMessageNotificationMethod.Invoke(null, new object[] { txt, ENotificationDurationType.Long, ENotificationIconType.Default, Color.yellow });
-            }
-        }
+		string json;
+		string fileName;
+		// Check if saveNewFileOnly is true then we use the sessionLocations object to serialize, otherwise we use combinedLocations
+		if (saveNewFileOnly.Value)
+		{
+			// Take the sessionLocations object only and serialize it to json
+			json = JsonConvert.SerializeObject(SessionLocations, Formatting.Indented);
+			fileName = string.Format("{0}_{1}_NewLocOnly.json",
+				Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+				Random.Range(0, 1000).ToString());
+		}
+		else
+		{
+			// Combine the fightLocations and sessionLocations objects into one variable
+			FightLocations combinedLocations = new()
+			{
+				Locations = [..FightLocations.Locations, ..SessionLocations.Locations]
+			};
 
-        internal static async UniTask WriteToJsonFile()
-        {
-            // Check if any of the required objects are null
-            if (Donuts.DonutComponent.gameWorld == null)
-            {
-                Logger.LogDebug("IBotGame Not Instantiated or gameWorld is null.");
-                return;
-            }
+			json = JsonConvert.SerializeObject(combinedLocations, Formatting.Indented);
+			fileName = string.Format("{0}_{1}_All.json",
+				Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+				Random.Range(0, 1000).ToString());
+		}
 
-            string dllPath = Assembly.GetExecutingAssembly().Location;
-            string directoryPath = Path.GetDirectoryName(dllPath);
-            string jsonFolderPath = Path.Combine(directoryPath, "patterns");
-            string json = string.Empty;
-            string fileName = string.Empty;
+		// Write json to file with filename == Donuts.DonutComponent.mapLocation + random number
+		await UniTask.SwitchToTaskPool();
+		string jsonFilePath = Path.Combine(directoryPath, "patterns", fileName);
+		using (var writer = new StreamWriter(jsonFilePath, false))
+		{
+			await writer.WriteAsync(json);
+		}
+		await UniTask.SwitchToMainThread();
 
-            //check if saveNewFileOnly is true then we use the sessionLocations object to serialize.  Otherwise we use combinedLocations
-            if (saveNewFileOnly.Value)
-            {
-                // take the sessionLocations object only and serialize it to json
-                json = JsonConvert.SerializeObject(Donuts.DonutComponent.sessionLocations, Formatting.Indented);
-                fileName = DonutsBotPrep.maplocation + "_" + UnityEngine.Random.Range(0, 1000) + "_NewLocOnly.json";
-            }
-            else
-            {
-                //combine the fightLocations and sessionLocations objects into one variable
-                FightLocations combinedLocations = new Donuts.Models.FightLocations
-                {
-                    Locations = Donuts.DonutComponent.fightLocations.Locations.Concat(Donuts.DonutComponent.sessionLocations.Locations).ToList()
-                };
-
-                json = JsonConvert.SerializeObject(combinedLocations, Formatting.Indented);
-                fileName = DonutsBotPrep.maplocation + "_" + UnityEngine.Random.Range(0, 1000) + "_All.json";
-            }
-
-            //write json to file with filename == Donuts.DonutComponent.maplocation + random number
-            string jsonFilePath = Path.Combine(jsonFolderPath, fileName);
-
-            await UniTask.SwitchToThreadPool();
-            using (StreamWriter writer = new StreamWriter(jsonFilePath, false))
-            {
-                await writer.WriteAsync(json);
-            }
-            await UniTask.SwitchToMainThread();
-
-            var txt = $"Donuts: Wrote Json File to: {jsonFilePath}";
-            var displayMessageNotificationMethod = Gizmos.GetDisplayMessageNotificationMethod();
-            if (displayMessageNotificationMethod != null)
-            {
-                displayMessageNotificationMethod.Invoke(null, new object[] { txt, ENotificationDurationType.Long, ENotificationIconType.Default, Color.yellow });
-            }
-        }
-
-    }
+		DonutsHelper.DisplayNotification($"Donuts: Wrote Json File to: {jsonFilePath}", Color.yellow);
+	}
 }

@@ -1,11 +1,13 @@
 ﻿using EFT;
 using HarmonyLib;
+using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System;
 using System.Reflection;
 
 namespace Donuts.Patches;
 
+[UsedImplicitly]
 internal class PlayerFireControlPatchGetter : ModulePatch
 {
 	protected override MethodBase GetTargetMethod()
@@ -26,6 +28,7 @@ internal class PlayerFireControlPatchGetter : ModulePatch
 	}
 }
 
+[UsedImplicitly]
 internal class PlayerFireControlPatchSetter : ModulePatch
 {
 	protected override MethodBase GetTargetMethod()

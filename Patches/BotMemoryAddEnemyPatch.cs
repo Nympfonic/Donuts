@@ -1,10 +1,12 @@
 ﻿using EFT;
 using HarmonyLib;
+using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System.Reflection;
 
 namespace Donuts.Patches;
 
+[UsedImplicitly]
 internal class BotMemoryAddEnemyPatch : ModulePatch
 {
 	protected override MethodBase GetTargetMethod() => AccessTools.Method(typeof(BotMemoryClass), nameof(BotMemoryClass.AddEnemy));

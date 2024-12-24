@@ -1,5 +1,6 @@
 using EFT;
 using HarmonyLib;
+using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System.Collections.Generic;
 using System.Reflection;
@@ -8,6 +9,7 @@ using System.Reflection;
 
 namespace Donuts.Patches;
 
+[UsedImplicitly]
 internal class BotGroupAddEnemyPatch : ModulePatch
 {
 	protected override MethodBase GetTargetMethod()
@@ -44,11 +46,11 @@ internal class BotGroupAddEnemyPatch : ModulePatch
 		}
 
 		// Get the ID's of all group members
-		List<BotOwner> groupMemberList = [];
-		for (int m = 0; m < __instance.MembersCount; m++)
-		{
-			groupMemberList.Add(__instance.Member(m));
-		}
+		// List<BotOwner> groupMemberList = [];
+		// for (int m = 0; m < __instance.MembersCount; m++)
+		// {
+		// 	groupMemberList.Add(__instance.Member(m));
+		// }
 		//string[] groupMemberIDs = groupMemberList.Select(m => m.Profile.Id).ToArray();
 
 		return true;

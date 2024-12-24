@@ -1,12 +1,15 @@
-﻿using Cysharp.Threading.Tasks;
+﻿using Comfort.Common;
+using Cysharp.Threading.Tasks;
+using Donuts.Bots;
 using Donuts.Models;
 using Donuts.Utils;
 using EFT;
 using JetBrains.Annotations;
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using UnityEngine;
@@ -16,10 +19,13 @@ namespace Donuts.Tools;
 
 internal class DonutsGizmos
 {
-	internal static ConcurrentDictionary<Vector3, GameObject> gizmoMarkers { get; } = new();
+	internal static ConcurrentDictionary<Vector3, GameObject> GizmoMarkers { get; } = new();
 	private static readonly IEnumerable<Entry> _emptyEntries = [];
 	
-	private readonly CancellationToken _cancellationToken;
+	private readonly CancellationToken _onDestroyToken;
+	private readonly CancellationTokenSource _cts = new();
+	private CancellationTokenSource _updateMarkerCts;
+	private CancellationTokenSource _resetMarkerCts;
 	
 	private readonly StringBuilder _displayedMarkerInfo = new();
 	private readonly StringBuilder _previousMarkerInfo = new();
@@ -28,10 +34,13 @@ internal class DonutsGizmos
 
 	private bool _isGizmoEnabled;
 	private bool _gizmoUpdateTaskStarted;
+	private bool _willResetMarkerInfo;
 
-	internal DonutsGizmos(CancellationToken cancellationToken)
+	internal DonutsGizmos(CancellationToken onDestroyToken)
 	{
-		_cancellationToken = cancellationToken;
+		_onDestroyToken = onDestroyToken;
+		_updateMarkerCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, _onDestroyToken);
+		_resetMarkerCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, _onDestroyToken);
 	}
 
 	internal void ToggleGizmoDisplay(bool enableGizmos)
@@ -44,19 +53,32 @@ internal class DonutsGizmos
 			//_gizmoUpdateCoroutine = _monoBehaviourRef.StartCoroutine(UpdateGizmoSpheresCoroutine());
 			UpdateGizmoSpheres().Forget();
 		}
+		else if (!_isGizmoEnabled && _gizmoUpdateTaskStarted)
+		{
+			ResetCts(ref _updateMarkerCts);
+		}
+	}
+
+	private void ResetCts(ref CancellationTokenSource cts)
+	{
+		cts.Cancel();
+		cts.Dispose();
+		cts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, _onDestroyToken);
 	}
 
 	internal void DisplayMarkerInformation(BifacialTransform playerTransform)
 	{
-		if (gizmoMarkers.Count == 0) return;
+		if (GizmoMarkers.Count == 0) return;
 
 		(var closestSqrMagnitude, GameObject closestMarker) = (float.MaxValue, null);
 
-		foreach (GameObject marker in gizmoMarkers.Values)
+		foreach (GameObject marker in GizmoMarkers.Values)
 		{
 			float sqrMagnitude = (marker.transform.position - playerTransform.position).sqrMagnitude;
 			if (sqrMagnitude < closestSqrMagnitude)
+			{
 				(closestSqrMagnitude, closestMarker) = (sqrMagnitude, marker);
+			}
 		}
 
 		if (closestMarker == null) return;
@@ -68,13 +90,21 @@ internal class DonutsGizmos
 		}
 	}
 
+	internal void Dispose()
+	{
+		_cts.Cancel();
+		_updateMarkerCts.Dispose();
+		_resetMarkerCts.Dispose();
+		_cts.Dispose();
+	}
+
 	private async UniTaskVoid UpdateGizmoSpheres()
 	{
 		_gizmoUpdateTaskStarted = true;
 		while (_isGizmoEnabled)
 		{
 			RefreshGizmoDisplay();
-			await UniTask.Delay(_updateInterval, cancellationToken: _cancellationToken);
+			await UniTask.Delay(_updateInterval, cancellationToken: _updateMarkerCts.Token, cancelImmediately: true);
 		}
 		ClearGizmoMarkers();
 		_gizmoUpdateTaskStarted = false;
@@ -83,34 +113,34 @@ internal class DonutsGizmos
 	private void RefreshGizmoDisplay()
 	{
 		ClearGizmoMarkers();
-		if (!DefaultPluginVars.DebugGizmos.Value)
-		{
-			return;
-		}
+		if (!DefaultPluginVars.DebugGizmos.Value) return;
 
-		DrawMarkers(fightLocations?.Locations ?? _emptyEntries, Color.green, PrimitiveType.Sphere);
-		DrawMarkers(sessionLocations?.Locations ?? _emptyEntries, Color.red, PrimitiveType.Cube);
+		DrawMarkers(EditorFunctions.FightLocations?.Locations ?? _emptyEntries, Color.green, PrimitiveType.Sphere);
+		DrawMarkers(EditorFunctions.SessionLocations?.Locations ?? _emptyEntries, Color.red, PrimitiveType.Cube);
 	}
 
 	private static void ClearGizmoMarkers()
 	{
-		foreach (GameObject marker in gizmoMarkers.Values)
+		foreach (GameObject marker in GizmoMarkers.Values)
 		{
 			Object.Destroy(marker);
 		}
-		gizmoMarkers.Clear();
+		GizmoMarkers.Clear();
 	}
 
 	private void DrawMarkers(IEnumerable<Entry> locations, Color color, PrimitiveType primitiveType)
 	{
 		foreach (Entry hotspot in locations)
 		{
-			var newPosition = hotspot.Position.ToVector3();
+			Position newPosition = hotspot.Position;
+			if (Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation() != hotspot.MapName ||
+				GizmoMarkers.ContainsKey(newPosition))
+			{
+				continue;
+			}
 
-			if (_mapLocation != hotspot.MapName || gizmoMarkers.ContainsKey(newPosition)) continue;
-			
 			GameObject marker = CreateMarker(newPosition, color, primitiveType, hotspot.MaxDistance);
-			gizmoMarkers[newPosition] = marker;
+			GizmoMarkers[newPosition] = marker;
 		}
 	}
 
@@ -140,38 +170,38 @@ internal class DonutsGizmos
 
 		_displayedMarkerInfo.Clear()
 			.AppendLine("Donuts: Marker Info")
-			.AppendLine($"GroupNum: {closestEntry.GroupNum}")
+			.AppendLine($"GroupNum: {closestEntry.GroupNum.ToString()}")
 			.AppendLine($"Name: {closestEntry.Name}")
 			.AppendLine($"SpawnType: {closestEntry.WildSpawnType}")
-			.AppendLine($"Position: {closestEntry.Position.x}, {closestEntry.Position.y}, {closestEntry.Position.z}")
-			.AppendLine($"Bot Timer Trigger: {closestEntry.BotTimerTrigger}")
-			.AppendLine($"Spawn Chance: {closestEntry.SpawnChance}")
-			.AppendLine($"Max Random Number of Bots: {closestEntry.MaxRandomNumBots}")
-			.AppendLine($"Max Spawns Before Cooldown: {closestEntry.MaxSpawnsBeforeCoolDown}")
-			.AppendLine($"Ignore Timer for First Spawn: {closestEntry.IgnoreTimerFirstSpawn}")
-			.AppendLine($"Min Spawn Distance From Player: {closestEntry.MinSpawnDistanceFromPlayer}");
+			.AppendLine(string.Format("Position: {0}, {1}, {2}",
+				closestEntry.Position.x.ToString(CultureInfo.InvariantCulture),
+				closestEntry.Position.y.ToString(CultureInfo.InvariantCulture),
+				closestEntry.Position.z.ToString(CultureInfo.InvariantCulture)))
+			.AppendLine($"Bot Timer Trigger: {closestEntry.BotTimerTrigger.ToString(CultureInfo.InvariantCulture)}")
+			.AppendLine($"Spawn Chance: {closestEntry.SpawnChance.ToString()}")
+			.AppendLine($"Max Random Number of Bots: {closestEntry.MaxRandomNumBots.ToString()}")
+			.AppendLine($"Max Spawns Before Cooldown: {closestEntry.MaxSpawnsBeforeCoolDown.ToString()}")
+			.AppendLine($"Ignore Timer for First Spawn: {closestEntry.IgnoreTimerFirstSpawn.ToString()}")
+			.AppendLine($"Min Spawn Distance From Player: {closestEntry.MinSpawnDistanceFromPlayer.ToString(CultureInfo.InvariantCulture)}");
 
-		if (_displayedMarkerInfo.ToString() == _previousMarkerInfo.ToString()) return;
+		var displayedMarkerString = _displayedMarkerInfo.ToString();
+		if (displayedMarkerString == _previousMarkerInfo.ToString()) return;
 		
-		DonutsHelper.DisplayNotification(_displayedMarkerInfo.ToString(), Color.yellow);
-		StartResetMarkerInfoCoroutine();
-	}
-
-	private void StartResetMarkerInfoCoroutine()
-	{
-		if (_resetMarkerInfoCoroutine != null)
+		DonutsHelper.DisplayNotification(displayedMarkerString, Color.yellow);
+		
+		if (_willResetMarkerInfo)
 		{
-			_monoBehaviourRef.StopCoroutine(_resetMarkerInfoCoroutine);
+			ResetCts(ref _resetMarkerCts);
 		}
-
-		_resetMarkerInfoCoroutine = _monoBehaviourRef.StartCoroutine(ResetMarkerInfoAfterDelay());
+		_willResetMarkerInfo = true;
+		ResetMarkerInfo().Forget();
 	}
 
-	private IEnumerator ResetMarkerInfoAfterDelay()
+	private async UniTaskVoid ResetMarkerInfo()
 	{
-		yield return _markerResetTime;
+		await UniTask.Delay(_markerResetTime, cancellationToken: _resetMarkerCts.Token, cancelImmediately: true);
 		_displayedMarkerInfo.Clear();
-		_resetMarkerInfoCoroutine = null;
+		_willResetMarkerInfo = false;
 	}
 
 	[CanBeNull]
@@ -179,10 +209,9 @@ internal class DonutsGizmos
 	{
 		(var closestSqrMagnitude, Entry closestEntry) = (float.MaxValue, null);
 
-		foreach (Entry entry in fightLocations.Locations.Concat(sessionLocations.Locations))
+		foreach (Entry entry in EditorFunctions.FightLocations.Locations.Concat(EditorFunctions.SessionLocations.Locations))
 		{
-			var entryPosition = entry.Position.ToVector3();
-			float sqrMagnitude = (entryPosition - position).sqrMagnitude;
+			float sqrMagnitude = (entry.Position - position).sqrMagnitude;
 			if (sqrMagnitude < closestSqrMagnitude)
 			{
 				(closestSqrMagnitude, closestEntry) = (sqrMagnitude, entry);
