@@ -157,8 +157,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 	}
 
+	[CanBeNull]
 	private AICorePoint GetClosestCorePoint(Vector3 position) =>
-		_botsController.CoversData.GetClosest(position).CorePointInGame;
+		_botsController.CoversData.GetClosest(position)?.CorePointInGame;
 
 	private void ActivateBotAtPosition(
 		[NotNull] BotCreationDataClass botData,
@@ -167,7 +168,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		BotZone closestBotZone = _eftBotSpawner.GetClosestZone(spawnPosition, out _);
 		AICorePoint closestCorePoint = GetClosestCorePoint(spawnPosition);
-		botData.AddPosition(spawnPosition, closestCorePoint.Id);
+		botData.AddPosition(spawnPosition, closestCorePoint!.Id);
 		
 		var createBotCallbackWrapper = new CreateBotCallbackWrapper(botData);
 		var getGroupWrapper = new GetBotsGroupWrapper(_eftBotSpawner);
