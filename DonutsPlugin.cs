@@ -174,17 +174,17 @@ public class DonutsPlugin : BaseUnityPlugin
 			return _emptyScenarioList;
 		}
 
-		Logger.LogWarning($"Loaded {folders.Count} Donuts Scenario Folders");
+		Logger.LogWarning($"Loaded {folders.Count.ToString()} Donuts Scenario Folders");
 		return folders;
 	}
 
 	private static void PopulateScenarioValues()
 	{
 		DefaultPluginVars.pmcScenarioCombinedArray = GenerateScenarioValues(DefaultPluginVars.PmcScenarios, DefaultPluginVars.PmcRandomScenarios);
-		Logger.LogWarning($"Loaded {DefaultPluginVars.pmcScenarioCombinedArray.Length} PMC Scenarios and Finished Generating");
+		Logger.LogWarning($"Loaded {DefaultPluginVars.pmcScenarioCombinedArray.Length.ToString()} PMC Scenarios and Finished Generating");
 
 		DefaultPluginVars.scavScenarioCombinedArray = GenerateScenarioValues(DefaultPluginVars.ScavScenarios, DefaultPluginVars.ScavRandomScenarios);
-		Logger.LogWarning($"Loaded {DefaultPluginVars.scavScenarioCombinedArray.Length} SCAV Scenarios and Finished Generating");
+		Logger.LogWarning($"Loaded {DefaultPluginVars.scavScenarioCombinedArray.Length.ToString()} SCAV Scenarios and Finished Generating");
 	}
 
 	private static string[] GenerateScenarioValues([NotNull] List<Folder> scenarios, [NotNull] List<Folder> randomScenarios)
