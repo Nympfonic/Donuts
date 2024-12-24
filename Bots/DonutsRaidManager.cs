@@ -183,10 +183,13 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			spawnService.FrameUpdate(deltaTime);
 		}
 
-		_botSpawnTimer += deltaTime;
-		if (_botSpawnTimer >= 1f && !_isSpawnProcessActive)
+		if (BotSpawnServices.Count > 0)
 		{
-			StartSpawnProcess().Forget();
+			_botSpawnTimer += deltaTime;
+			if (_botSpawnTimer >= 1f && !_isSpawnProcessActive)
+			{
+				StartSpawnProcess().Forget();
+			}
 		}
 	}
 
@@ -240,12 +243,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 	public void StartBotSpawnController()
 	{
-		BotSpawnServices.Add(DonutsSpawnType.Pmc,
-			BotSpawnService.Create<PmcBotSpawnService>(BotConfigService, BotDataServices[DonutsSpawnType.Pmc],
-				_eftBotSpawner, Logger, _onDestroyToken));
-		BotSpawnServices.Add(DonutsSpawnType.Scav,
-			BotSpawnService.Create<ScavBotSpawnService>(BotConfigService, BotDataServices[DonutsSpawnType.Scav],
-				_eftBotSpawner, Logger, _onDestroyToken));
+		CreateSpawnServices(DefaultPluginVars.forceAllBotType.Value);
 	}
 
 	public void RestartReplenishBotDataTimer()
@@ -283,7 +281,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 
 			if (memory.HaveEnemy &&
-				(Player)goalEnemy.Person == player.InteractablePlayer &&
+				goalEnemy.Person == player.InteractablePlayer &&
 				goalEnemy.HaveSeenPersonal &&
 				goalEnemy.IsVisible)
 			{
@@ -339,15 +337,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 					service.RestartPlayerHitTimer();
 				}
 				break;
-		}
-	}
-	
-	private async UniTask CreateServices()
-	{
-		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
-		if (await TryCreateDataServices(forceAllBotType))
-		{
-			CreateSpawnServices(forceAllBotType);
 		}
 	}
 
