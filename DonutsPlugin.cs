@@ -53,20 +53,7 @@ public class DonutsPlugin : BaseUnityPlugin
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
 
-		// Patches
-		// new GameWorldOnGameStartedPatch().Enable();
-		// new BotGroupAddEnemyPatch().Enable();
-		// new BotMemoryAddEnemyPatch().Enable();
-		// new MatchEndPlayerDisposePatch().Enable();
-		// new PatchStandbyTeleport().Enable();
-		// new BotProfilePreparationHook().Enable();
-		// new ShootDataNullRefPatch().Enable();
-		// new CoverPointMasterNullRef().Enable();
-		// new DelayedGameStartPatch().Enable();
-		// new PlayerFireControlPatchGetter().Enable();
-		// new PlayerFireControlPatchSetter().Enable();
 		ModulePatchManager.EnablePatches();
-
 	}
 
 	// ReSharper disable once Unity.IncorrectMethodSignature
