@@ -93,9 +93,8 @@ public class DonutsPlugin : BaseUnityPlugin
 			{
 				DefaultPluginVars.ShowGUI = !DefaultPluginVars.ShowGUI;
 			}
-
 			// Check if the config window is open
-			if (DefaultPluginVars.ShowGUI)
+			else if (DefaultPluginVars.ShowGUI)
 			{
 				DefaultPluginVars.ShowGUI = false;
 			}

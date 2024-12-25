@@ -31,16 +31,12 @@ public class PluginGUIComponent : MonoBehaviour
 
 	internal static event Action OnResetToDefaults;
 
-	private void Awake()
-	{
-		_settingsPage = new DonutsSettingsPage();
-	}
-
 	private void OnGUI()
 	{
 		if (!_stylesInitialized)
 		{
 			InitializeStyles();
+			_settingsPage = new DonutsSettingsPage();
 			_stylesInitialized = true;
 		}
 		
