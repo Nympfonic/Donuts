@@ -26,8 +26,6 @@ public interface IBotDataService
 	UniTask ReplenishBotData(CancellationToken cancellationToken);
 	[CanBeNull] BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int targetCount);
 	void ClearBotCache([NotNull] BotCreationDataClass botData);
-	WildSpawnType GetWildSpawnType();
-	EPlayerSide GetPlayerSide(WildSpawnType spawnType);
 	BotDifficulty GetBotDifficulty();
 }
 
