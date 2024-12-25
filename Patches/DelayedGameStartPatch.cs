@@ -1,6 +1,5 @@
 ﻿using Comfort.Common;
 using Donuts.Bots;
-using Donuts.Utils;
 using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -12,14 +11,16 @@ using UnityEngine;
 
 namespace Donuts.Patches;
 
-[DisablePatch]
 [UsedImplicitly]
 internal class DelayedGameStartPatch : ModulePatch
 {
+	/// <summary>
+	/// Target method has a return type of <see cref="IEnumerator"/> and has a single <see cref="Action"/> type parameter.
+	/// </summary>
 	protected override MethodBase GetTargetMethod()
 	{
 		Type baseGameType = typeof(BaseLocalGame<EftGamePlayerOwner>);
-		return AccessTools.Method(baseGameType, "vmethod_4");
+		return AccessTools.Method(baseGameType, "vmethod_5");
 	}
 
 	[PatchPostfix]
