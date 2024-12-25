@@ -6,8 +6,6 @@ namespace Donuts.Models;
 [JsonObject]
 public class Position
 {
-	private Vector3 _internalVector = Vector3.positiveInfinity;
-
 	[JsonProperty("x")]
 	public float x { get; set; }
 
@@ -19,7 +17,6 @@ public class Position
 
 	public static implicit operator Vector3(Position p)
 	{
-		p._internalVector.Set(p.x, p.y, p.z);
-		return p._internalVector;
+		return new Vector3(p.x, p.y, p.z);
 	}
 }
