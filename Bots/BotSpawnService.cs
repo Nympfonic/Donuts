@@ -79,8 +79,8 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	/// <summary>
 	/// Checks if HardStopTime setting is enabled and if the HardStopTime value has been reached for a spawn type.
-	/// Must call the <see cref="HasReachedHardStopTime(int, int)"/> overloaded signature.
 	/// </summary>
+	/// <remarks>Must call the <see cref="HasReachedHardStopTime(int, int)"/> overloaded signature.</remarks>
 	protected abstract bool HasReachedHardStopTime();
 
 	// TODO: why is this method failing?
