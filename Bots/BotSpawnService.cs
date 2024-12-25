@@ -591,7 +591,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		return groupSize;
 	}
 
-	protected int GetAliveBotsCount() => BotHelper.GetAliveBotsCount(IsCorrectSpawnType);
+	protected abstract int GetAliveBotsCount();
 
 	private int AdjustGroupSizeForHardCap(int groupSize)
 	{

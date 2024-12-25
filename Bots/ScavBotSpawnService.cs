@@ -45,8 +45,11 @@ public class ScavBotSpawnService : BotSpawnService
 	}
 	
 	protected override List<BotWave> GetBotWavesList() => MapBotWaves.Scav;
+	protected override int GetAliveBotsCount() => BotHelper.GetAliveBotsCount(IsScav);
+	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsScav(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledSCAV.Value;
 	protected override bool IsHotspotBoostEnabled() => DefaultPluginVars.hotspotBoostSCAV.Value;
 	protected override int GetMaxBotRespawns() => DefaultPluginVars.maxRespawnsSCAV.Value;
-	protected override bool IsCorrectSpawnType(WildSpawnType role) => role == WildSpawnType.assault;
+	
+	private static bool IsScav(WildSpawnType role) => role == WildSpawnType.assault;
 }

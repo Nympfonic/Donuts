@@ -45,8 +45,11 @@ public class PmcBotSpawnService : BotSpawnService
 	}
 
 	protected override List<BotWave> GetBotWavesList() => MapBotWaves.Pmc;
+	protected override int GetAliveBotsCount() => BotHelper.GetAliveBotsCount(IsPmc);
+	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsPmc(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledPMC.Value;
 	protected override bool IsHotspotBoostEnabled() => DefaultPluginVars.hotspotBoostPMC.Value;
 	protected override int GetMaxBotRespawns() => DefaultPluginVars.maxRespawnsPMC.Value;
-	protected override bool IsCorrectSpawnType(WildSpawnType role) => role is WildSpawnType.pmcUSEC or WildSpawnType.pmcBEAR;
+	
+	private static bool IsPmc(WildSpawnType role) => role is WildSpawnType.pmcUSEC or WildSpawnType.pmcBEAR;
 }
