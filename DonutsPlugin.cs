@@ -19,7 +19,7 @@ namespace Donuts;
 [BepInPlugin("com.dvize.Donuts", "Donuts", "2.0.0")]
 [BepInDependency("com.SPT.core", "3.10.0")]
 [BepInDependency("xyz.drakia.waypoints")]
-[BepInDependency("com.Arys.UnityToolkit", "1.0.2")]
+[BepInDependency("com.Arys.UnityToolkit", "1.1.0")]
 public class DonutsPlugin : BaseUnityPlugin
 {
 	private const KeyCode ESCAPE_KEY = KeyCode.Escape;
