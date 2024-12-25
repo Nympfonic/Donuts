@@ -39,19 +39,14 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	private ISpawnCheckProcessor _spawnCheckProcessor;
 	
-	// Spawn timer
-	private const int SPAWN_CHECK_INTERVAL = 1;
 	private bool _hasSpawnedStartingBots;
+	private float _despawnCooldownTime;
 	
 	// Combat state
 	private float _timeSinceLastHit;
 	
 	// Spawn caps
 	private int _currentRespawnCount;
-	
-	
-	private float _despawnCooldownTime;
-	private float _despawnCooldownDuration = DefaultPluginVars.despawnInterval.Value;
 	
 	protected BotConfigService ConfigService { get; private set; }
 	protected IBotDataService DataService { get; private set; }
@@ -81,10 +76,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		_timeSinceLastHit = 0;
 	}
-
-	protected abstract List<BotWave> GetBotWavesList();
-	protected abstract bool IsHotspotBoostEnabled();
-	protected abstract bool HasReachedHardCap();
 
 	/// <summary>
 	/// Checks if HardStopTime setting is enabled and if the HardStopTime value has been reached for a spawn type.
@@ -147,6 +138,8 @@ public abstract class BotSpawnService : IBotSpawnService
 			.SetNext(new WallSpawnCheckProcessor())
 			.SetNext(new GroundSpawnCheckProcessor());
 	}
+
+	protected abstract List<BotWave> GetBotWavesList();
 
 	private void UpdateBotWaveTimers(float deltaTime)
 	{
@@ -264,6 +257,9 @@ public abstract class BotSpawnService : IBotSpawnService
 
 		return furthestBot;
 	}
+	
+	// Only consider despawning if the number of active bots of the type exceeds the limit
+	private bool CanDespawnBot() => GetAliveBotsCount() > DataService.MaxBotLimit;
 
 	public void DespawnFurthestBot()
 	{
@@ -272,7 +268,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		float currentTime = Time.time;
 		float timeSinceLastDespawn = currentTime - _despawnCooldownTime;
 
-		if (timeSinceLastDespawn < _despawnCooldownDuration || !CanDespawnBot())
+		if (timeSinceLastDespawn < DefaultPluginVars.despawnInterval.Value || !CanDespawnBot())
 		{
 			return;
 		}
@@ -329,9 +325,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		_despawnCooldownTime = Time.time;
 	}
 
-	// Only consider despawning if the number of active bots of the type exceeds the limit
-	private bool CanDespawnBot() => GetAliveBotsCount() > DataService.MaxBotLimit;
-
 	private bool IsHumanPlayerInCombat()
 	{
 		return _timeSinceLastHit < DefaultPluginVars.battleStateCoolDown.Value;
@@ -342,7 +335,8 @@ public abstract class BotSpawnService : IBotSpawnService
     	int randomValue = Random.Range(0, 100);
     	bool canSpawn = randomValue < spawnChance;
 #if DEBUG
-    	Logger.LogDebug($"SpawnChance: {spawnChance}, RandomValue: {randomValue}, CanSpawn: {canSpawn}");
+    	Logger.LogDebug(string.Format("SpawnChance: {0}, RandomValue: {1}, CanSpawn: {2}", spawnChance.ToString(),
+		    randomValue.ToString(), canSpawn.ToString()));
 #endif
     	return canSpawn;
     }
@@ -389,11 +383,13 @@ public abstract class BotSpawnService : IBotSpawnService
 			{
 				botWave.ResetTimer();
 #if DEBUG
-				Logger.LogDebug($"Resetting timer for GroupNum: {groupNum}");
+				Logger.LogDebug($"Resetting timer for GroupNum: {groupNum.ToString()}");
 #endif
 			}
 		}
 	}
+	
+	protected abstract bool IsHotspotBoostEnabled();
 
 	/// <summary>
 	/// Sets the bot wave's spawn chance to 100% if the zone is a hotspot.
@@ -430,6 +426,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 		return false;
 	}
+	
+	protected abstract bool HasReachedHardCap();
 	
 	/// <summary>
 	/// Checks certain spawn options, reset groups timers.
@@ -474,8 +472,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		return true;
 	}
 
-	protected abstract int GetBotGroupSize(int minGroupSize, int maxGroupSize);
-	
 	private async UniTask<bool> SpawnBot(
 		int groupSize,
 		string zone,
@@ -511,7 +507,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		var spawned = false;
 		foreach (Vector3 position in spawnPoints)
 		{
-			//Vector3 spawnPosition = await SpawnCheckHelper.GetValidSpawnPosition(position, cancellationToken);
 			Vector3 spawnPosition = await GetValidSpawnPosition(position, cancellationToken);
 			if (spawnPosition != Vector3.positiveInfinity)
 			{
@@ -570,6 +565,8 @@ public abstract class BotSpawnService : IBotSpawnService
 
 		return Vector3.positiveInfinity;
 	}
+
+	protected abstract int GetBotGroupSize(int minGroupSize, int maxGroupSize);
 
 	private int DetermineBotGroupSize(int minGroupSize, int maxGroupSize)
 	{
