@@ -280,7 +280,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 
 			if (memory.HaveEnemy &&
-				goalEnemy.Person == player.InteractablePlayer &&
+				player.InteractablePlayer == (Player)goalEnemy.Person &&
 				goalEnemy.HaveSeenPersonal &&
 				goalEnemy.IsVisible)
 			{
@@ -295,6 +295,13 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		List<Player> humanPlayerList = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetHumanPlayerList();
 		foreach (Player humanPlayer in humanPlayerList)
 		{
+			if (humanPlayer == null ||
+				humanPlayer.HealthController == null ||
+				humanPlayer.HealthController.IsAlive == false)
+			{
+				continue;
+			}
+			
 			botToRemove.Memory.DeleteInfoAboutEnemy(humanPlayer);
 		}
 
