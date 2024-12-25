@@ -8,7 +8,8 @@ public class BotVicinitySpawnCheckProcessor : SpawnCheckProcessorBase
 	{
 		if (!DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsBool.Value)
 		{
-			data.Success = false;
+			data.Success = true;
+			base.Process(data);
 			return;
 		}
 		
@@ -38,11 +39,9 @@ public class BotVicinitySpawnCheckProcessor : SpawnCheckProcessorBase
 		mapLocation switch
 		{
 			"bigmap" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsCustoms.Value,
-			"factory4_day" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsFactory.Value,
-			"factory4_night" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsFactory.Value,
+			"factory4_day" or "factory4_night" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsFactory.Value,
 			"tarkovstreets" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsStreets.Value,
-			"sandbox" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsGroundZero.Value,
-			"sandbox_high" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerGroundZero.Value,
+			"sandbox" or "sandbox_high" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsGroundZero.Value,
 			"rezervbase" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsReserve.Value,
 			"lighthouse" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsLighthouse.Value,
 			"shoreline" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsShoreline.Value,
