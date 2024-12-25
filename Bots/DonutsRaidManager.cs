@@ -66,7 +66,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	
 	private GameWorld _gameWorld;
 	private Player _mainPlayer;
-	private string _mapLocation;
 
 	private BotsController _botsController;
 	private BotSpawner _eftBotSpawner;
@@ -78,7 +77,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private bool _isSpawnProcessActive;
 	private float _replenishBotDataTimer;
 	private float _botSpawnTimer;
-	private List<UniTask> _replenishBotDataTasks = [];
+	private readonly List<UniTask> _replenishBotDataTasks = [];
 
 	//private Dictionary<string, WildSpawnType> OriginalBotSpawnTypes;
 
@@ -390,12 +389,12 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		{
 			_replenishBotDataTimer = 0f;
 			_isReplenishingBotData = true;
-			_replenishBotDataTasks.Clear();
 			foreach (IBotDataService service in BotDataServices.Values)
 			{
 				_replenishBotDataTasks.Add(service.ReplenishBotData(_onDestroyToken));
 			}
 			await UniTask.WhenAll(_replenishBotDataTasks);
+			_replenishBotDataTasks.Clear();
 			_isReplenishingBotData = false;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
