@@ -45,12 +45,6 @@ public class PluginGUIComponent : MonoBehaviour
 			return;
 		}
 
-		// if (!_stylesInitialized)
-		// {
-		// 	InitializeStyles();
-		// 	_stylesInitialized = true;
-		// }
-
 		// Save the current GUI skin
 		GUISkin originalSkin = GUI.skin;
 
