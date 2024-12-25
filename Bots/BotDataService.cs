@@ -9,8 +9,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
-using BotProfileData = GClass652;
-using Random = UnityEngine.Random; // Implements IGetProfileData
+using BotProfileData = GClass652; // Implements IGetProfileData
+using Random = UnityEngine.Random;
 
 namespace Donuts.Bots;
 
@@ -79,7 +79,7 @@ public abstract class BotDataService : IBotDataService
 			var totalBots = 0;
 			while (totalBots < maxBots)
 			{
-				if (cancellationToken.IsCancellationRequested) break;
+				if (cancellationToken.IsCancellationRequested) return;
 				
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, botCfg.MinGroupSize, botCfg.MaxGroupSize,
 					maxBots - totalBots);
@@ -155,36 +155,46 @@ public abstract class BotDataService : IBotDataService
 
 	public async UniTask ReplenishBotData(CancellationToken cancellationToken)
 	{
-		var singleBotsCount = 0;
-		var groupBotsCount = 0;
-		foreach (PrepBotInfo botInfo in _botInfoList)
+		try
 		{
-			if (cancellationToken.IsCancellationRequested) return;
-			if (botInfo.Bots != null && botInfo.Bots.Profiles.Count > 0) continue;
-				
-			(bool success, BotCreationDataClass botData) = await TryCreateBotData(botInfo);
-			if (cancellationToken.IsCancellationRequested) return;
-			if (!success) continue;
-				
-			if (botInfo.IsGroup && groupBotsCount < 1)
+			var singleBotsCount = 0;
+			var groupBotsCount = 0;
+			foreach (PrepBotInfo botInfo in _botInfoList)
 			{
-				groupBotsCount++;
-#if DEBUG
-				Logger.LogDebug(string.Format("Replenishing group bot: {0} {1} {2} Count: {3}.",
-					SpawnType.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString(), botInfo.GroupSize.ToString()));
-#endif
-			}
-			else if (!botInfo.IsGroup && singleBotsCount < 3)
-			{
-				singleBotsCount++;
-#if DEBUG
-				Logger.LogDebug(string.Format("Replenishing single bot: {0} {1} {2} Count: 1.",
-					SpawnType.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString()));
-#endif
-			}
+				if (cancellationToken.IsCancellationRequested) return;
+				if (botInfo.Bots != null && botInfo.Bots.Profiles.Count > 0) continue;
 
-			if (singleBotsCount >= 3 && groupBotsCount >= 1) break;
+				(bool success, BotCreationDataClass botData) = await TryCreateBotData(botInfo);
+				if (cancellationToken.IsCancellationRequested) return;
+				if (!success) continue;
+
+				if (botInfo.IsGroup && groupBotsCount < 1)
+				{
+					groupBotsCount++;
+#if DEBUG
+					Logger.LogDebug(string.Format("Replenishing group bot: {0} {1} {2} Count: {3}.",
+						SpawnType.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString(),
+						botInfo.GroupSize.ToString()));
+#endif
+				}
+				else if (!botInfo.IsGroup && singleBotsCount < 3)
+				{
+					singleBotsCount++;
+#if DEBUG
+					Logger.LogDebug(string.Format("Replenishing single bot: {0} {1} {2} Count: 1.",
+						SpawnType.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString()));
+#endif
+				}
+
+				if (singleBotsCount >= 3 && groupBotsCount >= 1) break;
+			}
 		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Logger.LogError(
+				$"Exception thrown in {GetType()}::{nameof(ReplenishBotData)}: {ex.Message}\n{ex.StackTrace}");
+		}
+		catch (OperationCanceledException) {}
 	}
 	
 	public BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int groupSize)
