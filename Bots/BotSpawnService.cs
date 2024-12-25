@@ -183,7 +183,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (cancellationToken.IsCancellationRequested) return;
 			
-			await SpawnBot(botSpawnInfo.GroupSize, botSpawnInfo.Zone, botSpawnInfo.Coordinates, cancellationToken);
+			await SpawnBot(botSpawnInfo.GroupSize, botSpawnInfo.Zone, botSpawnInfo.Coordinates, cancellationToken, true);
 		}
 	}
 
@@ -476,7 +476,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		int groupSize,
 		string zone,
 		List<Vector3> spawnPoints,
-		CancellationToken cancellationToken)
+		CancellationToken cancellationToken,
+		bool ignoreChecks = false)
 	{
 		bool isGroup = groupSize > 1;
 #if DEBUG
@@ -507,13 +508,13 @@ public abstract class BotSpawnService : IBotSpawnService
 		var spawned = false;
 		foreach (Vector3 position in spawnPoints)
 		{
-			Vector3 spawnPosition = await GetValidSpawnPosition(position, cancellationToken);
+			Vector3 spawnPosition = await GetValidSpawnPosition(ignoreChecks, position, cancellationToken);
 			if (cancellationToken.IsCancellationRequested)
 			{
 				return false;
 			}
 			
-			if (spawnPosition != Vector3.positiveInfinity)
+			if (spawnPosition != Vector3.zero)
 			{
 				ActivateBotAtPosition(cachedBotData, spawnPosition, cancellationToken);
 				spawned = true;
@@ -529,7 +530,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		return spawned;
 	}
 
-	private async UniTask<Vector3> GetValidSpawnPosition(Vector3 position, CancellationToken cancellationToken)
+	private async UniTask<Vector3> GetValidSpawnPosition(bool ignoreChecks, Vector3 position, CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -538,17 +539,20 @@ public abstract class BotSpawnService : IBotSpawnService
 			{
 				if (cancellationToken.IsCancellationRequested)
 				{
-					return Vector3.positiveInfinity;
+					return Vector3.zero;
 				}
 
 				if (NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
 				{
-					var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation,
-						_gameWorld.AllAlivePlayersList);
-					_spawnCheckProcessor.Process(spawnCheckData);
-					if (!spawnCheckData.Success)
+					if (!ignoreChecks)
 					{
-						return Vector3.positiveInfinity;
+						var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation,
+							_gameWorld.AllAlivePlayersList);
+						_spawnCheckProcessor.Process(spawnCheckData);
+						if (!spawnCheckData.Success)
+						{
+							return Vector3.zero;
+						}
 					}
 					
 					Vector3 spawnPosition = navHit.position;
@@ -568,7 +572,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 		catch (OperationCanceledException) {}
 
-		return Vector3.positiveInfinity;
+		return Vector3.zero;
 	}
 
 	protected abstract int GetBotGroupSize(int minGroupSize, int maxGroupSize);
