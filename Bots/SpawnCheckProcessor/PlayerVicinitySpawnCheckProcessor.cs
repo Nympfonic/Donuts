@@ -8,7 +8,8 @@ public class PlayerVicinitySpawnCheckProcessor : SpawnCheckProcessorBase
 	{
 		if (!DefaultPluginVars.globalMinSpawnDistanceFromPlayerBool.Value)
 		{
-			data.Success = false;
+			data.Success = true;
+			base.Process(data);
 			return;
 		}
 		
@@ -23,27 +24,24 @@ public class PlayerVicinitySpawnCheckProcessor : SpawnCheckProcessorBase
 			}
 
 			float actualSqrMagnitude = (((IPlayer)player).Position - data.Position).sqrMagnitude;
-			// At least one player should be in the vicinity of the spawn position to trigger the spawn
 			if (actualSqrMagnitude <= triggerSqrMagnitude)
 			{
-				data.Success = true;
-				base.Process(data);
+				data.Success = false;
 				return;
 			}
 		}
 		
-		data.Success = false;
+		data.Success = true;
+		base.Process(data);
 	}
 	
 	private static float GetMinDistanceFromPlayer(string mapLocation) =>
 		mapLocation switch
 		{
 			"bigmap" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerCustoms.Value,
-			"factory4_day" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerFactory.Value,
-			"factory4_night" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerFactory.Value,
+			"factory4_day" or "factory4_night" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerFactory.Value,
 			"tarkovstreets" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerStreets.Value,
-			"sandbox" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerGroundZero.Value,
-			"sandbox_high" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerGroundZero.Value,
+			"sandbox" or "sandbox_high" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerGroundZero.Value,
 			"rezervbase" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerReserve.Value,
 			"lighthouse" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerLighthouse.Value,
 			"shoreline" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerShoreline.Value,
