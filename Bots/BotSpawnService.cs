@@ -508,6 +508,11 @@ public abstract class BotSpawnService : IBotSpawnService
 		foreach (Vector3 position in spawnPoints)
 		{
 			Vector3 spawnPosition = await GetValidSpawnPosition(position, cancellationToken);
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return false;
+			}
+			
 			if (spawnPosition != Vector3.positiveInfinity)
 			{
 				ActivateBotAtPosition(cachedBotData, spawnPosition, cancellationToken);
