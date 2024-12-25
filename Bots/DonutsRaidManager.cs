@@ -77,7 +77,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private bool _isSpawnProcessActive;
 	private float _replenishBotDataTimer;
 	private float _botSpawnTimer;
-	private readonly List<UniTask> _replenishBotDataTasks = [];
 
 	//private Dictionary<string, WildSpawnType> OriginalBotSpawnTypes;
 
@@ -120,7 +119,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_eftBotSpawner = _botsController.BotSpawner;
-		//OriginalBotSpawnTypes = [];
 	}
 
 	// ReSharper disable once Unity.IncorrectMethodSignature
@@ -141,11 +139,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 		}
 
-		// Get selected preset and setup bot limits now
-		//string selectionName = PresetSelector.GetWeightedScenarioSelection();
-		
-		//InitializeBotLimits(selectionName, _mapLocation);
-
 		if (!await TryCreateDataServices(DefaultPluginVars.forceAllBotType.Value))
 		{
 			ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
@@ -162,19 +155,16 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 	private void Update()
 	{
-		// timeSinceLastReplenish += Time.deltaTime;
-		// if (timeSinceLastReplenish >= DefaultPluginVars.replenishInterval.Value && !isReplenishing)
-		// {
-		// 	timeSinceLastReplenish = 0f;
-		// 	ReplenishAllBots(this.GetCancellationTokenOnDestroy()).Forget();
-		// }
 		float deltaTime = Time.deltaTime;
 		_donutsGizmos.DisplayMarkerInformation(_mainPlayer.Transform);
-		
-		_replenishBotDataTimer += deltaTime;
-		if (_replenishBotDataTimer >= DefaultPluginVars.replenishInterval.Value && !_isReplenishingBotData)
+
+		if (!_isReplenishingBotData)
 		{
-			ReplenishBotData().Forget();
+			_replenishBotDataTimer += deltaTime;
+			if (_replenishBotDataTimer >= DefaultPluginVars.replenishInterval.Value)
+			{
+				ReplenishBotData().Forget();
+			}
 		}
 		
 		foreach (IBotSpawnService spawnService in BotSpawnServices.Values)
@@ -182,10 +172,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			spawnService.FrameUpdate(deltaTime);
 		}
 
-		if (BotSpawnServices.Count > 0)
+		if (!_isSpawnProcessActive && BotSpawnServices.Count > 0)
 		{
 			_botSpawnTimer += deltaTime;
-			if (_botSpawnTimer >= 1f && !_isSpawnProcessActive)
+			if (_botSpawnTimer >= 1f)
 			{
 				StartSpawnProcess().Forget();
 			}
@@ -279,8 +269,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				continue;
 			}
 
+			// Ignore this unintended reference comparison warning, it just doesn't understand Unity's greatness
 			if (memory.HaveEnemy &&
-				player.InteractablePlayer == (Player)goalEnemy.Person &&
+				goalEnemy.Person == player.InteractablePlayer &&
 				goalEnemy.HaveSeenPersonal &&
 				goalEnemy.IsVisible)
 			{
@@ -398,10 +389,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			_isReplenishingBotData = true;
 			foreach (IBotDataService service in BotDataServices.Values)
 			{
-				_replenishBotDataTasks.Add(service.ReplenishBotData(_onDestroyToken));
+				await service.ReplenishBotData(_onDestroyToken);
 			}
-			await UniTask.WhenAll(_replenishBotDataTasks);
-			_replenishBotDataTasks.Clear();
 			_isReplenishingBotData = false;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
@@ -433,16 +422,4 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		catch (OperationCanceledException) {}
 	}
-
-
-	// private static void InitializeGroupChanceWeights()
-	// {
-	// 	var defaultWeights = ParseGroupWeightDistro(DefaultPluginVars.groupWeightDistroDefault.Value);
-	// 	var lowWeights = ParseGroupWeightDistro(DefaultPluginVars.groupWeightDistroLow.Value);
-	// 	var highWeights = ParseGroupWeightDistro(DefaultPluginVars.groupWeightDistroHigh.Value);
-	//
-	// 	DefaultPluginVars.GroupChanceWeights["Default"] = defaultWeights;
-	// 	DefaultPluginVars.GroupChanceWeights["Low"] = lowWeights;
-	// 	DefaultPluginVars.GroupChanceWeights["High"] = highWeights;
-	// }
 }
