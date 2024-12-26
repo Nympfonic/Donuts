@@ -1,4 +1,5 @@
-﻿using EFT;
+﻿using Donuts.Utils;
+using EFT;
 using EFT.AssetsManager;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -29,11 +30,11 @@ internal class MatchEndPlayerDisposePatch : ModulePatch
 			try
 			{
 				player.Dispose();
-				AssetPoolObject.ReturnToPool(player.gameObject, true);
+				AssetPoolObject.ReturnToPool(player.gameObject);
 			}
 			catch (Exception ex)
 			{
-				DonutsPlugin.Logger.LogError(ex);
+				DonutsPlugin.Logger.LogException(nameof(MatchEndPlayerDisposePatch), nameof(PatchPrefix), ex);
 			}
 		}
 		players.Clear();
