@@ -52,18 +52,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	// 	{ WildSpawnType.bossKnight, EPlayerSide.Savage },
 	// };
 	
-	//internal List<WildSpawnType> validDespawnListPMC =
-	//[
-	//    WildSpawnType.pmcUSEC,
-	//    WildSpawnType.pmcBEAR
-	//];
-
-	//internal List<WildSpawnType> validDespawnListScav =
-	//[
-	//    WildSpawnType.assault,
-	//    WildSpawnType.cursedAssault
-	//];
-	
 	private GameWorld _gameWorld;
 	private Player _mainPlayer;
 
@@ -226,13 +214,13 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			new GameObject(nameof(DonutsRaidManager)).AddComponent<DonutsRaidManager>();
 		}
 #if DEBUG
-		Logger.LogDebug($"{nameof(DonutsRaidManager)}::{nameof(Enable)}: Component enabled");
+		Logger.LogDebug($"{nameof(DonutsRaidManager)} component enabled");
 #endif
 	}
 
 	public void StartBotSpawnController()
 	{
-		CreateSpawnServices(DefaultPluginVars.forceAllBotType.Value);
+		CreateSpawnServices();
 	}
 
 	public void RestartReplenishBotDataTimer()
@@ -286,14 +274,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		List<Player> humanPlayerList = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetHumanPlayerList();
 		foreach (Player humanPlayer in humanPlayerList)
 		{
-			if (humanPlayer == null ||
-				humanPlayer.HealthController == null ||
-				humanPlayer.HealthController.IsAlive == false)
+			if (humanPlayer.OrNull()?.HealthController?.IsAlive == true)
 			{
-				continue;
+				botToRemove.Memory.DeleteInfoAboutEnemy(humanPlayer);
 			}
-			
-			botToRemove.Memory.DeleteInfoAboutEnemy(humanPlayer);
 		}
 
 		botToRemove.EnemiesController.EnemyInfos.Clear();
@@ -354,23 +338,19 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		return true;
 	}
 
-	private void CreateSpawnServices(string forceAllBotType)
+	private void CreateSpawnServices()
 	{
-		if (forceAllBotType is "PMC" or "Disabled")
+		if (BotDataServices.TryGetValue(DonutsSpawnType.Pmc, out IBotDataService pmcDataService))
 		{
-			if (!BotDataServices.TryGetValue(DonutsSpawnType.Pmc, out IBotDataService dataService)) return;
-			
 			IBotSpawnService spawnService = BotSpawnService.Create<PmcBotSpawnService>(BotConfigService,
-				dataService, _eftBotSpawner, Logger, _onDestroyToken);
+				pmcDataService, _eftBotSpawner, Logger, _onDestroyToken);
 			BotSpawnServices.Add(DonutsSpawnType.Pmc, spawnService);
 		}
 
-		if (forceAllBotType is "SCAV" or "Disabled")
+		if (BotDataServices.TryGetValue(DonutsSpawnType.Scav, out IBotDataService scavDataService))
 		{
-			if (!BotDataServices.TryGetValue(DonutsSpawnType.Scav, out IBotDataService dataService)) return;
-			
 			IBotSpawnService spawnService = BotSpawnService.Create<ScavBotSpawnService>(BotConfigService,
-				dataService, _eftBotSpawner, Logger, _onDestroyToken);
+				scavDataService, _eftBotSpawner, Logger, _onDestroyToken);
 			BotSpawnServices.Add(DonutsSpawnType.Scav, spawnService);
 		}
 	}
@@ -383,14 +363,13 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			_isReplenishingBotData = true;
 			foreach (IBotDataService service in BotDataServices.Values)
 			{
-				await service.ReplenishBotData(_onDestroyToken);
+				await service.ReplenishBotData();
 			}
 			_isReplenishingBotData = false;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogError(string.Format("Exception thrown in {0}::{1}: {2}\n{3}", nameof(DonutsRaidManager),
-				nameof(ReplenishBotData), ex.Message, ex.StackTrace));
+			Logger.LogException(nameof(DonutsRaidManager), nameof(ReplenishBotData), ex);
 		}
 		catch (OperationCanceledException) {}
 	}
@@ -403,16 +382,15 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			_isSpawnProcessActive = true;
 			foreach (IBotSpawnService service in BotSpawnServices.Values)
 			{
-				await service.SpawnStartingBots(_onDestroyToken);
+				await service.SpawnStartingBots();
 				service.DespawnFurthestBot();
-				await service.SpawnBotWaves(_onDestroyToken);
+				await service.SpawnBotWaves();
 			}
 			_isSpawnProcessActive = false;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogError(string.Format("Exception thrown in {0}::{1}: {2}\n{3}", nameof(DonutsRaidManager),
-				nameof(StartSpawnProcess), ex.Message, ex.StackTrace));
+			Logger.LogException(nameof(DonutsRaidManager), nameof(StartSpawnProcess), ex);
 		}
 		catch (OperationCanceledException) {}
 	}

@@ -23,8 +23,8 @@ namespace Donuts.Bots;
 public interface IBotSpawnService
 {
 	void FrameUpdate(float deltaTime);
-	UniTask SpawnStartingBots(CancellationToken cancellationToken);
-	UniTask SpawnBotWaves(CancellationToken cancellationToken);
+	UniTask SpawnStartingBots();
+	UniTask SpawnBotWaves();
 	void DespawnFurthestBot();
 	void RestartPlayerHitTimer();
 }
@@ -32,12 +32,14 @@ public interface IBotSpawnService
 public abstract class BotSpawnService : IBotSpawnService
 {
 	private BotSpawner _eftBotSpawner;
+	private CancellationToken _onDestroyToken;
+	
+	private ISpawnCheckProcessor _spawnCheckProcessor;
+	
 	private GameWorld _gameWorld;
 	private string _mapLocation;
 	private BotsController _botsController;
 	private IBotCreator _botCreator;
-
-	private ISpawnCheckProcessor _spawnCheckProcessor;
 	
 	private bool _hasSpawnedStartingBots;
 	private float _despawnCooldownTime;
@@ -47,7 +49,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	// Spawn caps
 	private int _currentRespawnCount;
-	
+
 	protected BotConfigService ConfigService { get; private set; }
 	protected IBotDataService DataService { get; private set; }
 	protected ManualLogSource Logger { get; private set; }
@@ -112,6 +114,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		DataService = dataService;
 		_eftBotSpawner = eftBotSpawner;
 		Logger = logger;
+		_onDestroyToken = cancellationToken;
 		
 		_gameWorld = Singleton<GameWorld>.Instance;
 		_mapLocation = ConfigService.GetMapLocation();
@@ -156,8 +159,7 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	private void ActivateBotAtPosition(
 		[NotNull] BotCreationDataClass botData,
-		Vector3 spawnPosition,
-		CancellationToken cancellationToken)
+		Vector3 spawnPosition)
 	{
 		BotZone closestBotZone = _eftBotSpawner.GetClosestZone(spawnPosition, out _);
 		AICorePoint closestCorePoint = GetClosestCorePoint(spawnPosition);
@@ -168,12 +170,12 @@ public abstract class BotSpawnService : IBotSpawnService
 		var groupAction = new Func<BotOwner, BotZone, BotsGroup>(getGroupWrapper.GetGroupAndSetEnemies);
 		var callback = new Action<BotOwner>(createBotCallbackWrapper.CreateBotCallback);
 
-		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, cancellationToken);
+		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
 		DataService.ClearBotCache(botData);
 		//_botDataService.ReplenishBotDataTimer.Restart();
 	}
 
-	public async UniTask SpawnStartingBots(CancellationToken cancellationToken)
+	public async UniTask SpawnStartingBots()
 	{
 		if (_hasSpawnedStartingBots) return;
 
@@ -181,19 +183,19 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		foreach (BotSpawnInfo botSpawnInfo in DataService.BotSpawnInfos)
 		{
-			if (cancellationToken.IsCancellationRequested) return;
+			if (_onDestroyToken.IsCancellationRequested) return;
 			
-			await SpawnBot(botSpawnInfo.GroupSize, botSpawnInfo.Zone, botSpawnInfo.Coordinates, cancellationToken, true);
+			await SpawnBot(botSpawnInfo.GroupSize, botSpawnInfo.Zone, botSpawnInfo.Coordinates);
 		}
 	}
 
-	public async UniTask SpawnBotWaves(CancellationToken cancellationToken)
+	public async UniTask SpawnBotWaves()
 	{
 		var anySpawned = false;
 
 		foreach (BotWave botWave in GetBotWavesList())
 		{
-			if (cancellationToken.IsCancellationRequested) return;
+			if (_onDestroyToken.IsCancellationRequested) return;
 			
 			if (IsHumanPlayerInCombat())
 			{
@@ -203,17 +205,17 @@ public abstract class BotSpawnService : IBotSpawnService
 				break;
 			}
 
-			if (CanSpawn(botWave.SpawnChance) && await TryProcessBotWave(botWave, cancellationToken))
+			if (CanSpawn(botWave.SpawnChance) && await TryProcessBotWave(botWave))
 			{
 				anySpawned = true;
 			}
-			// if CanSpawn is false then we need to reset the timers for this wave
+			
 			ResetGroupTimers(botWave.GroupNum);
 		}
 
 		if (!anySpawned)
 		{
-			await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: cancellationToken);
+			await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: _onDestroyToken);
 		}
 	}
 	
@@ -341,7 +343,7 @@ public abstract class BotSpawnService : IBotSpawnService
     	return canSpawn;
     }
 
-	private async UniTask<bool> TryProcessBotWave(BotWave botWave, CancellationToken cancellationToken)
+	private async UniTask<bool> TryProcessBotWave(BotWave botWave)
 	{
 		Dictionary<string, List<Vector3>> zoneSpawnPoints = DataService.ZoneSpawnPoints;
 		if (!zoneSpawnPoints.Any())
@@ -359,7 +361,7 @@ public abstract class BotSpawnService : IBotSpawnService
 
 		foreach (Vector3 spawnPoint in spawnPoints)
 		{
-			if (cancellationToken.IsCancellationRequested)
+			if (_onDestroyToken.IsCancellationRequested)
 			{
 				return false;
 			}
@@ -367,7 +369,7 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 			Logger.LogDebug($"Triggering spawn for botWave: {botWave} at {randomZone}, {spawnPoint.ToString()}");
 #endif
-			if (await TrySpawnBot(botWave, randomZone, spawnPoint, spawnPoints, cancellationToken))
+			if (await TrySpawnBot(botWave, randomZone, spawnPoint, spawnPoints))
 			{
 				return true;
 			}
@@ -436,8 +438,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		BotWave botWave,
 		string zone,
 		Vector3 primarySpawnPoint,
-		List<Vector3> spawnPoints,
-		CancellationToken cancellationToken)
+		List<Vector3> spawnPoints)
 	{
 		if (!IsHumanPlayerWithinTriggerDistance(botWave.TriggerDistance, primarySpawnPoint) ||
 			(DefaultPluginVars.HardCapEnabled.Value && HasReachedHardCap()) ||
@@ -453,12 +454,12 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 
-		if (await SpawnBot(groupSize, zone, spawnPoints, cancellationToken))
+		if (await SpawnBot(groupSize, zone, spawnPoints))
 		{
 			botWave.TimesSpawned++;
 		}
 		
-		if (cancellationToken.IsCancellationRequested)
+		if (_onDestroyToken.IsCancellationRequested)
 		{
 			return false;
 		}
@@ -476,7 +477,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		int groupSize,
 		string zone,
 		List<Vector3> spawnPoints,
-		CancellationToken cancellationToken,
 		bool ignoreChecks = false)
 	{
 		bool isGroup = groupSize > 1;
@@ -496,7 +496,7 @@ public abstract class BotSpawnService : IBotSpawnService
 #endif
 			var botInfo = new PrepBotInfo(botDifficulty, isGroup, groupSize);
 			(bool success, cachedBotData) = await DataService.TryCreateBotData(botInfo);
-			if (cancellationToken.IsCancellationRequested || !success)
+			if (_onDestroyToken.IsCancellationRequested || !success)
 			{
 				return false;
 			}
@@ -508,15 +508,15 @@ public abstract class BotSpawnService : IBotSpawnService
 		var spawned = false;
 		foreach (Vector3 position in spawnPoints)
 		{
-			Vector3 spawnPosition = await GetValidSpawnPosition(ignoreChecks, position, cancellationToken);
-			if (cancellationToken.IsCancellationRequested)
+			Vector3 spawnPosition = await GetValidSpawnPosition(ignoreChecks, position);
+			if (_onDestroyToken.IsCancellationRequested)
 			{
 				return false;
 			}
 			
 			if (spawnPosition != Vector3.zero)
 			{
-				ActivateBotAtPosition(cachedBotData, spawnPosition, cancellationToken);
+				ActivateBotAtPosition(cachedBotData, spawnPosition);
 				spawned = true;
 			}
 		}
@@ -530,47 +530,38 @@ public abstract class BotSpawnService : IBotSpawnService
 		return spawned;
 	}
 
-	private async UniTask<Vector3> GetValidSpawnPosition(bool ignoreChecks, Vector3 position, CancellationToken cancellationToken)
+	private async UniTask<Vector3> GetValidSpawnPosition(bool ignoreChecks, Vector3 position)
 	{
-		try
+		int maxSpawnAttempts = DefaultPluginVars.maxSpawnTriesPerBot.Value;
+		for (var i = 0; i < maxSpawnAttempts; i++)
 		{
-			int maxSpawnAttempts = DefaultPluginVars.maxSpawnTriesPerBot.Value;
-			for (var i = 0; i < maxSpawnAttempts; i++)
+			if (_onDestroyToken.IsCancellationRequested)
 			{
-				if (cancellationToken.IsCancellationRequested)
-				{
-					return Vector3.zero;
-				}
-
-				if (NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
-				{
-					if (!ignoreChecks)
-					{
-						var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation,
-							_gameWorld.AllAlivePlayersList);
-						_spawnCheckProcessor.Process(spawnCheckData);
-						if (!spawnCheckData.Success)
-						{
-							return Vector3.zero;
-						}
-					}
-					
-					Vector3 spawnPosition = navHit.position;
-#if DEBUG
-					Logger.LogDebug($"Found spawn position at: {spawnPosition.ToString()}");
-#endif
-					return spawnPosition;
-				}
-				
-				await UniTask.Yield(cancellationToken);
+				return Vector3.zero;
 			}
+
+			if (NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
+			{
+				if (!ignoreChecks)
+				{
+					var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation,
+						_gameWorld.AllAlivePlayersList);
+					_spawnCheckProcessor.Process(spawnCheckData);
+					if (!spawnCheckData.Success)
+					{
+						return Vector3.zero;
+					}
+				}
+					
+				Vector3 spawnPosition = navHit.position;
+#if DEBUG
+				Logger.LogDebug($"Found spawn position at: {spawnPosition.ToString()}");
+#endif
+				return spawnPosition;
+			}
+				
+			await UniTask.Yield(_onDestroyToken);
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
-		{
-			Logger.LogError(string.Format("Exception thrown in {0}::{1}: {2}\n{3}", GetType(),
-				nameof(GetValidSpawnPosition), ex.Message, ex.StackTrace));
-		}
-		catch (OperationCanceledException) {}
 
 		return Vector3.zero;
 	}
