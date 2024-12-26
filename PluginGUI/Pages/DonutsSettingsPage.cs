@@ -30,7 +30,7 @@ public class DonutsSettingsPage : TabContainerPage
 	{
 		// Manually draw the window title centered at the top
 		Rect titleRect = new(0, 0, WindowRect.width, 20);
-		GUI.Label(titleRect, "Donuts Configuration", new GUIStyle(GUI.skin.label)
+		GUI.Label(titleRect, Name, new GUIStyle(GUI.skin.label)
 		{
 			alignment = TextAnchor.MiddleCenter,
 			fontSize = 20,
@@ -39,12 +39,14 @@ public class DonutsSettingsPage : TabContainerPage
 		});
 
 		GUILayout.BeginVertical();
+		
 		_scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.ExpandHeight(true));
 		GUILayout.BeginVertical();
 		DrawTabButtons();
 		GUILayout.EndVertical();
 		DrawSelectedTabContent();
 		GUILayout.EndScrollView();
+		
 		DrawFooter();
 		GUILayout.EndVertical();
 
