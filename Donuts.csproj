@@ -122,6 +122,9 @@
     <Reference Include="UnityToolkit">
       <HintPath>E:\SPT-3.10\BepInEx\plugins\UnityToolkit\UnityToolkit.dll</HintPath>
     </Reference>
+    <Reference Include="ZString">
+      <HintPath>E:\SPT-3.10\BepInEx\plugins\UnityToolkit\ZString.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>

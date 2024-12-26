@@ -1,4 +1,5 @@
 ﻿using BepInEx.Logging;
+using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using EFT.Communications;
 using EFT.UI;
@@ -21,8 +22,8 @@ internal static class DonutsHelper
 	/// Custom implementation of ReadAllTextAsync since it isn't available on .NET Framework 4.7.1
 	/// </summary>
 	/// <param name="path">A relative or absolute path for the file to be read.</param>
-	/// <returns>A UniTask that represents the read file's entire contents as a single string.</returns>
-	/// <exception cref="ArgumentException">path is null or empty.</exception>
+	/// <returns>A <c>UniTask</c> that represents the read file's entire contents as a single string.</returns>
+	/// <exception cref="ArgumentException"><c>path</c> is null or empty.</exception>
 	internal static async UniTask<string> ReadAllTextAsync(string path)
 	{
 		if (string.IsNullOrEmpty(path))
@@ -35,6 +36,19 @@ internal static class DonutsHelper
 		// otherwise you may get chinese characters even when your text does not contain any
 
 		return await streamReader.ReadToEndAsync();
+	}
+	
+	internal static void LogException(this ManualLogSource logSource, string typeName, string methodName, Exception ex)
+	{
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		sb.Append(typeName);
+		sb.Append("::");
+		sb.Append(methodName);
+		sb.Append(": ");
+		sb.Append(ex.Message);
+		sb.Append("\n");
+		sb.Append(ex.StackTrace);
+		logSource.LogError(sb.ToString());
 	}
 
 	internal static void NotifyLog(
@@ -83,11 +97,9 @@ internal static class DonutsHelper
 		{
 			NotificationManagerClass.DisplayMessageNotification(message, ENotificationDurationType.Long, iconType, color);
 		}
-		catch (Exception ex)
+		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			DonutsPlugin.Logger.LogError(string.Format("Exception thrown in {0}::{1}: {2}\n{3}",
-				nameof(NotificationManagerClass), nameof(NotificationManagerClass.DisplayMessageNotification),
-				ex.Message, ex.StackTrace));
+			DonutsPlugin.Logger.LogException(nameof(DonutsHelper), nameof(DisplayNotification), ex);
 		}
 	}
 
@@ -121,7 +133,9 @@ internal static class DonutsHelper
 	{
 		int n = source.Count;
 		if (n == 0)
+		{
 			return default;
+		}
 		int randomIndex = _random.Next(n);
 		return source[randomIndex];
 	}
