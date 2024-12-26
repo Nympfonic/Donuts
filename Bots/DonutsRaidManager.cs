@@ -341,20 +341,14 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		if (forceAllBotType is "PMC" or "Disabled")
 		{
-			IBotDataService dataService = BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
+			IBotDataService dataService = await BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
 			BotDataServices.Add(DonutsSpawnType.Pmc, dataService);
 		}
 
 		if (forceAllBotType is "SCAV" or "Disabled")
 		{
-			IBotDataService dataService = BotDataService.Create<ScavBotDataService>(BotConfigService, Logger, _onDestroyToken);
+			IBotDataService dataService = await BotDataService.Create<ScavBotDataService>(BotConfigService, Logger, _onDestroyToken);
 			BotDataServices.Add(DonutsSpawnType.Scav, dataService);
-		}
-		
-		foreach (IBotDataService service in BotDataServices.Values)
-		{
-			if (_onDestroyToken.IsCancellationRequested) return false;
-			await service.SetupInitialBotCache(_onDestroyToken);
 		}
 
 		return true;

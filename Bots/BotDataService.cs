@@ -21,7 +21,6 @@ public interface IBotDataService
 	public DonutsSpawnType SpawnType { get; }
 	public int MaxBotLimit { get; }
 	
-	UniTask SetupInitialBotCache(CancellationToken cancellationToken);
 	UniTask<(bool, BotCreationDataClass)> TryCreateBotData([NotNull] PrepBotInfo botInfo);
 	UniTask ReplenishBotData(CancellationToken cancellationToken);
 	[CanBeNull] BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int targetCount);
@@ -31,7 +30,7 @@ public interface IBotDataService
 
 public abstract class BotDataService : IBotDataService
 {
-	private CancellationToken _cancellationToken;
+	private CancellationToken _onDestroyToken;
 	private IBotCreator _botCreator;
 	private BotSpawner _eftBotSpawner;
 
@@ -51,14 +50,15 @@ public abstract class BotDataService : IBotDataService
 	protected abstract BotConfig BotConfig { get; }
 	protected abstract List<BotDifficulty> BotDifficulties { get; }
 
-	public static TBotDataService Create<TBotDataService>(
+	public static async UniTask<TBotDataService> Create<TBotDataService>(
 		[NotNull] BotConfigService configService,
 		[NotNull] ManualLogSource logger,
 		CancellationToken cancellationToken)
-		where TBotDataService : BotDataService, new()
+	where TBotDataService : BotDataService, new()
 	{
 		var service = new TBotDataService();
 		service.Initialize(configService, logger, cancellationToken);
+		await service.SetupInitialBotCache();
 		return service;
 	}
 
@@ -68,6 +68,7 @@ public abstract class BotDataService : IBotDataService
 	protected abstract List<string> GetZoneNames(string location);
 
 	public async UniTask SetupInitialBotCache(CancellationToken cancellationToken)
+	private async UniTask SetupInitialBotCache()
 	{
 		try
 		{
@@ -79,7 +80,7 @@ public abstract class BotDataService : IBotDataService
 			var totalBots = 0;
 			while (totalBots < maxBots)
 			{
-				if (cancellationToken.IsCancellationRequested) return;
+				if (_onDestroyToken.IsCancellationRequested) return;
 				
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, botCfg.MinGroupSize, botCfg.MaxGroupSize,
 					maxBots - totalBots);
@@ -89,7 +90,7 @@ public abstract class BotDataService : IBotDataService
 				
 				var botInfo = new PrepBotInfo(BotDifficulties.PickRandomElement(), groupSize > 1, groupSize);
 				(bool success, BotCreationDataClass _) = await TryCreateBotData(botInfo);
-				if (cancellationToken.IsCancellationRequested) return;
+				if (_onDestroyToken.IsCancellationRequested) return;
 				
 				if (success)
 				{
@@ -100,7 +101,7 @@ public abstract class BotDataService : IBotDataService
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogError($"Exception thrown in {GetType()}::{nameof(SetupInitialBotCache)}: {ex.Message}\n{ex.StackTrace}");
+			Logger.LogException(GetType().Name, nameof(SetupInitialBotCache), ex);
 		}
 		catch (OperationCanceledException) {}
 	}
@@ -261,7 +262,7 @@ public abstract class BotDataService : IBotDataService
 	{
 		ConfigService = configService;
 		Logger = logger;
-		_cancellationToken = cancellationToken;
+		_onDestroyToken = cancellationToken;
 		_eftBotSpawner = Singleton<IBotGame>.Instance.BotsController.BotSpawner;
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
 
