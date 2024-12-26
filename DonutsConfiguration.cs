@@ -1,4 +1,5 @@
 ﻿using Donuts.Models;
+using Donuts.Utils;
 using HarmonyLib;
 using Newtonsoft.Json;
 using System;
@@ -184,7 +185,7 @@ internal static class DonutsConfiguration
 		}
 		catch (Exception ex)
 		{
-			DonutsPlugin.Logger.LogError($"Error setting value for field {settingField.Name}: {ex}");
+			DonutsPlugin.Logger.LogException(nameof(DonutsConfiguration), nameof(ApplySetting), ex);
 		}
 	}
 }
