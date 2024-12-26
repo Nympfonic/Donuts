@@ -22,7 +22,7 @@ public interface IBotDataService
 	public int MaxBotLimit { get; }
 	
 	UniTask<(bool, BotCreationDataClass)> TryCreateBotData([NotNull] PrepBotInfo botInfo);
-	UniTask ReplenishBotData(CancellationToken cancellationToken);
+	UniTask ReplenishBotData();
 	[CanBeNull] BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int targetCount);
 	void ClearBotCache([NotNull] BotCreationDataClass botData);
 	BotDifficulty GetBotDifficulty();
@@ -33,8 +33,10 @@ public abstract class BotDataService : IBotDataService
 	private CancellationToken _onDestroyToken;
 	private IBotCreator _botCreator;
 	private BotSpawner _eftBotSpawner;
+	
+	protected BotConfig botConfig;
 
-	private const int INITIAL_BOT_CACHE_SIZE = 100;
+	private const int INITIAL_BOT_CACHE_SIZE = 30;
 	private readonly List<PrepBotInfo> _botInfoList = new(INITIAL_BOT_CACHE_SIZE);
 	
 	protected BotConfigService ConfigService { get; private set; }
@@ -44,10 +46,9 @@ public abstract class BotDataService : IBotDataService
 	public Dictionary<string, List<Vector3>> ZoneSpawnPoints { get; } = [];
 	public abstract DonutsSpawnType SpawnType { get; }
 	public int MaxBotLimit => ConfigService.GetMaxBotLimit(SpawnType);
+	
 	protected abstract string GroupChance { get; }
 	protected HashSet<string> UsedSpawnZones { get; } = [];
-	
-	protected abstract BotConfig BotConfig { get; }
 	protected abstract List<BotDifficulty> BotDifficulties { get; }
 
 	public static async UniTask<TBotDataService> Create<TBotDataService>(
@@ -61,18 +62,16 @@ public abstract class BotDataService : IBotDataService
 		await service.SetupInitialBotCache();
 		return service;
 	}
-
-	public abstract WildSpawnType GetWildSpawnType();
-	public abstract EPlayerSide GetPlayerSide(WildSpawnType spawnType);
+	
 	public abstract BotDifficulty GetBotDifficulty();
-	protected abstract List<string> GetZoneNames(string location);
+	
+	protected abstract BotConfig GetBotConfig();
 
-	public async UniTask SetupInitialBotCache(CancellationToken cancellationToken)
 	private async UniTask SetupInitialBotCache()
 	{
 		try
 		{
-			BotConfig botCfg = BotConfig;
+			BotConfig botCfg = GetBotConfig();
 			int maxBots = BotHelper.GetRandomBotCap(botCfg.MinCount, botCfg.MaxCount, MaxBotLimit);
 #if DEBUG
 			Logger.LogDebug($"{GetType()}::{nameof(SetupInitialBotCache)}: Max starting bots: {maxBots.ToString()}");
@@ -106,11 +105,14 @@ public abstract class BotDataService : IBotDataService
 		catch (OperationCanceledException) {}
 	}
 
+	protected abstract WildSpawnType GetWildSpawnType();
+	protected abstract EPlayerSide GetPlayerSide(WildSpawnType spawnType);
+
 	public async UniTask<(bool, BotCreationDataClass)> TryCreateBotData(PrepBotInfo botInfo)
 	{
 		try
 		{
-			if (_cancellationToken.IsCancellationRequested)
+			if (_onDestroyToken.IsCancellationRequested)
 			{
 				return (false, null);
 			}
@@ -125,14 +127,10 @@ public abstract class BotDataService : IBotDataService
 			var botProfileData = new BotProfileData(side, spawnType, botInfo.Difficulty, 0f);
 			BotCreationDataClass botCreationData = await BotCreationDataClass
 				.Create(botProfileData, _botCreator, botInfo.GroupSize, _eftBotSpawner)
-				.AsUniTask()
-				.AttachExternalCancellation(_cancellationToken);
+				.AsUniTask();
 
 			if (botCreationData?.Profiles == null || botCreationData.Profiles.Count == 0)
 			{
-				Logger.LogError(string.Format(
-					"{0}::{1}: Failed to create or properly initialize bot for {2}; Profiles is null or empty.",
-					GetType(), nameof(TryCreateBotData), spawnType.ToString()));
 				return (false, null);
 			}
 
@@ -146,15 +144,14 @@ public abstract class BotDataService : IBotDataService
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogError(string.Format("Exception thrown in {0}::{1}: {2}\n{3}", GetType(), nameof(TryCreateBotData),
-				ex.Message, ex.StackTrace));
+			Logger.LogException(GetType().Name, nameof(TryCreateBotData), ex);
 		}
 		catch (OperationCanceledException) {}
 		
 		return (false, null);
 	}
 
-	public async UniTask ReplenishBotData(CancellationToken cancellationToken)
+	public async UniTask ReplenishBotData()
 	{
 		try
 		{
@@ -162,11 +159,11 @@ public abstract class BotDataService : IBotDataService
 			var groupBotsCount = 0;
 			foreach (PrepBotInfo botInfo in _botInfoList)
 			{
-				if (cancellationToken.IsCancellationRequested) return;
+				if (_onDestroyToken.IsCancellationRequested) return;
 				if (botInfo.Bots != null && botInfo.Bots.Profiles.Count > 0) continue;
 
 				(bool success, BotCreationDataClass botData) = await TryCreateBotData(botInfo);
-				if (cancellationToken.IsCancellationRequested) return;
+				if (_onDestroyToken.IsCancellationRequested) return;
 				if (!success) continue;
 
 				if (botInfo.IsGroup && groupBotsCount < 1)
@@ -192,12 +189,11 @@ public abstract class BotDataService : IBotDataService
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogError(
-				$"Exception thrown in {GetType()}::{nameof(ReplenishBotData)}: {ex.Message}\n{ex.StackTrace}");
+			Logger.LogException(GetType().Name, nameof(ReplenishBotData), ex);
 		}
 		catch (OperationCanceledException) {}
 	}
-	
+
 	public BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int groupSize)
 	{
 		// Find the bot info that matches the difficulty and group size
@@ -217,7 +213,7 @@ public abstract class BotDataService : IBotDataService
 #endif
 		return null;
 	}
-	
+
 	public void ClearBotCache(BotCreationDataClass botData)
 	{
 		foreach (PrepBotInfo botInfo in _botInfoList)
@@ -233,7 +229,7 @@ public abstract class BotDataService : IBotDataService
 			}
 		}
 	}
-	
+
 	protected static BotDifficulty GetBotDifficulty(string settingValue)
 	{
 		string difficultyLower = settingValue.ToLower();
@@ -254,6 +250,8 @@ public abstract class BotDataService : IBotDataService
 				return BotDifficulty.normal;
 		}
 	}
+
+	protected abstract List<string> GetZoneNames(string location);
 
 	private void Initialize(
 		[NotNull] BotConfigService configService,

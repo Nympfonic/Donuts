@@ -9,20 +9,14 @@ namespace Donuts.Bots;
 
 public class PmcBotDataService : BotDataService
 {
-	private BotConfig _botConfig;
-	private List<BotDifficulty> _botDifficulties;
-	
 	public override DonutsSpawnType SpawnType => DonutsSpawnType.Pmc;
 
-	protected override BotConfig BotConfig =>
-		_botConfig ??= ConfigService.GetStartingBotConfig()!.Maps[ConfigService.GetMapLocation()].Pmc;
-	
-	protected override List<BotDifficulty> BotDifficulties =>
-		_botDifficulties ??= BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value.ToLower());
+	protected override List<BotDifficulty> BotDifficulties { get; } =
+		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value.ToLower());
 
 	protected override string GroupChance => DefaultPluginVars.pmcGroupChance.Value;
 
-	public override WildSpawnType GetWildSpawnType() =>
+	protected override WildSpawnType GetWildSpawnType() =>
 		DefaultPluginVars.pmcFaction.Value switch
 		{
 			"USEC" => WildSpawnType.pmcUSEC,
@@ -30,7 +24,7 @@ public class PmcBotDataService : BotDataService
 			_ => GetPmcFactionBasedOnRatio()
 		};
 
-	public override EPlayerSide GetPlayerSide(WildSpawnType spawnType) =>
+	protected override EPlayerSide GetPlayerSide(WildSpawnType spawnType) =>
 		spawnType switch
 		{
 			WildSpawnType.pmcUSEC => EPlayerSide.Usec,
@@ -39,12 +33,13 @@ public class PmcBotDataService : BotDataService
 				"Must provide a PMC WildSpawnType (WildSpawnType.pmcUSEC or WildSpawnType.pmcBEAR).", nameof(spawnType))
 		};
 
+	protected override BotConfig GetBotConfig() =>
+		botConfig ??= ConfigService.GetStartingBotConfig()!.Maps[ConfigService.GetMapLocation()].Pmc;
+
 	public override BotDifficulty GetBotDifficulty() => GetBotDifficulty(DefaultPluginVars.botDifficultiesPMC.Value);
 
-	protected override List<string> GetZoneNames(string location)
-	{
-		return ConfigService.GetStartingBotConfig()!.Maps[location].Pmc.Zones;
-	}
+	protected override List<string> GetZoneNames(string location) =>
+		ConfigService.GetStartingBotConfig()!.Maps[location].Pmc.Zones;
 
 	private static WildSpawnType GetPmcFactionBasedOnRatio() =>
 		Random.Range(0, 100) < DefaultPluginVars.pmcFactionRatio.Value
