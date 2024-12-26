@@ -224,24 +224,31 @@ public abstract class BotSpawnService : IBotSpawnService
 	[CanBeNull]
 	private Player FindFurthestBot()
 	{
-		var maxSqrMagnitude = float.MinValue;
+		var furthestSqrMagnitude = float.MinValue;
 		Player furthestBot = null;
-
-		foreach (Player bot in _gameWorld.AllAlivePlayersList)
+		List<Player> allAlivePlayers = _gameWorld.AllAlivePlayersList;
+		List<Player> humanPlayers = ConfigService.GetHumanPlayerList();
+		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
-			if (bot.IsYourPlayer || bot.AIData.BotOwner == null || IsCorrectSpawnType(bot.Profile.Info.Settings.Role))
+			Player player = allAlivePlayers[i];
+			if (!player.IsAI || player.AIData.BotOwner == null || IsCorrectSpawnType(player.Profile.Info.Settings.Role))
 			{
 				continue;
 			}
 
-			// Get distance of bot to player using squared distance
-			float sqrMagnitude = (_gameWorld.MainPlayer.Transform.position - bot.Transform.position).sqrMagnitude;
-
-			// Check if this is the furthest distance
-			if (sqrMagnitude > maxSqrMagnitude)
+			for (int j = humanPlayers.Count - 1; j >= 0; j--)
 			{
-				maxSqrMagnitude = sqrMagnitude;
-				furthestBot = bot;
+				Player humanPlayer = humanPlayers[j];
+				
+				// Get distance of bot to player using squared distance
+				float sqrMagnitude = (humanPlayer.Transform.position - player.Transform.position).sqrMagnitude;
+
+				// Check if this is the furthest distance
+				if (sqrMagnitude > furthestSqrMagnitude)
+				{
+					furthestSqrMagnitude = sqrMagnitude;
+					furthestBot = player;
+				}
 			}
 		}
 
@@ -253,7 +260,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		else
 		{
 			Logger.LogDebug(string.Format("Furthest bot found: {0} at distance {1}", furthestBot.Profile.Info.Nickname,
-				Mathf.Sqrt(maxSqrMagnitude).ToString(CultureInfo.InvariantCulture)));
+				Mathf.Sqrt(furthestSqrMagnitude).ToString(CultureInfo.InvariantCulture)));
 		}
 #endif
 
