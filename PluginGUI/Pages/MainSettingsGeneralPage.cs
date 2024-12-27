@@ -17,6 +17,7 @@ internal class MainSettingsGeneralPage : ISettingsPage
 	public MainSettingsGeneralPage()
 	{
 		InitializeDropdownIndices();
+		PluginGUIComponent.OnOpen += InitializeDropdownIndices;
 		PluginGUIComponent.OnResetToDefaults += InitializeDropdownIndices;
 	}
 	

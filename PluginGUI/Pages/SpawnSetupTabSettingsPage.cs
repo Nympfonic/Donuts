@@ -13,6 +13,7 @@ internal class SpawnSetupTabSettingsPage : ISettingsPage
 	public SpawnSetupTabSettingsPage()
 	{
 		InitializeDropdownIndices();
+		PluginGUIComponent.OnOpen += InitializeDropdownIndices;
 		PluginGUIComponent.OnResetToDefaults += InitializeDropdownIndices;
 	}
 

@@ -18,6 +18,7 @@ internal class MainSettingsBotAttributesPage : ISettingsPage
 	public MainSettingsBotAttributesPage()
 	{
 		InitializeDropdownIndices();
+		PluginGUIComponent.OnOpen += InitializeDropdownIndices;
 		PluginGUIComponent.OnResetToDefaults += InitializeDropdownIndices;
 	}
 	

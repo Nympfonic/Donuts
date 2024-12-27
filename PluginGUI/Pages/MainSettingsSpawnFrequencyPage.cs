@@ -14,6 +14,7 @@ internal class MainSettingsSpawnFrequencyPage : ISettingsPage
 	public MainSettingsSpawnFrequencyPage()
 	{
 		InitializeDropdownIndices();
+		PluginGUIComponent.OnOpen += InitializeDropdownIndices;
 		PluginGUIComponent.OnResetToDefaults += InitializeDropdownIndices;
 	}
 	

@@ -8,10 +8,7 @@ namespace Donuts.PluginGUI;
 
 public class PluginGUIComponent : MonoBehaviour
 {
-	//internal static Rect windowRect = new(20, 20, 1664, 936);
-
-	//private bool _stylesInitialized = false;
-
+	private bool _currentGuiState = DefaultPluginVars.ShowGUI;
 	private ISettingsPage _settingsPage;
 	private static bool _stylesInitialized;
 
@@ -29,6 +26,28 @@ public class PluginGUIComponent : MonoBehaviour
 	internal static GUIStyle ToggleButtonStyle { get; private set; }
 	internal static GUIStyle TooltipStyle { get; private set; }
 
+	private bool GuiEnabled
+	{
+		get
+		{
+			if (_currentGuiState != DefaultPluginVars.ShowGUI)
+			{
+				_currentGuiState = DefaultPluginVars.ShowGUI;
+				if (_currentGuiState)
+				{
+					OnOpen?.Invoke();
+				}
+				else
+				{
+					OnClose?.Invoke();
+				}
+			}
+			return _currentGuiState;
+		}
+	}
+
+	internal static event Action OnOpen;
+	internal static event Action OnClose;
 	internal static event Action OnResetToDefaults;
 
 	private void OnGUI()
@@ -40,7 +59,7 @@ public class PluginGUIComponent : MonoBehaviour
 			_stylesInitialized = true;
 		}
 		
-		if (!DefaultPluginVars.ShowGUI)
+		if (!GuiEnabled)
 		{
 			return;
 		}
@@ -63,7 +82,7 @@ public class PluginGUIComponent : MonoBehaviour
 	private void Update()
 	{
 		// If showing the gui, disable mouse clicks affecting the game
-		if (!DefaultPluginVars.ShowGUI) return;
+		if (!GuiEnabled) return;
 			
 		Cursor.lockState = CursorLockMode.None;
 		Cursor.visible = true;
