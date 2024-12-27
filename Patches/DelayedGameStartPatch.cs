@@ -14,9 +14,7 @@ namespace Donuts.Patches;
 [UsedImplicitly]
 internal class DelayedGameStartPatch : ModulePatch
 {
-	/// <summary>
-	/// Target method has a return type of <see cref="IEnumerator"/> and has a single <see cref="Action"/> type parameter.
-	/// </summary>
+	/// <remarks>Target method has a return type of <see cref="IEnumerator"/> and has a single <see cref="Action"/> type parameter.</remarks>
 	protected override MethodBase GetTargetMethod()
 	{
 		Type baseGameType = typeof(BaseLocalGame<EftGamePlayerOwner>);
@@ -50,19 +48,21 @@ internal class DelayedGameStartPatch : ModulePatch
 			float currentTime = Time.time;
 			if (currentTime - startTime >= maxWaitTime)
 			{
-				Logger.LogWarning("Max raid delay time reached. Proceeding with raid start, some bots might spawn late!");
+				DonutsRaidManager.Logger.LogWarning(
+					"Max raid delay time reached. Proceeding with raid start, some bots might spawn late!");
 				break;
 			}
 
-			if (currentTime - lastLogTime < 1f)
+			// Log every 2 seconds instead of every second to avoid spamming logs
+			if (currentTime - lastLogTime >= 2f)
 			{
 				lastLogTime = currentTime;
-				Logger.LogWarning("Donuts still waiting...");
+				DonutsRaidManager.Logger.LogWarning("Donuts still waiting...");
 			}
 		}
 
 		// Continue with the original task
-		Logger.LogWarning("Donuts bot preparation is complete...");
+		Logger.LogWarning("Donuts bot preparation is complete.");
 		yield return originalTask;
 	}
 }
