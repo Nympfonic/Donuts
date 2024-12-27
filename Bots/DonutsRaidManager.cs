@@ -12,6 +12,8 @@ using System.Threading;
 using UnityEngine;
 using UnityToolkit.Extensions;
 
+#pragma warning disable CS0252, CS0253
+
 namespace Donuts.Bots;
 
 public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
