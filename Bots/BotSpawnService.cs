@@ -34,7 +34,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	private BotSpawner _eftBotSpawner;
 	private CancellationToken _onDestroyToken;
 	
-	private ISpawnCheckProcessor _spawnCheckProcessor;
+	private SpawnCheckProcessorBase _spawnCheckProcessor;
 	
 	private GameWorld _gameWorld;
 	private string _mapLocation;
@@ -172,7 +172,7 @@ public abstract class BotSpawnService : IBotSpawnService
 
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
 		DataService.ClearBotCache(botData);
-		//_botDataService.ReplenishBotDataTimer.Restart();
+		//DataService.ReplenishBotDataTimer.Restart();
 	}
 
 	public async UniTask SpawnStartingBots()

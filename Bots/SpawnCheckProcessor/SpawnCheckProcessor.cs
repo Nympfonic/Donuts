@@ -1,15 +1,11 @@
-﻿namespace Donuts.Bots.SpawnCheckProcessor;
+﻿using UnityToolkit.Structures;
 
-public interface ISpawnCheckProcessor
+namespace Donuts.Bots.SpawnCheckProcessor;
+
+public abstract class SpawnCheckProcessorBase : IProcessor<SpawnCheckProcessorBase, SpawnCheckData>
 {
-	ISpawnCheckProcessor SetNext(ISpawnCheckProcessor nextProcessor);
-	void Process(SpawnCheckData data);
-}
+	private SpawnCheckProcessorBase _nextProcessor;
 
-public abstract class SpawnCheckProcessorBase : ISpawnCheckProcessor
-{
-	private ISpawnCheckProcessor _nextProcessor;
-
-	public ISpawnCheckProcessor SetNext(ISpawnCheckProcessor nextProcessor) => _nextProcessor = nextProcessor;
+	public SpawnCheckProcessorBase SetNext(SpawnCheckProcessorBase nextProcessor) => _nextProcessor = nextProcessor;
 	public virtual void Process(SpawnCheckData data) => _nextProcessor?.Process(data);
 }

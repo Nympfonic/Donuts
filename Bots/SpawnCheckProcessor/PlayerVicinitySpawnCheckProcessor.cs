@@ -13,17 +13,17 @@ public class PlayerVicinitySpawnCheckProcessor : SpawnCheckProcessorBase
 			return;
 		}
 		
-		float triggerDistance = GetMinDistanceFromPlayer(data.MapLocation);
+		float triggerDistance = GetMinDistanceFromPlayer(data.mapLocation);
 		float triggerSqrMagnitude = triggerDistance * triggerDistance;
 
-		foreach (Player player in data.AlivePlayers)
+		foreach (Player player in data.alivePlayers)
 		{
 			if (player.IsAI)
 			{
 				continue;
 			}
 
-			float actualSqrMagnitude = (((IPlayer)player).Position - data.Position).sqrMagnitude;
+			float actualSqrMagnitude = (((IPlayer)player).Position - data.position).sqrMagnitude;
 			if (actualSqrMagnitude <= triggerSqrMagnitude)
 			{
 				data.Success = false;

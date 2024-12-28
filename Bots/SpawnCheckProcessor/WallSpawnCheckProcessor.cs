@@ -10,7 +10,7 @@ public class WallSpawnCheckProcessor : SpawnCheckProcessorBase
 	
 	public override void Process(SpawnCheckData data)
 	{
-		int size = Physics.OverlapBoxNonAlloc(data.Position, _boxCheckScale, _spawnCheckColliderBuffer,
+		int size = Physics.OverlapBoxNonAlloc(data.position, _boxCheckScale, _spawnCheckColliderBuffer,
 			Quaternion.identity, LayerMaskClass.LowPolyColliderLayer);
 
 		if (size <= 0)

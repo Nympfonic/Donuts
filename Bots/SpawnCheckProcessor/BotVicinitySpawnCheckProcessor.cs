@@ -13,17 +13,17 @@ public class BotVicinitySpawnCheckProcessor : SpawnCheckProcessorBase
 			return;
 		}
 		
-		float triggerDistance = GetMinDistanceFromOtherBots(data.MapLocation);
+		float triggerDistance = GetMinDistanceFromOtherBots(data.mapLocation);
 		float triggerSqrMagnitude = triggerDistance * triggerDistance;
 
-		foreach (Player player in data.AlivePlayers)
+		foreach (Player player in data.alivePlayers)
 		{
 			if (!player.IsAI)
 			{
 				continue;
 			}
 
-			float actualSqrMagnitude = (((IPlayer)player).Position - data.Position).sqrMagnitude;
+			float actualSqrMagnitude = (((IPlayer)player).Position - data.position).sqrMagnitude;
 			if (actualSqrMagnitude <= triggerSqrMagnitude)
 			{
 				data.Success = false;

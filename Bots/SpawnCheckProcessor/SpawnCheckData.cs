@@ -4,10 +4,11 @@ using UnityEngine;
 
 namespace Donuts.Bots.SpawnCheckProcessor;
 
-public struct SpawnCheckData(Vector3 position, string mapLocation, List<Player> alivePlayers)
+public class SpawnCheckData(Vector3 position, string mapLocation, List<Player> alivePlayers)
 {
-	public Vector3 Position { get; } = position;
-	public string MapLocation { get; } = mapLocation;
-	public List<Player> AlivePlayers { get; } = alivePlayers;
+	public readonly Vector3 position = position;
+	public readonly string mapLocation = mapLocation;
+	public readonly List<Player> alivePlayers = alivePlayers;
+
 	public bool Success { get; set; }
 }

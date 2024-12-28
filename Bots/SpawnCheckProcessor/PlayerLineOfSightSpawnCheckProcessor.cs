@@ -7,7 +7,7 @@ public class PlayerLineOfSightSpawnCheckProcessor : SpawnCheckProcessorBase
 {
 	public override void Process(SpawnCheckData data)
 	{
-		foreach (Player player in data.AlivePlayers)
+		foreach (Player player in data.alivePlayers)
 		{
 			if (player.IsAI)
 			{
@@ -15,7 +15,7 @@ public class PlayerLineOfSightSpawnCheckProcessor : SpawnCheckProcessorBase
 			}
 
 			// If the spawn position is in at least one player's line of sight, cancel the spawn
-			if (IsInPlayerLineOfSight(player, data.Position))
+			if (IsInPlayerLineOfSight(player, data.position))
 			{
 				data.Success = false;
 				return;
