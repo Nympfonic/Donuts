@@ -41,7 +41,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	private BotsController _botsController;
 	private IBotCreator _botCreator;
 	
-	private bool _hasSpawnedStartingBots;
 	private float _despawnCooldownTime;
 	
 	// Combat state
@@ -177,10 +176,6 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	public async UniTask SpawnStartingBots()
 	{
-		if (_hasSpawnedStartingBots) return;
-
-		_hasSpawnedStartingBots = true;
-		
 		foreach (BotSpawnInfo botSpawnInfo in DataService.BotSpawnInfos)
 		{
 			if (_onDestroyToken.IsCancellationRequested) return;

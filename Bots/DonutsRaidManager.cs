@@ -63,6 +63,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private CancellationToken _onDestroyToken;
 	private DonutsGizmos _donutsGizmos;
 
+	private bool _hasSpawnedStartingBots;
 	private bool _isReplenishingBotData;
 	private bool _isSpawnProcessActive;
 	private float _replenishBotDataTimer;
@@ -129,7 +130,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 		}
 
-		if (!await TryCreateDataServices(DefaultPluginVars.forceAllBotType.Value))
+		if (!await TryCreateDataServices())
 		{
 			ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
 		}
@@ -162,7 +163,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			spawnService.FrameUpdate(deltaTime);
 		}
 
-		if (!_isSpawnProcessActive && BotSpawnServices.Count > 0)
+		if (_hasSpawnedStartingBots && !_isSpawnProcessActive && BotSpawnServices.Count > 0)
 		{
 			_botSpawnTimer += deltaTime;
 			if (_botSpawnTimer >= 1f)
@@ -223,6 +224,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	public void StartBotSpawnController()
 	{
 		CreateSpawnServices();
+		SpawnStartingBots().Forget();
 	}
 
 	public void RestartReplenishBotDataTimer()
@@ -323,8 +325,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 	}
 
-	private async UniTask<bool> TryCreateDataServices(string forceAllBotType)
+	private async UniTask<bool> TryCreateDataServices()
 	{
+		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
 		if (forceAllBotType is "PMC" or "Disabled")
 		{
 			IBotDataService dataService = await BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
@@ -357,6 +360,23 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 	}
 
+	private async UniTask SpawnStartingBots()
+	{
+		try
+		{
+			foreach (IBotSpawnService service in BotSpawnServices.Values)
+			{
+				await service.SpawnStartingBots();
+			}
+			_hasSpawnedStartingBots = true;
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Logger.LogException(nameof(DonutsRaidManager), nameof(SpawnStartingBots), ex);
+		}
+		catch (OperationCanceledException) {}
+	}
+
 	private async UniTask ReplenishBotData()
 	{
 		try
@@ -384,7 +404,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			_isSpawnProcessActive = true;
 			foreach (IBotSpawnService service in BotSpawnServices.Values)
 			{
-				await service.SpawnStartingBots();
 				service.DespawnFurthestBot();
 				await service.SpawnBotWaves();
 			}
