@@ -138,12 +138,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		IsBotPreparationComplete = true;
 	}
 
-	private static void DisposePlayerSubscriptions(Player player)
-	{
-		player.BeingHitAction -= TakingDamageCombatCooldown;
-		player.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
-	}
-
 	private void Update()
 	{
 		float deltaTime = Time.deltaTime;
@@ -188,14 +182,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			_eftBotSpawner.OnBotRemoved -= ClearBotOwnerData;
 			_eftBotSpawner.OnBotCreated -= EftBotSpawner_OnBotCreated;
 		}
-
-		foreach (Player player in BotConfigService.GetHumanPlayerList())
-		{
-			if (player != null)
-			{
-				player.BeingHitAction -= TakingDamageCombatCooldown;
-			}
-		}
 		
 		base.OnDestroy();
 		IsBotPreparationComplete = false;
@@ -232,111 +218,20 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_replenishBotDataTimer = 0f;
 	}
 
-	private static void EftBotSpawner_OnBotCreated(BotOwner bot)
-	{
-		bot.Memory.OnGoalEnemyChanged += Memory_OnGoalEnemyChanged;
-	}
-
-	private static void EftBotSpawner_OnBotRemoved(BotOwner bot)
-	{
-		bot.Memory.OnGoalEnemyChanged -= Memory_OnGoalEnemyChanged;
-		//OriginalBotSpawnTypes.Remove(bot.Profile.Id);
-	}
-
-	private static void Memory_OnGoalEnemyChanged(BotOwner bot)
-	{
-		if (bot.Memory?.GoalEnemy == null) return;
-		
-		DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
-		if (raidManager == null) return;
-			
-		BotMemoryClass memory = bot.Memory;
-		EnemyInfo goalEnemy = memory.GoalEnemy;
-		List<Player> humanPlayers = raidManager.BotConfigService.GetHumanPlayerList();
-		for (int i = humanPlayers.Count - 1; i >= 0; i--)
-		{
-			Player player = humanPlayers[i];
-			if (player == null || player.HealthController == null || player.HealthController.IsAlive == false)
-			{
-				continue;
-			}
-
-			// Ignore this unintended reference comparison warning, it just doesn't understand Unity's greatness
-			if (memory.HaveEnemy &&
-				goalEnemy.Person == player.InteractablePlayer &&
-				goalEnemy.HaveSeenPersonal &&
-				goalEnemy.IsVisible)
-			{
-				raidManager._replenishBotDataTimer = 0f;
-				break;
-			}
-		}
-	}
-	
-	private static void ClearBotOwnerData(BotOwner botToRemove)
-	{
-		List<Player> humanPlayerList = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetHumanPlayerList();
-		foreach (Player humanPlayer in humanPlayerList)
-		{
-			if (humanPlayer.OrNull()?.HealthController?.IsAlive == true)
-			{
-				botToRemove.Memory.DeleteInfoAboutEnemy(humanPlayer);
-			}
-		}
-
-		botToRemove.EnemiesController.EnemyInfos.Clear();
-
-		List<Player> allAlivePlayers = Singleton<GameWorld>.Instance.AllAlivePlayersList;
-		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
-		{
-			Player player = allAlivePlayers[i];
-			if (player == null || !player.IsAI || player.AIData.BotOwner == botToRemove)
-			{
-				continue;
-			}
-
-			BotOwner botOwner = player.AIData.BotOwner;
-			botOwner.Memory.DeleteInfoAboutEnemy(botToRemove);
-			botOwner.BotsGroup.RemoveInfo(botToRemove);
-			botOwner.BotsGroup.RemoveEnemy(botToRemove, EBotEnemyCause.death);
-			botOwner.BotsGroup.RemoveAlly(botToRemove);
-		}
-	}
-	
-	private static void TakingDamageCombatCooldown(DamageInfoStruct info, EBodyPart part, float arg3)
-	{
-		switch (info.DamageType)
-		{
-			case EDamageType.Btr:
-			case EDamageType.Melee:
-			case EDamageType.Bullet:
-			case EDamageType.Explosion:
-			case EDamageType.GrenadeFragment:
-			case EDamageType.Sniper:
-				DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
-				if (raidManager == null) return;
-				
-				raidManager.RestartReplenishBotDataTimer();
-				foreach (IBotSpawnService service in raidManager.BotSpawnServices.Values)
-				{
-					service.RestartPlayerHitTimer();
-				}
-				break;
-		}
-	}
-
 	private async UniTask<bool> TryCreateDataServices()
 	{
 		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
 		if (forceAllBotType is "PMC" or "Disabled")
 		{
-			IBotDataService dataService = await BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
+			IBotDataService dataService =
+				await BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
 			BotDataServices.Add(DonutsSpawnType.Pmc, dataService);
 		}
 
 		if (forceAllBotType is "SCAV" or "Disabled")
 		{
-			IBotDataService dataService = await BotDataService.Create<ScavBotDataService>(BotConfigService, Logger, _onDestroyToken);
+			IBotDataService dataService =
+				await BotDataService.Create<ScavBotDataService>(BotConfigService, Logger, _onDestroyToken);
 			BotDataServices.Add(DonutsSpawnType.Scav, dataService);
 		}
 
@@ -395,7 +290,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		catch (OperationCanceledException) {}
 	}
-	
+
 	private async UniTask StartSpawnProcess()
 	{
 		try
@@ -414,5 +309,108 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			Logger.LogException(nameof(DonutsRaidManager), nameof(StartSpawnProcess), ex);
 		}
 		catch (OperationCanceledException) {}
+	}
+
+	private static void EftBotSpawner_OnBotCreated(BotOwner bot)
+	{
+		bot.Memory.OnGoalEnemyChanged += Memory_OnGoalEnemyChanged;
+	}
+
+	private static void EftBotSpawner_OnBotRemoved(BotOwner bot)
+	{
+		bot.Memory.OnGoalEnemyChanged -= Memory_OnGoalEnemyChanged;
+		//OriginalBotSpawnTypes.Remove(bot.Profile.Id);
+	}
+
+	private static void Memory_OnGoalEnemyChanged(BotOwner bot)
+	{
+		if (bot.Memory?.GoalEnemy == null) return;
+		
+		DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
+		if (raidManager == null) return;
+			
+		BotMemoryClass memory = bot.Memory;
+		EnemyInfo goalEnemy = memory.GoalEnemy;
+		List<Player> humanPlayers = raidManager.BotConfigService.GetHumanPlayerList();
+		for (int i = humanPlayers.Count - 1; i >= 0; i--)
+		{
+			Player player = humanPlayers[i];
+			if (player == null || player.HealthController == null || player.HealthController.IsAlive == false)
+			{
+				continue;
+			}
+
+			if (memory.HaveEnemy &&
+				// Ignore this unintended reference comparison warning, it just doesn't understand Unity's greatness
+				goalEnemy.Person == player.InteractablePlayer &&
+				goalEnemy.HaveSeenPersonal &&
+				goalEnemy.IsVisible)
+			{
+#if DEBUG
+				Logger.LogDebug(string.Format("Bot {0} changed target to player {1}. Resetting ReplenishBotData timer!",
+					bot.Profile.Info.Nickname, player.Profile.Nickname));		
+#endif
+				raidManager._replenishBotDataTimer = 0f;
+				break;
+			}
+		}
+	}
+
+	private static void ClearBotOwnerData(BotOwner botToRemove)
+	{
+		List<Player> humanPlayerList = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetHumanPlayerList();
+		foreach (Player humanPlayer in humanPlayerList)
+		{
+			if (humanPlayer.OrNull()?.HealthController?.IsAlive == true)
+			{
+				botToRemove.Memory.DeleteInfoAboutEnemy(humanPlayer);
+			}
+		}
+
+		botToRemove.EnemiesController.EnemyInfos.Clear();
+
+		List<Player> allAlivePlayers = Singleton<GameWorld>.Instance.AllAlivePlayersList;
+		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
+		{
+			Player player = allAlivePlayers[i];
+			if (player == null || !player.IsAI || player.AIData.BotOwner == botToRemove)
+			{
+				continue;
+			}
+
+			BotOwner botOwner = player.AIData.BotOwner;
+			botOwner.Memory.DeleteInfoAboutEnemy(botToRemove);
+			botOwner.BotsGroup.RemoveInfo(botToRemove);
+			botOwner.BotsGroup.RemoveEnemy(botToRemove, EBotEnemyCause.death);
+			botOwner.BotsGroup.RemoveAlly(botToRemove);
+		}
+	}
+
+	private static void TakingDamageCombatCooldown(DamageInfoStruct info, EBodyPart part, float arg3)
+	{
+		switch (info.DamageType)
+		{
+			case EDamageType.Btr:
+			case EDamageType.Melee:
+			case EDamageType.Bullet:
+			case EDamageType.Explosion:
+			case EDamageType.GrenadeFragment:
+			case EDamageType.Sniper:
+				DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
+				if (raidManager == null) return;
+				
+				raidManager.RestartReplenishBotDataTimer();
+				foreach (IBotSpawnService service in raidManager.BotSpawnServices.Values)
+				{
+					service.RestartPlayerHitTimer();
+				}
+				break;
+		}
+	}
+
+	private static void DisposePlayerSubscriptions(Player player)
+	{
+		player.BeingHitAction -= TakingDamageCombatCooldown;
+		player.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
 	}
 }
