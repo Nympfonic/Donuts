@@ -24,8 +24,9 @@ public interface IBotSpawnService
 {
 	void FrameUpdate(float deltaTime);
 	UniTask SpawnStartingBots();
-	UniTask SpawnBotWaves();
-	void DespawnFurthestBot();
+	List<BotWave> GetBotWavesToSpawn();
+	UniTask<bool> TrySpawnBotWave(BotWave wave);
+	bool TryDespawnFurthestBot();
 	void RestartPlayerHitTimer();
 }
 
@@ -192,36 +193,39 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 	}
 
-	public async UniTask SpawnBotWaves()
+	public List<BotWave> GetBotWavesToSpawn()
+	{
+		List<BotWave> botWaves = GetBotWavesList();
+		List<BotWave> wavesToSpawn = new(botWaves.Count);
+		foreach (BotWave wave in botWaves)
+		{
+			if (wave.ShouldSpawn())
+			{
+				wavesToSpawn.Add(wave);
+			}
+		}
+		return wavesToSpawn;
+	}
+
+	public async UniTask<bool> TrySpawnBotWave(BotWave wave)
 	{
 		var anySpawned = false;
-
-		foreach (BotWave botWave in GetBotWavesList())
+		if (IsHumanPlayerInCombat())
 		{
-			if (_onDestroyToken.IsCancellationRequested) return;
-
-			if (!botWave.ShouldSpawn()) continue;
-			
-			if (IsHumanPlayerInCombat())
-			{
 #if DEBUG
-				Logger.LogDebug("In combat state cooldown, breaking the loop.");
+			Logger.LogDebug("In combat state cooldown, breaking the loop.");
 #endif
-				break;
-			}
-
-			if (CanSpawn(botWave.SpawnChance) && await TryProcessBotWave(botWave))
-			{
-				anySpawned = true;
-			}
-			
-			ResetGroupTimers(botWave.GroupNum);
+			ResetGroupTimers(wave.GroupNum);
+			return false;
 		}
 
-		if (!anySpawned)
+		if (CanSpawn(wave.SpawnChance) && await TryProcessBotWave(wave))
 		{
-			await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: _onDestroyToken);
+			anySpawned = true;
 		}
+			
+		ResetGroupTimers(wave.GroupNum);
+		return anySpawned;
 	}
 	
 	protected abstract bool IsCorrectSpawnType(WildSpawnType role);
@@ -275,47 +279,48 @@ public abstract class BotSpawnService : IBotSpawnService
 	// Only consider despawning if the number of active bots of the type exceeds the limit
 	private bool CanDespawnBot() => GetAliveBotsCount() > DataService.MaxBotLimit;
 
-	public void DespawnFurthestBot()
+	public bool TryDespawnFurthestBot()
 	{
-		if (!IsDespawnBotEnabled()) return;
+		if (!IsDespawnBotEnabled())
+		{
+			return false;
+		}
 
 		float currentTime = Time.time;
 		float timeSinceLastDespawn = currentTime - _despawnCooldownTime;
 
 		if (timeSinceLastDespawn < DefaultPluginVars.despawnInterval.Value || !CanDespawnBot())
 		{
-			return;
+			return false;
 		}
 
 		Player furthestBot = FindFurthestBot();
 
 		if (furthestBot != null)
 		{
-			DespawnBot(furthestBot);
+			return TryDespawnBot(furthestBot);
 		}
 #if DEBUG
-		else
-		{
-			Logger.LogDebug($"No {DataService.SpawnType.ToString()} bot found to despawn.");
-		}
+		Logger.LogDebug($"No {DataService.SpawnType.ToString()} bot found to despawn.");
+		return false;
 #endif
 	}
 
 	protected abstract bool IsDespawnBotEnabled();
 
-	private void DespawnBot([NotNull] Player furthestBot)
+	private bool TryDespawnBot([NotNull] Player furthestBot)
 	{
 		if (furthestBot == null)
 		{
 			Logger.LogError("Attempted to despawn a null bot.");
-			return;
+			return false;
 		}
 
 		BotOwner botOwner = furthestBot.AIData.BotOwner;
 		if (botOwner == null)
 		{
 			Logger.LogError("BotOwner is null for the furthest bot.");
-			return;
+			return false;
 		}
 
 #if DEBUG
@@ -337,6 +342,7 @@ public abstract class BotSpawnService : IBotSpawnService
 
 		// Update the cooldown
 		_despawnCooldownTime = Time.time;
+		return true;
 	}
 
 	private bool IsHumanPlayerInCombat()

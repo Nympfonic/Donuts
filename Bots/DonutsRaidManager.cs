@@ -1,6 +1,7 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
 using Cysharp.Threading.Tasks;
+using Donuts.Models;
 using Donuts.Patches;
 using Donuts.Tools;
 using Donuts.Utils;
@@ -68,6 +69,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private bool _isSpawnProcessActive;
 	private float _replenishBotDataTimer;
 	private float _botSpawnTimer;
+	
+	private readonly Dictionary<IBotSpawnService, List<BotWave>.Enumerator> _botWavesToSpawn = [];
 
 	//private Dictionary<string, WildSpawnType> OriginalBotSpawnTypes;
 
@@ -297,11 +300,29 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		{
 			_botSpawnTimer = 0f;
 			_isSpawnProcessActive = true;
-			foreach (IBotSpawnService service in BotSpawnServices.Values)
+			
+			List<IBotSpawnService> spawnServices = BotSpawnServices.Values.ShuffleElements();
+			var hasDespawnedBot = false;
+			foreach (IBotSpawnService service in spawnServices)
 			{
-				service.DespawnFurthestBot();
-				await service.SpawnBotWaves();
+				// Only despawn if a bot hasn't been despawned during this current spawn process
+				if (!hasDespawnedBot)
+				{
+					hasDespawnedBot = service.TryDespawnFurthestBot();
+				}
+				
+				// Preparation for bot wave spawning
+				_botWavesToSpawn.Add(service, service.GetBotWavesToSpawn().GetEnumerator());
 			}
+			
+			bool anySpawned = await SpawnNextBotWaves();
+			DisposeBotWaveCache();
+			
+			if (!anySpawned)
+			{
+				await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: _onDestroyToken);
+			}
+			
 			_isSpawnProcessActive = false;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
@@ -309,6 +330,48 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			Logger.LogException(nameof(DonutsRaidManager), nameof(StartSpawnProcess), ex);
 		}
 		catch (OperationCanceledException) {}
+	}
+
+	private bool TryGetNextBotWave()
+	{
+		var hasWavesToSpawn = false;
+		foreach (IBotSpawnService service in _botWavesToSpawn.Keys)
+		{
+			if (_botWavesToSpawn[service].MoveNext() && !hasWavesToSpawn)
+			{
+				hasWavesToSpawn = true;
+			}
+		}
+		return hasWavesToSpawn;
+	}
+
+	private async UniTask<bool> SpawnNextBotWaves()
+	{
+		var anySpawned = false;
+		while (TryGetNextBotWave())
+		{
+			List<IBotSpawnService> spawnServices = _botWavesToSpawn.Keys.ShuffleElements();
+			foreach (IBotSpawnService service in spawnServices)
+			{
+				BotWave wave = _botWavesToSpawn[service].Current;
+				if (wave == null) continue;
+
+				if (await service.TrySpawnBotWave(wave) && !anySpawned)
+				{
+					anySpawned = true;
+				}
+			}
+		}
+		return anySpawned;
+	}
+
+	private void DisposeBotWaveCache()
+	{
+		foreach (IBotSpawnService service in _botWavesToSpawn.Keys)
+		{
+			_botWavesToSpawn[service].Dispose();
+		}
+		_botWavesToSpawn.Clear();
 	}
 
 	private static void EftBotSpawner_OnBotCreated(BotOwner bot)
