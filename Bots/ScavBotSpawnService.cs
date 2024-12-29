@@ -22,22 +22,11 @@ public class ScavBotSpawnService : BotSpawnService
 		return false;
 	}
 
-	protected override bool HasReachedHardStopTime()
-	{
-		if (!DefaultPluginVars.hardStopOptionSCAV.Value)
-		{
-			return false;
-		}
-
-		int hardStopTime = DefaultPluginVars.hardStopTimeSCAV.Value;
-		int hardStopPercent = DefaultPluginVars.hardStopPercentSCAV.Value;
-
-		bool result = HasReachedHardStopTime(hardStopTime, hardStopPercent);
-#if DEBUG
-		if (result) Logger.LogDebug("Scav spawn not allowed due to raid time conditions - skipping this spawn");
-#endif
-		return result;
-	}
+	protected override bool IsHardStopEnabled() => DefaultPluginVars.hardStopOptionSCAV.Value;
+	
+	protected override int GetHardStopTime() => DefaultPluginVars.useTimeBasedHardStop.Value
+		? DefaultPluginVars.hardStopTimeSCAV.Value
+		: DefaultPluginVars.hardStopPercentSCAV.Value;
 
 	protected override int GetBotGroupSize(int minGroupSize, int maxGroupSize)
 	{

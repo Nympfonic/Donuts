@@ -22,22 +22,11 @@ public class PmcBotSpawnService : BotSpawnService
 		return false;
 	}
 
-	protected override bool HasReachedHardStopTime()
-	{
-		if (!DefaultPluginVars.hardStopOptionPMC.Value)
-		{
-			return false;
-		}
+	protected override bool IsHardStopEnabled() => DefaultPluginVars.hardStopOptionPMC.Value;
 
-		int hardStopTime = DefaultPluginVars.hardStopTimePMC.Value;
-		int hardStopPercent = DefaultPluginVars.hardStopPercentPMC.Value;
-
-		bool result = HasReachedHardStopTime(hardStopTime, hardStopPercent);
-#if DEBUG
-		if (result) Logger.LogDebug("PMC spawn not allowed due to raid time conditions - skipping this spawn");
-#endif
-		return result;
-	}
+	protected override int GetHardStopTime() => DefaultPluginVars.useTimeBasedHardStop.Value
+		? DefaultPluginVars.hardStopTimePMC.Value
+		: DefaultPluginVars.hardStopPercentPMC.Value;
 
 	protected override int GetBotGroupSize(int minGroupSize, int maxGroupSize)
 	{

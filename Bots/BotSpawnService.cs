@@ -78,28 +78,36 @@ public abstract class BotSpawnService : IBotSpawnService
 		_timeSinceLastHit = 0;
 	}
 
-	/// <summary>
-	/// Checks if HardStopTime setting is enabled and if the HardStopTime value has been reached for a spawn type.
-	/// </summary>
-	/// <remarks>Must call the <see cref="HasReachedHardStopTime(int, int)"/> overloaded signature.</remarks>
-	protected abstract bool HasReachedHardStopTime();
+	protected abstract bool IsHardStopEnabled();
+	protected abstract int GetHardStopTime();
 
 	// TODO: why is this method failing?
 	// This is an old comment, method has been changed so it needs testing
-	protected bool HasReachedHardStopTime(int hardStopTime, int hardStopPercent)
+	private bool HasReachedHardStopTime()
 	{
-		float raidTimeLeftTime = RaidTimeUtil.GetRemainingRaidSeconds(); // Time left
-		float raidTimeLeftPercent = RaidTimeUtil.GetRaidTimeRemainingFraction() * 100f; // Percent left
+		if (!IsHardStopEnabled())
+		{
+			return false;
+		}
+		
+		if (DefaultPluginVars.useTimeBasedHardStop.Value)
+		{
+			float raidTimeLeftTime = RaidTimeUtil.GetRemainingRaidSeconds(); // Time left
+			int hardStopTime = GetHardStopTime();
 #if DEBUG
-		Logger.LogDebug(string.Format(
-			"RaidTimeLeftTime: {0}, RaidTimeLeftPercent: {1}, HardStopTime: {2}, HardStopPercent: {3}",
-			raidTimeLeftTime.ToString(CultureInfo.InvariantCulture),
-			raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture), hardStopTime.ToString(),
-			hardStopPercent.ToString()));
+			Logger.LogDebug(string.Format("RaidTimeLeftTime: {0}, HardStopTime: {1}",
+				raidTimeLeftTime.ToString(CultureInfo.InvariantCulture), hardStopTime.ToString()));
 #endif
-		return DefaultPluginVars.useTimeBasedHardStop.Value
-			? raidTimeLeftTime <= hardStopTime
-			: raidTimeLeftPercent <= hardStopPercent;
+			return raidTimeLeftTime <= hardStopTime;
+		}
+
+		float raidTimeLeftPercent = RaidTimeUtil.GetRaidTimeRemainingFraction() * 100f; // Percent left
+		int hardStopPercent = GetHardStopTime();
+#if DEBUG
+		Logger.LogDebug(string.Format("RaidTimeLeftPercent: {0}, HardStopPercent: {1}",
+			raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture), hardStopPercent.ToString()));
+#endif
+		return raidTimeLeftPercent <= hardStopPercent;
 	}
 
 	protected virtual void Initialize(
