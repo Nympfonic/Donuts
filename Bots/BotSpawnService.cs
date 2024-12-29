@@ -78,38 +78,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		_timeSinceLastHit = 0;
 	}
 
-	protected abstract bool IsHardStopEnabled();
-	protected abstract int GetHardStopTime();
-
-	// TODO: why is this method failing?
-	// This is an old comment, method has been changed so it needs testing
-	private bool HasReachedHardStopTime()
-	{
-		if (!IsHardStopEnabled())
-		{
-			return false;
-		}
-		
-		if (DefaultPluginVars.useTimeBasedHardStop.Value)
-		{
-			float raidTimeLeftTime = RaidTimeUtil.GetRemainingRaidSeconds(); // Time left
-			int hardStopTime = GetHardStopTime();
-#if DEBUG
-			Logger.LogDebug(string.Format("RaidTimeLeftTime: {0}, HardStopTime: {1}",
-				raidTimeLeftTime.ToString(CultureInfo.InvariantCulture), hardStopTime.ToString()));
-#endif
-			return raidTimeLeftTime <= hardStopTime;
-		}
-
-		float raidTimeLeftPercent = RaidTimeUtil.GetRaidTimeRemainingFraction() * 100f; // Percent left
-		int hardStopPercent = GetHardStopTime();
-#if DEBUG
-		Logger.LogDebug(string.Format("RaidTimeLeftPercent: {0}, HardStopPercent: {1}",
-			raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture), hardStopPercent.ToString()));
-#endif
-		return raidTimeLeftPercent <= hardStopPercent;
-	}
-
 	protected virtual void Initialize(
 		[NotNull] BotConfigService configService,
 		[NotNull] IBotDataService dataService,
@@ -147,6 +115,38 @@ public abstract class BotSpawnService : IBotSpawnService
 			.SetNext(new PlayerLineOfSightSpawnCheckProcessor())
 			.SetNext(new WallSpawnCheckProcessor())
 			.SetNext(new GroundSpawnCheckProcessor());
+	}
+
+	protected abstract bool IsHardStopEnabled();
+	protected abstract int GetHardStopTime();
+
+	// TODO: why is this method failing?
+	// This is an old comment, method has been changed so it needs testing
+	private bool HasReachedHardStopTime()
+	{
+		if (!IsHardStopEnabled())
+		{
+			return false;
+		}
+		
+		if (DefaultPluginVars.useTimeBasedHardStop.Value)
+		{
+			float raidTimeLeftTime = RaidTimeUtil.GetRemainingRaidSeconds(); // Time left
+			int hardStopTime = GetHardStopTime();
+#if DEBUG
+			Logger.LogDebug(string.Format("RaidTimeLeftTime: {0}, HardStopTime: {1}",
+				raidTimeLeftTime.ToString(CultureInfo.InvariantCulture), hardStopTime.ToString()));
+#endif
+			return raidTimeLeftTime <= hardStopTime;
+		}
+
+		float raidTimeLeftPercent = RaidTimeUtil.GetRaidTimeRemainingFraction() * 100f; // Percent left
+		int hardStopPercent = GetHardStopTime();
+#if DEBUG
+		Logger.LogDebug(string.Format("RaidTimeLeftPercent: {0}, HardStopPercent: {1}",
+			raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture), hardStopPercent.ToString()));
+#endif
+		return raidTimeLeftPercent <= hardStopPercent;
 	}
 
 	protected abstract List<BotWave> GetBotWavesList();
