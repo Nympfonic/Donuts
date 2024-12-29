@@ -57,7 +57,9 @@ public class BotWave
 	public bool ShouldSpawn()
 	{
 		if (OnCooldown)
+		{
 			return false;
+		}
 
 		if (IgnoreTimerFirstSpawn)
 		{

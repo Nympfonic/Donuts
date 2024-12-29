@@ -199,6 +199,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		foreach (BotWave botWave in GetBotWavesList())
 		{
 			if (_onDestroyToken.IsCancellationRequested) return;
+
+			if (!botWave.ShouldSpawn()) continue;
 			
 			if (IsHumanPlayerInCombat())
 			{
