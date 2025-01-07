@@ -205,9 +205,9 @@ internal static class DefaultPluginVars
 
 		PluginEnabled.OnSettingChanged += _ =>
 		{
-			if (Singleton<DonutsRaidManager>.Instantiated)
+			if (MonoBehaviourSingleton<DonutsRaidManager>.Instantiated)
 			{
-				Singleton<DonutsRaidManager>.Instance.enabled = PluginEnabled.Value;
+				MonoBehaviourSingleton<DonutsRaidManager>.Instance.enabled = PluginEnabled.Value;
 			}
 		};
 

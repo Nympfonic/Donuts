@@ -12,7 +12,7 @@ namespace Donuts.Models;
 public class CreateBotCallbackWrapper([NotNull] BotCreationDataClass botData)
 {
 	private static CreateBotCallbackDelegate _createBotCallbackDelegate;
-	private readonly Stopwatch _stopwatch = new();
+	private static readonly Stopwatch _stopwatch = new();
 
 	private delegate void CreateBotCallbackDelegate([NotNull] BotOwner botOwner, [NotNull] BotCreationDataClass data,
 		[CanBeNull] Action<BotOwner> callback, bool shallBeGroup, [NotNull] Stopwatch stopwatch);

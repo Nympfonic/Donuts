@@ -77,12 +77,13 @@ public class BotConfigService
 	{
 		if (_mapLocation == null)
 		{
-			_mapLocation = Singleton<GameWorld>.Instance.MainPlayer.Location.ToLower();
+			string mapLocation = Singleton<GameWorld>.Instance.MainPlayer.Location.ToLower();
 			// Handle Ground Zero (High) the same as Ground Zero
-			if (_mapLocation == "sandbox_high")
+			if (mapLocation == "sandbox_high")
 			{
-				_mapLocation = "sandbox";
+				mapLocation = "sandbox";
 			}
+			_mapLocation = mapLocation;
 		}
 		return _mapLocation;
 	}
@@ -92,8 +93,8 @@ public class BotConfigService
 	{
 		if (_mapName == null)
 		{
-			_mapLocation ??= GetMapLocation();
-			_mapName = _mapLocation switch
+			string mapLocation = GetMapLocation();
+			string mapName = mapLocation switch
 			{
 				"bigmap" => "customs",
 				"factory4_day" => "factory",
@@ -106,8 +107,9 @@ public class BotConfigService
 				"laboratory" => "laboratory",
 				"lighthouse" => "lighthouse",
 				"shoreline" => "shoreline",
-				_ => _mapLocation
+				_ => mapLocation
 			};
+			_mapName = mapName;
 		}
 		return _mapName;
 	}
@@ -118,12 +120,13 @@ public class BotConfigService
 		if (_allMapsZoneConfig == null)
 		{
 			string zoneSpawnPointsPath = Path.Combine(DonutsPlugin.directoryPath, "zoneSpawnPoints");
-			_allMapsZoneConfig = AllMapsZoneConfig.LoadFromDirectory(zoneSpawnPointsPath);
-			if (_allMapsZoneConfig == null)
+			AllMapsZoneConfig allMapsZoneConfig = AllMapsZoneConfig.LoadFromDirectory(zoneSpawnPointsPath);
+			if (allMapsZoneConfig == null)
 			{
 				_logger.NotifyLogError("Donuts: Failed to load AllMapZoneConfig. Donuts will not function properly.");
 				return null;
 			}
+			_allMapsZoneConfig = allMapsZoneConfig;
 		}
 		return _allMapsZoneConfig;
 	}
@@ -161,7 +164,8 @@ public class BotConfigService
 			return null;
 		}
 
-		string jsonString = File.ReadAllText(jsonFilePath);
+		using var reader = new StreamReader(jsonFilePath);
+		string jsonString = reader.ReadToEnd();
 		_startingBotConfig = JsonConvert.DeserializeObject<StartingBotConfig>(jsonString);
 		return _startingBotConfig;
 	}
@@ -182,9 +186,7 @@ public class BotConfigService
 		if (jsonFiles.Length == 0)
 		{
 			// TODO: Implement generating default JSONs for the patterns if not found.
-			_logger.NotifyLogError(string.Format(
-				"Donuts: No JSON Pattern files found in folder: {0}\nDonuts will not function properly.",
-				patternFolderPath));
+			_logger.NotifyLogError($"Donuts: No JSON Pattern files found in folder: {patternFolderPath}\nDonuts will not function properly.");
 			return false;
 		}
 
@@ -201,7 +203,9 @@ public class BotConfigService
 	public List<Player> GetHumanPlayerList()
 	{
 		if (_gameWorld.RegisteredPlayers.Count == 0)
+		{
 			return _emptyPlayerList;
+		}
 
 		IEnumerable<Player> allPlayers = _gameWorld.AllPlayersEverExisted;
 		foreach (Player player in allPlayers)

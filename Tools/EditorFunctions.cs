@@ -1,5 +1,6 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
+using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using Donuts.Bots;
 using Donuts.Models;
@@ -152,7 +153,7 @@ internal static class EditorFunctions
 		{
 			Name = spawnName.Value,
 			GroupNum = groupNum.Value,
-			MapName = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+			MapName = MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
 			WildSpawnType = wildSpawns.Value,
 			MinDistance = minSpawnDist.Value,
 			MaxDistance = maxSpawnDist.Value,
@@ -185,11 +186,12 @@ internal static class EditorFunctions
 		var timer = new HotspotTimer(newEntry);
 		_groupedHotspotTimers[newEntry.GroupNum].Add(timer);
 
-		string msg = string.Format("Donuts: Wrote Entry for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", newEntry.Name,
+		using var sb = ZString.CreateUtf8StringBuilder();
+		sb.AppendFormat("Donuts: Wrote Entry for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", newEntry.Name,
 			newEntry.WildSpawnType, newEntry.Position.x.ToString(CultureInfo.InvariantCulture),
 			newEntry.Position.y.ToString(CultureInfo.InvariantCulture),
 			newEntry.Position.z.ToString(CultureInfo.InvariantCulture));
-		DonutsHelper.DisplayNotification(msg, Color.yellow);
+		DonutsHelper.DisplayNotification(sb.ToString(), Color.yellow);
 	}
 
 	internal static async UniTask WriteToJsonFileAsync(string directoryPath)
@@ -204,7 +206,7 @@ internal static class EditorFunctions
 			// Take the sessionLocations object only and serialize it to json
 			json = JsonConvert.SerializeObject(SessionLocations, Formatting.Indented);
 			fileName = string.Format("{0}_{1}_NewLocOnly.json",
-				Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+				MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
 				Random.Range(0, 1000).ToString());
 		}
 		else
@@ -217,7 +219,7 @@ internal static class EditorFunctions
 
 			json = JsonConvert.SerializeObject(combinedLocations, Formatting.Indented);
 			fileName = string.Format("{0}_{1}_All.json",
-				Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+				MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
 				Random.Range(0, 1000).ToString());
 		}
 

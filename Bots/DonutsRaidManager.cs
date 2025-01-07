@@ -1,15 +1,17 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
+using Cysharp.Text;
 using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks.Linq;
 using Donuts.Models;
 using Donuts.Patches;
 using Donuts.Tools;
 using Donuts.Utils;
 using EFT;
-using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityToolkit.Extensions;
 
@@ -65,10 +67,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private DonutsGizmos _donutsGizmos;
 
 	private bool _hasSpawnedStartingBots;
-	private bool _isReplenishingBotData;
-	private bool _isSpawnProcessActive;
-	private float _replenishBotDataTimer;
-	private float _botSpawnTimer;
+	private float _replenishBotDataPrevTime;
+	private float _botSpawnPrevTime;
 	
 	private readonly Dictionary<IBotSpawnService, List<BotWave>.Enumerator> _botWavesToSpawn = [];
 
@@ -113,14 +113,12 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_eftBotSpawner = _botsController.BotSpawner;
+		
+		BotConfigService = BotConfigService.Create(Logger);
 	}
 
-	// ReSharper disable once Unity.IncorrectMethodSignature
-	[UsedImplicitly]
-	private async UniTaskVoid Start()
+	private void Start()
 	{
-		BotConfigService = BotConfigService.Create(Logger);
-		
 		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
 		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
 		_eftBotSpawner.OnBotRemoved += ClearBotOwnerData;
@@ -132,13 +130,27 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				player.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
 			}
 		}
+	}
 
-		if (!await TryCreateDataServices())
+	public static async Task Initialize()
+	{
+#if DEBUG
+		Logger.LogDebug("Started initializing Donuts Raid Manager");
+#endif
+		if (Instance == null)
+		{
+			return;
+		}
+		
+		if (!await Instance.TryCreateDataServices())
 		{
 			ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
 		}
-
+		
 		IsBotPreparationComplete = true;
+#if DEBUG
+		Logger.LogDebug("Finished initializing Donuts Raid Manager");
+#endif
 	}
 
 	private void Update()
@@ -146,27 +158,11 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		float deltaTime = Time.deltaTime;
 		_donutsGizmos.DisplayMarkerInformation(_mainPlayer.Transform);
 
-		if (!_isReplenishingBotData)
-		{
-			_replenishBotDataTimer += deltaTime;
-			if (_replenishBotDataTimer >= DefaultPluginVars.replenishInterval.Value)
-			{
-				ReplenishBotData().Forget();
-			}
-		}
+		if (!_hasSpawnedStartingBots) return;
 		
 		foreach (IBotSpawnService spawnService in BotSpawnServices.Values)
 		{
 			spawnService.FrameUpdate(deltaTime);
-		}
-
-		if (_hasSpawnedStartingBots && !_isSpawnProcessActive && BotSpawnServices.Count > 0)
-		{
-			_botSpawnTimer += deltaTime;
-			if (_botSpawnTimer >= 1f)
-			{
-				StartSpawnProcess().Forget();
-			}
 		}
 	}
 
@@ -197,11 +193,11 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		if (!Singleton<GameWorld>.Instantiated)
 		{
-			Logger.LogError($"{nameof(DonutsRaidManager)}::{nameof(Enable)}: GameWorld is null. Failed to enable component");
+			Logger.LogError($"{nameof(Enable)}: GameWorld is null. Failed to enable component");
 			return;
 		}
 		
-		if (!Singleton<DonutsRaidManager>.Instantiated)
+		if (!Instantiated)
 		{
 			new GameObject(nameof(DonutsRaidManager)).AddComponent<DonutsRaidManager>();
 		}
@@ -210,51 +206,79 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 #endif
 	}
 
-	public void StartBotSpawnController()
+	public async UniTask StartBotSpawnController()
 	{
 		CreateSpawnServices();
-		SpawnStartingBots().Forget();
+		await SpawnStartingBots();
+
+		float currentTime = Time.time;
+		_replenishBotDataPrevTime = currentTime;
+		_botSpawnPrevTime = currentTime;
+
+		UniTaskAsyncEnumerable.EveryUpdate(cancelImmediately: true)
+			// TODO: Use 'await foreach' instead once we get C# 8.0 with Unity 2022 update
+			.ForEachAwaitAsync(async _ => await UpdateAsync(), _onDestroyToken)
+			.Forget();
 	}
 
-	public void RestartReplenishBotDataTimer()
+	public void UpdateReplenishBotDataTime()
 	{
-		_replenishBotDataTimer = 0f;
+		_replenishBotDataPrevTime = Time.time;
+	}
+
+	private static async UniTask UpdateAsync()
+	{
+		DonutsRaidManager raidManager = Instance;
+		if (raidManager == null) return;
+		
+		if (Time.time >= raidManager._replenishBotDataPrevTime + DefaultPluginVars.replenishInterval.Value)
+		{
+			await raidManager.ReplenishBotData();
+			raidManager.UpdateReplenishBotDataTime();
+		}
+
+		if (Time.time >= raidManager._botSpawnPrevTime + 5f)
+		{
+			await raidManager.StartSpawnProcess();
+			raidManager._botSpawnPrevTime = Time.time;
+		}
 	}
 
 	private async UniTask<bool> TryCreateDataServices()
 	{
 		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
+		List<UniTask> tasks = [];
+		
 		if (forceAllBotType is "PMC" or "Disabled")
 		{
-			IBotDataService dataService =
-				await BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
-			BotDataServices.Add(DonutsSpawnType.Pmc, dataService);
+			UniTask<PmcBotDataService> task =
+				BotDataService.Create<PmcBotDataService>(BotConfigService, Logger, _onDestroyToken);
+			tasks.Add(task);
 		}
 
 		if (forceAllBotType is "SCAV" or "Disabled")
 		{
-			IBotDataService dataService =
-				await BotDataService.Create<ScavBotDataService>(BotConfigService, Logger, _onDestroyToken);
-			BotDataServices.Add(DonutsSpawnType.Scav, dataService);
+			UniTask<ScavBotDataService> task =
+				BotDataService.Create<ScavBotDataService>(BotConfigService, Logger, _onDestroyToken);
+			tasks.Add(task);
 		}
-
-		return true;
+		
+		await UniTask.WhenAll(tasks);
+		return !_onDestroyToken.IsCancellationRequested;
 	}
 
 	private void CreateSpawnServices()
 	{
 		if (BotDataServices.TryGetValue(DonutsSpawnType.Pmc, out IBotDataService pmcDataService))
 		{
-			IBotSpawnService spawnService = BotSpawnService.Create<PmcBotSpawnService>(BotConfigService,
-				pmcDataService, _eftBotSpawner, Logger, _onDestroyToken);
-			BotSpawnServices.Add(DonutsSpawnType.Pmc, spawnService);
+			BotSpawnService.Create<PmcBotSpawnService>(BotConfigService, pmcDataService, _eftBotSpawner, Logger,
+				_onDestroyToken);
 		}
 
 		if (BotDataServices.TryGetValue(DonutsSpawnType.Scav, out IBotDataService scavDataService))
 		{
-			IBotSpawnService spawnService = BotSpawnService.Create<ScavBotSpawnService>(BotConfigService,
-				scavDataService, _eftBotSpawner, Logger, _onDestroyToken);
-			BotSpawnServices.Add(DonutsSpawnType.Scav, spawnService);
+			BotSpawnService.Create<ScavBotSpawnService>(BotConfigService, scavDataService, _eftBotSpawner, Logger,
+				_onDestroyToken);
 		}
 	}
 
@@ -262,11 +286,17 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		try
 		{
+#if DEBUG
+			Logger.LogDebug($"{nameof(SpawnStartingBots)} Begun");
+#endif
 			foreach (IBotSpawnService service in BotSpawnServices.Values)
 			{
 				await service.SpawnStartingBots();
 			}
 			_hasSpawnedStartingBots = true;
+#if DEBUG
+			Logger.LogDebug($"{nameof(SpawnStartingBots)} Finished");
+#endif
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
@@ -279,13 +309,16 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		try
 		{
-			_replenishBotDataTimer = 0f;
-			_isReplenishingBotData = true;
+#if DEBUG
+			Logger.LogDebug($"{nameof(ReplenishBotData)} Begun");
+#endif
 			foreach (IBotDataService service in BotDataServices.Values)
 			{
 				await service.ReplenishBotData();
 			}
-			_isReplenishingBotData = false;
+#if DEBUG
+			Logger.LogDebug($"{nameof(ReplenishBotData)} Finished");
+#endif
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
@@ -298,9 +331,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		try
 		{
-			_botSpawnTimer = 0f;
-			_isSpawnProcessActive = true;
-			
+#if DEBUG
+			Logger.LogDebug($"{nameof(StartSpawnProcess)} Begun");
+#endif
 			List<IBotSpawnService> spawnServices = BotSpawnServices.Values.ShuffleElements();
 			var hasDespawnedBot = false;
 			foreach (IBotSpawnService service in spawnServices)
@@ -310,42 +343,34 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				{
 					hasDespawnedBot = service.TryDespawnFurthestBot();
 				}
-				
+
 				// Preparation for bot wave spawning
 				_botWavesToSpawn.Add(service, service.GetBotWavesToSpawn().GetEnumerator());
 			}
-			
-			bool anySpawned = await SpawnNextBotWaves();
-			DisposeBotWaveCache();
-			
+
+			bool anySpawned = await SpawnBotWaves();
+
+
 			if (!anySpawned)
 			{
 				await UniTask.Delay(TimeSpan.FromSeconds(1), cancellationToken: _onDestroyToken);
 			}
-			
-			_isSpawnProcessActive = false;
+#if DEBUG
+			Logger.LogDebug($"{nameof(StartSpawnProcess)} Finished");
+#endif
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
 			Logger.LogException(nameof(DonutsRaidManager), nameof(StartSpawnProcess), ex);
 		}
 		catch (OperationCanceledException) {}
-	}
-
-	private bool TryGetNextBotWave()
-	{
-		var hasWavesToSpawn = false;
-		foreach (IBotSpawnService service in _botWavesToSpawn.Keys)
+		finally
 		{
-			if (_botWavesToSpawn[service].MoveNext() && !hasWavesToSpawn)
-			{
-				hasWavesToSpawn = true;
-			}
+			DisposeBotWaveCache();
 		}
-		return hasWavesToSpawn;
 	}
 
-	private async UniTask<bool> SpawnNextBotWaves()
+	private async UniTask<bool> SpawnBotWaves()
 	{
 		var anySpawned = false;
 		while (TryGetNextBotWave())
@@ -365,11 +390,24 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		return anySpawned;
 	}
 
-	private void DisposeBotWaveCache()
+	private bool TryGetNextBotWave()
 	{
+		var hasWavesToSpawn = false;
 		foreach (IBotSpawnService service in _botWavesToSpawn.Keys)
 		{
-			_botWavesToSpawn[service].Dispose();
+			if (_botWavesToSpawn[service].MoveNext() & !hasWavesToSpawn)
+			{
+				hasWavesToSpawn = true;
+			}
+		}
+		return hasWavesToSpawn;
+	}
+
+	private void DisposeBotWaveCache()
+	{
+		foreach (List<BotWave>.Enumerator waveEnumerator in _botWavesToSpawn.Values)
+		{
+			waveEnumerator.Dispose();
 		}
 		_botWavesToSpawn.Clear();
 	}
@@ -389,7 +427,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		if (bot.Memory?.GoalEnemy == null) return;
 		
-		DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
+		DonutsRaidManager raidManager = Instance;
 		if (raidManager == null) return;
 			
 		BotMemoryClass memory = bot.Memory;
@@ -410,10 +448,14 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				goalEnemy.IsVisible)
 			{
 #if DEBUG
-				Logger.LogDebug(string.Format("Bot {0} changed target to player {1}. Resetting ReplenishBotData timer!",
-					bot.Profile.Info.Nickname, player.Profile.Nickname));		
+				using (var sb = ZString.CreateUtf8StringBuilder())
+				{
+					sb.AppendFormat("Bot {0} changed target to player {1}. Resetting ReplenishBotData timer!",
+						bot.Profile.Info.Nickname, player.Profile.Nickname);
+					Logger.LogDebug(sb.ToString());
+				}
 #endif
-				raidManager._replenishBotDataTimer = 0f;
+				raidManager.UpdateReplenishBotDataTime();
 				break;
 			}
 		}
@@ -462,7 +504,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
 				if (raidManager == null) return;
 				
-				raidManager.RestartReplenishBotDataTimer();
+				raidManager.UpdateReplenishBotDataTime();
 				foreach (IBotSpawnService service in raidManager.BotSpawnServices.Values)
 				{
 					service.RestartPlayerHitTimer();

@@ -1,4 +1,5 @@
 ﻿using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using Donuts.Bots;
 using EFT;
 using HarmonyLib;
@@ -16,8 +17,8 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 {
 	protected override MethodBase GetTargetMethod() => AccessTools.Method(typeof(GameWorld), nameof(GameWorld.OnGameStarted));
 
-	[PatchPrefix]
-	private static void PatchPrefix()
+	[PatchPostfix]
+	private static void PatchPostfix()
 	{
 		if (!Singleton<DonutsRaidManager>.Instantiated)
 		{
@@ -25,6 +26,6 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 			return;
 		}
 
-		Singleton<DonutsRaidManager>.Instance.StartBotSpawnController();
+		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController().Forget();
 	}
 }

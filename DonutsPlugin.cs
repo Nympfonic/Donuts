@@ -77,7 +77,9 @@ public class DonutsPlugin : BaseUnityPlugin
 		if (IsKeyPressed(DefaultPluginVars.WriteToFileKey.Value) && !_isWritingToFile)
 		{
 			_isWritingToFile = true;
-			EditorFunctions.WriteToJsonFileAsync(directoryPath).ContinueWith(() => _isWritingToFile = false).Forget();
+			EditorFunctions.WriteToJsonFileAsync(directoryPath)
+				.ContinueWith(() => _isWritingToFile = false)
+				.Forget();
 		}
 		if (IsKeyPressed(DefaultPluginVars.DeleteSpawnMarkerKey.Value))
 		{
@@ -104,14 +106,6 @@ public class DonutsPlugin : BaseUnityPlugin
 	private static async UniTask SetupScenariosUI()
 	{
 		await LoadDonutsScenarios();
-
-		// pmcScenarioCombinedArray = [..scenarioValuesList];
-		// scavScenarioCombinedArray = [..scavScenarioValuesList];
-
-#if DEBUG
-		Logger.LogWarning($"Loaded PMC Scenarios: {string.Join(", ", DefaultPluginVars.pmcScenarioCombinedArray)}");
-		Logger.LogWarning($"Loaded Scav Scenarios: {string.Join(", ", DefaultPluginVars.scavScenarioCombinedArray)}");
-#endif
 
 		// Dynamically initialize the scenario settings
 		DefaultPluginVars.pmcScenarioSelection = new Setting<string>("PMC Raid Spawn Preset Selection",
@@ -141,6 +135,11 @@ public class DonutsPlugin : BaseUnityPlugin
 		DefaultPluginVars.ScavRandomScenarios = DefaultPluginVars.PmcRandomScenarios;
 
 		PopulateScenarioValues();
+		
+#if DEBUG
+		Logger.LogWarning($"Loaded PMC Scenarios: {string.Join(", ", DefaultPluginVars.pmcScenarioCombinedArray)}");
+		Logger.LogWarning($"Loaded Scav Scenarios: {string.Join(", ", DefaultPluginVars.scavScenarioCombinedArray)}");
+#endif
 	}
 
 	private static async UniTask<List<Folder>> LoadFoldersAsync([NotNull] string filePath)

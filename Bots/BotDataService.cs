@@ -1,5 +1,6 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
+using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using Donuts.Models;
 using Donuts.Utils;
@@ -7,6 +8,7 @@ using EFT;
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using UnityEngine;
 using BotProfileData = GClass652; // Implements IGetProfileData
@@ -59,6 +61,7 @@ public abstract class BotDataService : IBotDataService
 	{
 		var service = new TBotDataService();
 		service.Initialize(configService, logger, cancellationToken);
+		MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotDataServices.Add(service.SpawnType, service);
 		await service.SetupInitialBotCache();
 		return service;
 	}
@@ -74,13 +77,16 @@ public abstract class BotDataService : IBotDataService
 			BotConfig botCfg = GetBotConfig();
 			int maxBots = BotHelper.GetRandomBotCap(botCfg.MinCount, botCfg.MaxCount, MaxBotLimit);
 #if DEBUG
-			Logger.LogDebug($"{GetType()}::{nameof(SetupInitialBotCache)}: Max starting bots: {maxBots.ToString()}");
+			using (var sb = ZString.CreateUtf8StringBuilder())
+			{
+				sb.AppendFormat("{0}::{1}: Max starting bots set to {2}", GetType().Name,
+					nameof(SetupInitialBotCache), maxBots.ToString());
+				Logger.LogDebug(sb.ToString());
+			}
 #endif
 			var totalBots = 0;
-			while (totalBots < maxBots)
+			while (totalBots < maxBots && !_onDestroyToken.IsCancellationRequested)
 			{
-				if (_onDestroyToken.IsCancellationRequested) return;
-				
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, botCfg.MinGroupSize, botCfg.MaxGroupSize,
 					maxBots - totalBots);
 
@@ -120,14 +126,17 @@ public abstract class BotDataService : IBotDataService
 			WildSpawnType spawnType = GetWildSpawnType();
 			EPlayerSide side = GetPlayerSide(spawnType);
 #if DEBUG
-			Logger.LogDebug(string.Format("{0}::{1}: Creating bot: Type={2}, Difficulty={3}, Side={4}, GroupSize={5}",
-				nameof(BotDataService), nameof(TryCreateBotData), spawnType.ToString(),
-				botInfo.Difficulty.ToString(), side.ToString(), botInfo.GroupSize.ToString()));
+			using (var sb = ZString.CreateUtf8StringBuilder())
+			{
+				sb.AppendFormat("{0}::{1}: Creating bot: Type={2}, Difficulty={3}, Side={4}, GroupSize={5}",
+					GetType().Name, nameof(TryCreateBotData), spawnType.ToString(),
+					botInfo.Difficulty.ToString(), side.ToString(), botInfo.GroupSize.ToString());
+				Logger.LogDebug(sb.ToString());
+			}
 #endif
 			var botProfileData = new BotProfileData(side, spawnType, botInfo.Difficulty, 0f);
-			BotCreationDataClass botCreationData = await BotCreationDataClass
-				.Create(botProfileData, _botCreator, botInfo.GroupSize, _eftBotSpawner)
-				.AsUniTask();
+			var botCreationData = await BotCreationDataClass
+				.Create(botProfileData, _botCreator, botInfo.GroupSize, _eftBotSpawner);
 
 			if (botCreationData?.Profiles == null || botCreationData.Profiles.Count == 0)
 			{
@@ -137,8 +146,13 @@ public abstract class BotDataService : IBotDataService
 			botInfo.Bots = botCreationData;
 			_botInfoList.Add(botInfo);
 #if DEBUG
-			Logger.LogDebug(string.Format("{0}::{1}: Bot created and assigned successfully; {2} profiles loaded.",
-				GetType(), nameof(TryCreateBotData), botCreationData.Profiles.Count.ToString()));
+			using (var sb = ZString.CreateUtf8StringBuilder())
+			{
+				sb.AppendFormat("{0}::{1}: Bot created and assigned successfully; {2} profiles loaded. IDs: {3}",
+					GetType().Name, nameof(TryCreateBotData), botCreationData.Profiles.Count.ToString(),
+					string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
+				Logger.LogDebug(sb.ToString());
+			}
 #endif
 			return (true, botCreationData);
 		}
@@ -157,8 +171,9 @@ public abstract class BotDataService : IBotDataService
 		{
 			var singleBotsCount = 0;
 			var groupBotsCount = 0;
-			foreach (PrepBotInfo botInfo in _botInfoList)
+			for (int i = _botInfoList.Count - 1; i >= 0; i--)
 			{
+				PrepBotInfo botInfo = _botInfoList[i];
 				if (_onDestroyToken.IsCancellationRequested) return;
 				if (botInfo.Bots != null && botInfo.Bots.Profiles.Count > 0) continue;
 
@@ -166,21 +181,31 @@ public abstract class BotDataService : IBotDataService
 				if (_onDestroyToken.IsCancellationRequested) return;
 				if (!success) continue;
 
+				botData._profileData.TryGetRole(out WildSpawnType role, out _);
 				if (botInfo.IsGroup && groupBotsCount < 1)
 				{
 					groupBotsCount++;
 #if DEBUG
-					Logger.LogDebug(string.Format("Replenishing group bot: {0} {1} {2} Count: {3}.",
-						SpawnType.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString(),
-						botInfo.GroupSize.ToString()));
+					using (var sb = ZString.CreateUtf8StringBuilder())
+					{
+						sb.AppendFormat("{0}::{1}: Replenishing group bot: {2} {3} {4} Count: {5}.",
+							GetType().Name, nameof(ReplenishBotData), role.ToString(), botInfo.Difficulty.ToString(),
+							botData.Side.ToString(), botInfo.GroupSize.ToString());
+						Logger.LogDebug(sb.ToString());
+					}
 #endif
 				}
 				else if (!botInfo.IsGroup && singleBotsCount < 3)
 				{
 					singleBotsCount++;
 #if DEBUG
-					Logger.LogDebug(string.Format("Replenishing single bot: {0} {1} {2} Count: 1.",
-						SpawnType.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString()));
+					using (var sb = ZString.CreateUtf8StringBuilder())
+					{
+						sb.AppendFormat("{0}::{1}: Replenishing single bot: {2} {3} {4} Count: 1.", GetType().Name,
+							nameof(ReplenishBotData), role.ToString(), botInfo.Difficulty.ToString(),
+							botData.Side.ToString());
+						Logger.LogDebug(sb.ToString());
+					}
 #endif
 				}
 
@@ -197,8 +222,9 @@ public abstract class BotDataService : IBotDataService
 	public BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int groupSize)
 	{
 		// Find the bot info that matches the difficulty and group size
-		foreach (PrepBotInfo botInfo in _botInfoList)
+		for (int i = _botInfoList.Count - 1; i >= 0; i--)
 		{
+			PrepBotInfo botInfo = _botInfoList[i];
 			if (botInfo.Difficulty == difficulty &&
 				botInfo.Bots != null &&
 				botInfo.Bots.Profiles.Count == groupSize)
@@ -207,24 +233,32 @@ public abstract class BotDataService : IBotDataService
 			}
 		}
 #if DEBUG
-		Logger.LogWarning(string.Format(
-			"{0}: No cached bots found for difficulty {1}, and target count {2}.",
-			nameof(FindCachedBotData), difficulty.ToString(), groupSize.ToString()));
+		using (var sb = ZString.CreateUtf8StringBuilder())
+		{
+			sb.AppendFormat("{0}::{1}: No cached bots found for difficulty {2}, and target count {3}.",
+				GetType().Name, nameof(FindCachedBotData), difficulty.ToString(), groupSize.ToString());
+			Logger.LogWarning(sb.ToString());
+		}
 #endif
 		return null;
 	}
 
 	public void ClearBotCache(BotCreationDataClass botData)
 	{
-		foreach (PrepBotInfo botInfo in _botInfoList)
+		for (int i = _botInfoList.Count - 1; i >= 0; i--)
 		{
+			PrepBotInfo botInfo = _botInfoList[i];
 			if (botInfo.Bots == botData)
 			{
 				botInfo.Bots = null;
 #if DEBUG
-				Logger.LogDebug($"Cleared cached bot info for bot type: {SpawnType.ToString()}");
+				using (var sb = ZString.CreateUtf8StringBuilder())
+				{
+					sb.AppendFormat("{0}::{1}: Cleared cached bot info for bot type: {2}", GetType().Name,
+						nameof(ClearBotCache), SpawnType.ToString());
+					Logger.LogDebug(sb.ToString());
+				}
 #endif
-				Singleton<DonutsRaidManager>.Instance.RestartReplenishBotDataTimer();
 				return;
 			}
 		}

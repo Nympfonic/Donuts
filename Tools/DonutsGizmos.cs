@@ -133,7 +133,7 @@ internal class DonutsGizmos
 		foreach (Entry hotspot in locations)
 		{
 			Position newPosition = hotspot.Position;
-			if (Singleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation() != hotspot.MapName ||
+			if (MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation() != hotspot.MapName ||
 				GizmoMarkers.ContainsKey(newPosition))
 			{
 				continue;
