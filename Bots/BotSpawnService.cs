@@ -642,7 +642,7 @@ public abstract class BotSpawnService : IBotSpawnService
 				if (!ignoreChecks)
 				{
 					var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation,
-						_gameWorld.AllAlivePlayersList);
+						_gameWorld.AllAlivePlayersList.AsReadOnly());
 					_spawnCheckProcessor.Process(spawnCheckData);
 					if (!spawnCheckData.Success)
 					{
