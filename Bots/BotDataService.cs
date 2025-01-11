@@ -23,7 +23,7 @@ public interface IBotDataService
 	public DonutsSpawnType SpawnType { get; }
 	public int MaxBotLimit { get; }
 	
-	UniTask<(bool, BotCreationDataClass)> TryCreateBotData([NotNull] PrepBotInfo botInfo);
+	UniTask<(bool success, BotCreationDataClass botData)> TryCreateBotData([NotNull] PrepBotInfo botInfo);
 	UniTask ReplenishBotData();
 	[CanBeNull] BotCreationDataClass FindCachedBotData(BotDifficulty difficulty, int targetCount);
 	void ClearBotCache([NotNull] BotCreationDataClass botData);
@@ -114,7 +114,7 @@ public abstract class BotDataService : IBotDataService
 	protected abstract WildSpawnType GetWildSpawnType();
 	protected abstract EPlayerSide GetPlayerSide(WildSpawnType spawnType);
 
-	public async UniTask<(bool, BotCreationDataClass)> TryCreateBotData(PrepBotInfo botInfo)
+	public async UniTask<(bool success, BotCreationDataClass botData)> TryCreateBotData(PrepBotInfo botInfo)
 	{
 		try
 		{
