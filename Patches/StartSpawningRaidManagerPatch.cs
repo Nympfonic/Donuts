@@ -1,5 +1,4 @@
 ﻿using Comfort.Common;
-using Cysharp.Threading.Tasks;
 using Donuts.Bots;
 using EFT;
 using HarmonyLib;
@@ -26,6 +25,6 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 			return;
 		}
 
-		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController().Forget();
+		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
 	}
 }

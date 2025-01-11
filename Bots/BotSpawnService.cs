@@ -25,7 +25,7 @@ public interface IBotSpawnService
 {
 	void FrameUpdate(float deltaTime);
 	UniTask SpawnStartingBots();
-	List<BotWave> GetBotWavesToSpawn();
+	Queue<BotWave> GetBotWavesToSpawn();
 	UniTask<bool> TrySpawnBotWave(BotWave wave);
 	bool TryDespawnFurthestBot();
 	void RestartPlayerHitTimer();
@@ -206,15 +206,15 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 	}
 
-	public List<BotWave> GetBotWavesToSpawn()
+	public Queue<BotWave> GetBotWavesToSpawn()
 	{
 		List<BotWave> botWaves = GetBotWavesList();
-		List<BotWave> wavesToSpawn = new(botWaves.Count);
+		Queue<BotWave> wavesToSpawn = new(botWaves.Count);
 		foreach (BotWave wave in botWaves)
 		{
 			if (wave.ShouldSpawn())
 			{
-				wavesToSpawn.Add(wave);
+				wavesToSpawn.Enqueue(wave);
 			}
 		}
 		return wavesToSpawn;
@@ -324,6 +324,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 #if DEBUG
 		Logger.LogDebug($"No {DataService.SpawnType.ToString()} bot found to despawn.");
+#endif
 		return false;
 #endif
 	}
