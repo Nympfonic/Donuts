@@ -2,6 +2,7 @@
 using Donuts.Utils;
 using EFT;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace Donuts.Bots;
 
@@ -9,7 +10,7 @@ public class ScavBotDataService : BotDataService
 {
 	public override DonutsSpawnType SpawnType => DonutsSpawnType.Scav;
 
-	protected override List<BotDifficulty> BotDifficulties { get; } =
+	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties { get; } =
 		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesSCAV.Value.ToLower());
 
 	protected override string GroupChance => DefaultPluginVars.scavGroupChance.Value;

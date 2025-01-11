@@ -3,6 +3,7 @@ using Cysharp.Text;
 using EFT;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Random = UnityEngine.Random;
 
 namespace Donuts.Utils;
@@ -19,20 +20,27 @@ internal static class BotHelper
 	
 	private static readonly string[] _groupChances = ["None", "Low", "Default", "High", "Max"];
 
-	internal static List<BotDifficulty> GetSettingDifficulties(string difficultySetting)
+	internal static ReadOnlyCollection<BotDifficulty> GetSettingDifficulties(string difficultySetting)
 	{
+		List<BotDifficulty> difficulties;
+		difficultySetting = difficultySetting.ToLower();
 		switch (difficultySetting)
 		{
 			case "asonline":
-				return _asOnlineDifficulties;
+				difficulties = _asOnlineDifficulties;
+				break;
 			case "easy":
-				return _easyDifficulty;
+				difficulties = _easyDifficulty;
+				break;
 			case "normal":
-				return _normalDifficulty;
+				difficulties = _normalDifficulty;
+				break;
 			case "hard":
-				return _hardDifficulty;
+				difficulties = _hardDifficulty;
+				break;
 			case "impossible":
-				return _impossibleDifficulty;
+				difficulties = _impossibleDifficulty;
+				break;
 			default:
 				using (var sb = ZString.CreateUtf8StringBuilder())
 				{
@@ -40,8 +48,10 @@ internal static class BotHelper
 						nameof(BotHelper), nameof(GetSettingDifficulties), difficultySetting);
 					DonutsPlugin.Logger.LogError(sb.ToString());
 				}
-				return _invalidDifficulty;
+				difficulties = _invalidDifficulty;
+				break;
 		}
+		return difficulties.AsReadOnly();
 	}
 
 	/// <summary>
@@ -70,56 +80,6 @@ internal static class BotHelper
 		}
 		return count;
 	}
-
-	// internal static WildSpawnType GetWildSpawnType(string wildSpawnType) =>
-	// 	wildSpawnType.ToLower() switch
-	// 	{
-	// 		"arenafighterevent" => WildSpawnType.arenaFighterEvent,
-	// 		"assault" => WildSpawnType.assault,
-	// 		"assaultgroup" => WildSpawnType.assaultGroup,
-	// 		"bossboar" => WildSpawnType.bossBoar,
-	// 		"bossboarsniper" => WildSpawnType.bossBoarSniper,
-	// 		"bossbully" => WildSpawnType.bossBully,
-	// 		"bossgluhar" => WildSpawnType.bossGluhar,
-	// 		"bosskilla" => WildSpawnType.bossKilla,
-	// 		"bosskojaniy" => WildSpawnType.bossKojaniy,
-	// 		"bosssanitar" => WildSpawnType.bossSanitar,
-	// 		"bosstagilla" => WildSpawnType.bossTagilla,
-	// 		"bosszryachiy" => WildSpawnType.bossZryachiy,
-	// 		"crazyassaultevent" => WildSpawnType.crazyAssaultEvent,
-	// 		"cursedassault" => WildSpawnType.cursedAssault,
-	// 		"exusec" => WildSpawnType.exUsec,
-	// 		"followerboar" => WildSpawnType.followerBoar,
-	// 		"followerbully" => WildSpawnType.followerBully,
-	// 		"followergluharassault" => WildSpawnType.followerGluharAssault,
-	// 		"followergluharscout" => WildSpawnType.followerGluharScout,
-	// 		"followergluharsecurity" => WildSpawnType.followerGluharSecurity,
-	// 		"followergluharsnipe" => WildSpawnType.followerGluharSnipe,
-	// 		"followerkojaniy" => WildSpawnType.followerKojaniy,
-	// 		"followersanitar" => WildSpawnType.followerSanitar,
-	// 		"followertagilla" => WildSpawnType.followerTagilla,
-	// 		"followerzryachiy" => WildSpawnType.followerZryachiy,
-	// 		"gifter" => WildSpawnType.gifter,
-	// 		"marksman" => WildSpawnType.marksman,
-	// 		"raiders" => WildSpawnType.pmcBot,
-	// 		"sectantpriest" => WildSpawnType.sectantPriest,
-	// 		"sectantwarrior" => WildSpawnType.sectantWarrior,
-	// 		"usec" or "pmcUSEC" => WildSpawnType.pmcUSEC,
-	// 		"bear" or "pmcBEAR" => WildSpawnType.pmcBEAR,
-	// 		"followerbigpipe" => WildSpawnType.followerBigPipe,
-	// 		"followerbirdeye" => WildSpawnType.followerBirdEye,
-	// 		"bossknight" => WildSpawnType.bossKnight,
-	// 		"pmc" => Random.Range(0, 2) == 0 ? WildSpawnType.pmcUSEC : WildSpawnType.pmcBEAR,
-	// 		_ => WildSpawnType.assault,
-	// 	};
-
-	// internal static bool IsBotType(Player bot, DonutsSpawnType botType) =>
-	// 	botType switch
-	// 	{
-	// 		DonutsSpawnType.Scav => IsScav(bot.Profile.Info.Settings.Role),
-	// 		DonutsSpawnType.Pmc => IsPmc(bot.Profile.Info.Settings.Role),
-	// 		_ => throw new ArgumentException("Invalid bot type", nameof(botType)),
-	// 	};
 
 	internal static int GetBotGroupSize(string pluginGroupChance, int minGroupSize, int maxGroupSize, int maxCap = int.MaxValue)
 	{

@@ -3,6 +3,7 @@ using Donuts.Utils;
 using EFT;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Random = UnityEngine.Random;
 
 namespace Donuts.Bots;
@@ -11,8 +12,8 @@ public class PmcBotDataService : BotDataService
 {
 	public override DonutsSpawnType SpawnType => DonutsSpawnType.Pmc;
 
-	protected override List<BotDifficulty> BotDifficulties { get; } =
-		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value.ToLower());
+	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties { get; } =
+		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value);
 
 	protected override string GroupChance => DefaultPluginVars.pmcGroupChance.Value;
 

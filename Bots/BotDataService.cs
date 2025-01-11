@@ -8,6 +8,7 @@ using EFT;
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using UnityEngine;
@@ -51,7 +52,7 @@ public abstract class BotDataService : IBotDataService
 	
 	protected abstract string GroupChance { get; }
 	protected HashSet<string> UsedSpawnZones { get; } = [];
-	protected abstract List<BotDifficulty> BotDifficulties { get; }
+	protected abstract ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 
 	public static async UniTask<TBotDataService> Create<TBotDataService>(
 		[NotNull] BotConfigService configService,
