@@ -1,4 +1,5 @@
 using Comfort.Common;
+using Cysharp.Text;
 using EFT;
 using System;
 using System.Collections.Generic;
@@ -33,8 +34,12 @@ internal static class BotHelper
 			case "impossible":
 				return _impossibleDifficulty;
 			default:
-				DonutsPlugin.Logger.LogError(string.Format("{0}::{1}: Unsupported difficulty setting: {2}",
-					nameof(BotHelper), nameof(GetSettingDifficulties), difficultySetting));
+				using (var sb = ZString.CreateUtf8StringBuilder())
+				{
+					sb.AppendFormat("{0} {1}::{2}: Unsupported difficulty setting: {3}", DateTime.Now.ToLongTimeString(),
+						nameof(BotHelper), nameof(GetSettingDifficulties), difficultySetting);
+					DonutsPlugin.Logger.LogError(sb.ToString());
+				}
 				return _invalidDifficulty;
 		}
 	}

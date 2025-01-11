@@ -139,8 +139,8 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0}::{1}: RaidTimeLeftTime: {2}, HardStopTime: {3}", GetType().Name,
-					nameof(HasReachedHardStopTime), raidTimeLeftTime.ToString(CultureInfo.InvariantCulture),
+				sb.AppendFormat("{0} {1}::{2}: RaidTimeLeftTime: {3}, HardStopTime: {4}", DateTime.Now.ToLongTimeString(),
+					GetType().Name, nameof(HasReachedHardStopTime), raidTimeLeftTime.ToString(CultureInfo.InvariantCulture),
 					hardStopTime.ToString());
 				Logger.LogDebug(sb.ToString());
 			}
@@ -153,8 +153,8 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 		using (var sb = ZString.CreateUtf8StringBuilder())
 		{
-			sb.AppendFormat("{0}::{1}: RaidTimeLeftPercent: {2}, HardStopPercent: {3}", GetType().Name,
-				nameof(HasReachedHardStopTime), raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture),
+			sb.AppendFormat("{0} {1}::{2}: RaidTimeLeftPercent: {3}, HardStopPercent: {4}", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(HasReachedHardStopTime), raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture),
 				hardStopPercent.ToString());
 			Logger.LogDebug(sb.ToString());
 		}
@@ -202,7 +202,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			BotSpawnInfo botSpawnInfo = DataService.BotSpawnInfos[i];
 			if (_onDestroyToken.IsCancellationRequested) return;
 
-			await SpawnBot(botSpawnInfo.GroupSize, botSpawnInfo.Zone, botSpawnInfo.Coordinates, false);
+			await SpawnBot(botSpawnInfo.GroupSize, botSpawnInfo.Coordinates, generateNew: false);
 		}
 	}
 
@@ -225,15 +225,16 @@ public abstract class BotSpawnService : IBotSpawnService
 		var anySpawned = false;
 		if (IsHumanPlayerInCombat())
 		{
+			ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0}::{1}: In combat state cooldown, breaking the loop.", GetType().Name,
-					nameof(TrySpawnBotWave));
+				sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ResetGroupTimers), wave.GroupNum.ToString(),
+					"A Human player is in combat state");
 				Logger.LogDebug(sb.ToString());
 			}
 #endif
-			ResetGroupTimers(wave.GroupNum);
 			return false;
 		}
 
@@ -242,7 +243,15 @@ public abstract class BotSpawnService : IBotSpawnService
 			anySpawned = true;
 		}
 			
-		ResetGroupTimers(wave.GroupNum);
+// 		ResetGroupTimers(wave.GroupNum);
+// #if DEBUG
+// 		using (var sb = ZString.CreateUtf8StringBuilder())
+// 		{
+// 			sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}", DateTime.Now.ToLongTimeString(),
+//				GetType().Name, nameof(ResetGroupTimers), wave.GroupNum.ToString(), "Bot wave spawn triggered");
+// 			Logger.LogDebug(sb.ToString());
+// 		}
+// #endif
 		return anySpawned;
 	}
 	
@@ -258,7 +267,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = allAlivePlayers[i];
-			if (!player.IsAI || player.AIData.BotOwner == null || IsCorrectSpawnType(player.Profile.Info.Settings.Role))
+			if (!player.IsAI || player.AIData.BotOwner == null || !IsCorrectSpawnType(player.Profile.Info.Settings.Role))
 			{
 				continue;
 			}
@@ -283,13 +292,13 @@ public abstract class BotSpawnService : IBotSpawnService
 		using var sb = ZString.CreateUtf8StringBuilder();
 		if (furthestBot == null)
 		{
-			sb.AppendFormat("{0}::{1}: Furthest bot is null. No bots found in the list.", GetType().Name,
-				nameof(FindFurthestBot));
+			sb.AppendFormat("{0} {1}::{2}: Furthest bot is null. No bots found in the list.", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(FindFurthestBot));
 		}
 		else
 		{
-			sb.AppendFormat("{0}::{1}: Furthest bot found: {2} at distance {3}", GetType().Name,
-				nameof(FindFurthestBot), furthestBot.Profile.Info.Nickname,
+			sb.AppendFormat("{0} {1}::{2}: Furthest bot found: {3} at distance {4}", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(FindFurthestBot), furthestBot.Profile.Info.Nickname,
 				Mathf.Sqrt(furthestSqrMagnitude).ToString(CultureInfo.InvariantCulture));
 		}
 		Logger.LogDebug(sb.ToString());
@@ -326,7 +335,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		Logger.LogDebug($"No {DataService.SpawnType.ToString()} bot found to despawn.");
 #endif
 		return false;
-#endif
 	}
 
 	protected abstract bool IsDespawnBotEnabled();
@@ -336,7 +344,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		if (furthestBot == null)
 		{
 			using var sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0}::{1}: Attempted to despawn a null bot.", GetType().Name, nameof(TryDespawnBot));
+			sb.AppendFormat("{0} {1}::{2}: Attempted to despawn a null bot.", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(TryDespawnBot));
 			Logger.LogDebug(sb.ToString());
 			return false;
 		}
@@ -345,8 +354,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		if (botOwner == null)
 		{
 			using var sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0}::{1}: BotOwner is null for the furthest bot.", GetType().Name,
-				nameof(TryDespawnBot));
+			sb.AppendFormat("{0} {1}::{2}: BotOwner is null for the furthest bot.", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(TryDespawnBot));
 			Logger.LogDebug(sb.ToString());
 			return false;
 		}
@@ -354,8 +363,8 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 		using (var sb = ZString.CreateUtf8StringBuilder())
 		{
-			sb.AppendFormat("{0}::{1}: Despawning bot: {2} ({3})", GetType().Name, nameof(TryDespawnBot),
-				furthestBot.Profile.Info.Nickname, furthestBot.name);
+			sb.AppendFormat("{0} {1}::{2}: Despawning bot: {3} ({4})", DateTime.Now.ToLongTimeString(), GetType().Name,
+				nameof(TryDespawnBot), furthestBot.Profile.Info.Nickname, furthestBot.name);
 			Logger.LogDebug(sb.ToString());
 		}
 #endif
@@ -389,8 +398,8 @@ public abstract class BotSpawnService : IBotSpawnService
     	bool canSpawn = randomValue < spawnChance;
 #if DEBUG
 	    using var sb = ZString.CreateUtf8StringBuilder();
-	    sb.AppendFormat("{0}::{1}: SpawnChance: {2}, RandomValue: {3}, CanSpawn: {4}", GetType().Name, nameof(CanSpawn),
-		    spawnChance.ToString(), randomValue.ToString(), canSpawn.ToString());
+	    sb.AppendFormat("{0} {1}::{2}: SpawnChance: {3}, RandomValue: {4}, CanSpawn: {5}", DateTime.Now.ToLongTimeString(),
+		    GetType().Name, nameof(CanSpawn), spawnChance.ToString(), randomValue.ToString(), canSpawn.ToString());
 	    Logger.LogDebug(sb.ToString());
 #endif
     	return canSpawn;
@@ -401,11 +410,15 @@ public abstract class BotSpawnService : IBotSpawnService
 		Dictionary<string, List<Vector3>> zoneSpawnPoints = DataService.ZoneSpawnPoints;
 		if (!zoneSpawnPoints.Any())
 		{
+			ResetGroupTimers(botWave.GroupNum);
 #if DEBUG
-			using var sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0}::{1}: No zone spawn points found, cannot spawn any bot waves.", GetType().Name,
-				nameof(TryProcessBotWave));
-			Logger.LogDebug(sb.ToString());
+			using (var sb = ZString.CreateUtf8StringBuilder())
+			{
+				sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ResetGroupTimers),
+					botWave.GroupNum.ToString(), "No zone spawn points found");
+				Logger.LogDebug(sb.ToString());
+			}
 #endif
 			return false;
 		}
@@ -422,14 +435,6 @@ public abstract class BotSpawnService : IBotSpawnService
 				return false;
 			}
 			
-#if DEBUG
-			using (var sb = ZString.CreateUtf8StringBuilder())
-			{
-				sb.AppendFormat("Triggering spawn for botWave: {2} at {3}, {4}", GetType().Name,
-					nameof(TryProcessBotWave), botWave, randomZone, spawnPoint.ToString());
-				Logger.LogDebug(sb.ToString());
-			}
-#endif
 			if (await TrySpawnBot(botWave, randomZone, spawnPoint, spawnPoints))
 			{
 				return true;
@@ -445,12 +450,6 @@ public abstract class BotSpawnService : IBotSpawnService
 			if (botWave.GroupNum == groupNum)
 			{
 				botWave.ResetTimer();
-#if DEBUG
-				using var sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("{0}::{1}: Resetting timer for GroupNum: {2}", GetType().Name,
-					nameof(ResetGroupTimers), groupNum.ToString());
-				Logger.LogDebug(sb.ToString());
-#endif
 			}
 		}
 	}
@@ -470,8 +469,8 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 		using (var sb = ZString.CreateUtf8StringBuilder())
 		{
-			sb.AppendFormat("{0}::{1}: {2} is a hotspot; hotspot boost is enabled, setting spawn chance to 100",
-				GetType().Name, nameof(AdjustSpawnChanceIfHotspot), zone);
+			sb.AppendFormat("{0} {1}::{2}: {3} is a hotspot; hotspot boost is enabled, setting spawn chance to 100",
+				DateTime.Now.ToLongTimeString(), GetType().Name, nameof(AdjustSpawnChanceIfHotspot), zone);
 			Logger.LogDebug(sb.ToString());
 		}
 #endif
@@ -514,6 +513,15 @@ public abstract class BotSpawnService : IBotSpawnService
 			HasReachedHardStopTime())
 		{
 			ResetGroupTimers(botWave.GroupNum); // Reset timer if the wave is hard capped
+#if DEBUG
+			using (var sb = ZString.CreateUtf8StringBuilder())
+			{
+				sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ResetGroupTimers),
+					botWave.GroupNum.ToString(), "Reached hard cap");
+				Logger.LogDebug(sb.ToString());
+			}
+#endif
 			return false;
 		}
 		
@@ -523,17 +531,24 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 
-		if (await SpawnBot(groupSize, zone, spawnPoints))
+		if (await SpawnBot(groupSize, spawnPoints))
 		{
 			botWave.TimesSpawned++;
+#if DEBUG
+			using (var sb = ZString.CreateUtf8StringBuilder())
+			{
+				sb.AppendFormat("{0} {1}::{2}: Spawning bot wave for GroupNum {3} at {4}, {5}",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(TryProcessBotWave), botWave.GroupNum, zone,
+					primarySpawnPoint.ToString());
+				Logger.LogDebug(sb.ToString());
+			}
+#endif
 		}
 		
 		if (_onDestroyToken.IsCancellationRequested)
 		{
 			return false;
 		}
-		
-		ResetGroupTimers(botWave.GroupNum);
 
 		if (botWave.TimesSpawned >= botWave.MaxTriggersBeforeCooldown)
 		{
@@ -544,21 +559,11 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	private async UniTask<bool> SpawnBot(
 		int groupSize,
-		string zone,
 		List<Vector3> spawnPoints,
 		bool generateNew = true,
 		bool ignoreChecks = false)
 	{
 		bool isGroup = groupSize > 1;
-#if DEBUG
-		using (var sb = ZString.CreateUtf8StringBuilder())
-		{
-			sb.AppendFormat("{0}::{1}: Attempting to spawn {2} bot {3} in spawn zone {4}", GetType().Name,
-				nameof(SpawnBot), isGroup ? "group" : "solo", groupSize.ToString(), zone);
-			Logger.LogDebug(sb.ToString());
-		}
-#endif
-		
 		BotDifficulty botDifficulty = DataService.GetBotDifficulty();
 
 		BotCreationDataClass cachedBotData = DataService.FindCachedBotData(botDifficulty, groupSize);
@@ -567,8 +572,8 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0}::{1}: No cached bots found for this spawn, generating on the fly for {2} bots - this may take some time.",
-					GetType().Name, nameof(SpawnBot), groupSize.ToString());
+				sb.AppendFormat("{0} {1}::{2}: No cached bots found for this spawn, generating on the fly for {3} bots - this may take some time.",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(SpawnBot), groupSize.ToString());
 				Logger.LogWarning(sb.ToString());
 			}
 #endif
@@ -588,8 +593,8 @@ public abstract class BotSpawnService : IBotSpawnService
 #if DEBUG
 		using (var sb = ZString.CreateUtf8StringBuilder())
 		{
-			sb.AppendFormat("{0}::{1}: Found grouped cached bots, spawning them.", GetType().Name,
-				nameof(SpawnBot));
+			sb.AppendFormat("{0} {1}::{2}: Found grouped cached bots, spawning them.", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(SpawnBot));
 			Logger.LogWarning(sb.ToString());
 		}
 #endif
@@ -614,8 +619,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		if (!spawned)
 		{
 			using var sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0}::{1}: No valid spawn position found after retries - skipping this spawn",
-				GetType().Name, nameof(SpawnBot));
+			sb.AppendFormat("{0} {1}::{2}: No valid spawn position found after retries - skipping this spawn",
+				DateTime.Now.ToLongTimeString(), GetType().Name, nameof(SpawnBot));
 			Logger.LogDebug(sb.ToString());
 		}
 #endif
@@ -648,8 +653,8 @@ public abstract class BotSpawnService : IBotSpawnService
 				Vector3 spawnPosition = navHit.position;
 #if DEBUG
 				using var sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("{0}::{1}: Found spawn position at: {2}", GetType().Name,
-					nameof(GetValidSpawnPosition), spawnPosition.ToString());
+				sb.AppendFormat("{0} {1}::{2}: Found spawn position at: {3}", DateTime.Now.ToLongTimeString(),
+					GetType().Name, nameof(GetValidSpawnPosition), spawnPosition.ToString());
 				Logger.LogDebug(sb.ToString());
 #endif
 				return spawnPosition;
@@ -700,6 +705,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	private int AdjustMaxCountForRespawnLimits(int groupSize)
 	{
 		int maxBotRespawns = GetMaxBotRespawns();
+		// Don't cap if maxRespawns is set to zero or less
 		if (maxBotRespawns <= 0)
 		{
 			_currentRespawnCount += groupSize;
@@ -710,8 +716,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 #if DEBUG
 			using var sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0}::{1}: Max {2} respawns reached, skipping this spawn", GetType().Name,
-				nameof(AdjustMaxCountForRespawnLimits), DataService.SpawnType.ToString());
+			sb.AppendFormat("{0} {1}::{2}: Max {3} respawns reached, skipping this spawn", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(AdjustMaxCountForRespawnLimits), DataService.SpawnType.ToString());
 			Logger.LogDebug(sb.ToString());
 #endif
 			return -1;
@@ -721,9 +727,10 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 #if DEBUG
 			using var sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0}::{1}: Max {2} respawn limit reached: {3}. Current {4} respawns this raid: {5}",
-				GetType().Name, nameof(AdjustMaxCountForRespawnLimits), DataService.SpawnType.ToString(),
-				DefaultPluginVars.maxRespawnsPMC.Value.ToString(), (_currentRespawnCount + groupSize).ToString());
+			sb.AppendFormat("{0} {1}::{2}: Max {3} respawn limit reached: {4}. Current {5} respawns this raid: {6}",
+				DateTime.Now.ToLongTimeString(), GetType().Name, nameof(AdjustMaxCountForRespawnLimits),
+				DataService.SpawnType.ToString(), DefaultPluginVars.maxRespawnsPMC.Value.ToString(),
+				(_currentRespawnCount + groupSize).ToString());
 			Logger.LogDebug(sb.ToString());
 #endif
 			groupSize = maxBotRespawns - _currentRespawnCount;

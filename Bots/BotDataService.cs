@@ -79,8 +79,8 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0}::{1}: Max starting bots set to {2}", GetType().Name,
-					nameof(SetupInitialBotCache), maxBots.ToString());
+				sb.AppendFormat("{0} {1}::{2}: Max starting bots set to {3}", DateTime.Now.ToLongTimeString(),
+					GetType().Name, nameof(SetupInitialBotCache), maxBots.ToString());
 				Logger.LogDebug(sb.ToString());
 			}
 #endif
@@ -128,8 +128,8 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0}::{1}: Creating bot: Type={2}, Difficulty={3}, Side={4}, GroupSize={5}",
-					GetType().Name, nameof(TryCreateBotData), spawnType.ToString(),
+				sb.AppendFormat("{0} {1}::{2}: Creating bot: Type={3}, Difficulty={4}, Side={5}, GroupSize={6}",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(TryCreateBotData), spawnType.ToString(),
 					botInfo.Difficulty.ToString(), side.ToString(), botInfo.GroupSize.ToString());
 				Logger.LogDebug(sb.ToString());
 			}
@@ -148,8 +148,9 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0}::{1}: Bot created and assigned successfully; {2} profiles loaded. IDs: {3}",
-					GetType().Name, nameof(TryCreateBotData), botCreationData.Profiles.Count.ToString(),
+				sb.AppendFormat("{0} {1}::{2}: Bot created and assigned successfully; {3} profiles loaded. IDs: {4}",
+					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(TryCreateBotData),
+					botCreationData.Profiles.Count.ToString(),
 					string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
 				Logger.LogDebug(sb.ToString());
 			}
@@ -188,9 +189,9 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 					using (var sb = ZString.CreateUtf8StringBuilder())
 					{
-						sb.AppendFormat("{0}::{1}: Replenishing group bot: {2} {3} {4} Count: {5}.",
-							GetType().Name, nameof(ReplenishBotData), role.ToString(), botInfo.Difficulty.ToString(),
-							botData.Side.ToString(), botInfo.GroupSize.ToString());
+						sb.AppendFormat("{0} {1}::{2}: Replenishing group bot: {3} {4} {5} Count: {6}.",
+							DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ReplenishBotData), role.ToString(),
+							botInfo.Difficulty.ToString(), botData.Side.ToString(), botInfo.GroupSize.ToString());
 						Logger.LogDebug(sb.ToString());
 					}
 #endif
@@ -201,9 +202,9 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 					using (var sb = ZString.CreateUtf8StringBuilder())
 					{
-						sb.AppendFormat("{0}::{1}: Replenishing single bot: {2} {3} {4} Count: 1.", GetType().Name,
-							nameof(ReplenishBotData), role.ToString(), botInfo.Difficulty.ToString(),
-							botData.Side.ToString());
+						sb.AppendFormat("{0} {1}::{2}: Replenishing single bot: {3} {4} {5} Count: 1.",
+							DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ReplenishBotData), role.ToString(),
+							botInfo.Difficulty.ToString(), botData.Side.ToString());
 						Logger.LogDebug(sb.ToString());
 					}
 #endif
@@ -235,8 +236,9 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 		using (var sb = ZString.CreateUtf8StringBuilder())
 		{
-			sb.AppendFormat("{0}::{1}: No cached bots found for difficulty {2}, and target count {3}.",
-				GetType().Name, nameof(FindCachedBotData), difficulty.ToString(), groupSize.ToString());
+			sb.AppendFormat("{0} {1}::{2}: No cached bots found for difficulty {3}, and target count {4}.",
+				DateTime.Now.ToLongTimeString(), GetType().Name, nameof(FindCachedBotData), difficulty.ToString(),
+				groupSize.ToString());
 			Logger.LogWarning(sb.ToString());
 		}
 #endif
@@ -254,8 +256,8 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 				using (var sb = ZString.CreateUtf8StringBuilder())
 				{
-					sb.AppendFormat("{0}::{1}: Cleared cached bot info for bot type: {2}", GetType().Name,
-						nameof(ClearBotCache), SpawnType.ToString());
+					sb.AppendFormat("{0} {1}::{2}: Cleared cached bot info for bot type: {3}",
+						DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ClearBotCache), SpawnType.ToString());
 					Logger.LogDebug(sb.ToString());
 				}
 #endif
