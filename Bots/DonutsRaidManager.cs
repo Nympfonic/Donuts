@@ -105,7 +105,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		IsBotPreparationComplete = false;
 		base.Awake();
 		
-		ModulePatchManager.EnablePatch<StartSpawningRaidManagerPatch>();
+		DonutsPlugin.ModulePatchManager.EnablePatch<StartSpawningRaidManagerPatch>();
 		
 		// TODO: In future release, make services for Bosses, special bots, and event bots. SWAG will become obsolete.
 
@@ -148,7 +148,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		if (!await Instance.TryCreateDataServices())
 		{
-			ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
+			DonutsPlugin.ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
 		}
 		
 		Instance.CreateSpawnServices();

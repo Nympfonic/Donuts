@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
+using UnityToolkit.Utils;
 
 namespace Donuts;
 
@@ -33,12 +34,14 @@ public class DonutsPlugin : BaseUnityPlugin
 	private bool _isWritingToFile;
 	
 	public new static ManualLogSource Logger { get; private set; }
+	internal static ModulePatchManager ModulePatchManager { get; private set; }
 
 	private void Awake()
 	{
 		Logger = base.Logger;
 
-		string assemblyPath = Assembly.GetExecutingAssembly().Location;
+		Assembly currentAssembly = Assembly.GetExecutingAssembly();
+		string assemblyPath = currentAssembly.Location;
 		directoryPath = Path.GetDirectoryName(assemblyPath);
 		
 		// Run dependency checker
@@ -53,7 +56,8 @@ public class DonutsPlugin : BaseUnityPlugin
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
 
-		ModulePatchManager.EnablePatches();
+		ModulePatchManager = new ModulePatchManager(currentAssembly);
+		ModulePatchManager.EnableAllPatches();
 	}
 
 	// ReSharper disable once Unity.IncorrectMethodSignature

@@ -1,6 +1,5 @@
 ﻿using Comfort.Common;
 using Donuts.Bots;
-using Donuts.Utils;
 using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -9,6 +8,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 using UnityEngine;
+using UnityToolkit.Utils;
 
 namespace Donuts.Patches;
 
