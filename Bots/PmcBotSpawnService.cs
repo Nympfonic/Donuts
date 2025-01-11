@@ -12,14 +12,14 @@ public class PmcBotSpawnService : BotSpawnService
 		int activeBots = GetAliveBotsCount();
 		if (activeBots < DataService.MaxBotLimit || DefaultPluginVars.hotspotIgnoreHardCapPMC.Value)
 		{
-			return true;
+			return false;
 		}
 #if DEBUG
 		Logger.LogDebug(string.Format(
 			"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {0}, {0} Bot Limit: {0}",
 			DataService.SpawnType.ToString()));
 #endif
-		return false;
+		return true;
 	}
 
 	protected override bool IsHardStopEnabled() => DefaultPluginVars.hardStopOptionPMC.Value;
