@@ -10,6 +10,7 @@ using JetBrains.Annotations;
 using SPT.SinglePlayer.Utils.InRaid;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -162,12 +163,12 @@ public abstract class BotSpawnService : IBotSpawnService
 		return raidTimeLeftPercent <= hardStopPercent;
 	}
 
-	protected abstract List<BotWave> GetBotWavesList();
+	protected abstract ReadOnlyCollection<BotWave> GetBotWaves();
 
 	private void UpdateBotWaveTimers(float deltaTime)
 	{
 		float cooldownDuration = DefaultPluginVars.coolDownTimer.Value;
-		foreach (BotWave wave in GetBotWavesList())
+		foreach (BotWave wave in GetBotWaves())
 		{
 			wave.UpdateTimer(deltaTime, cooldownDuration);
 		}
@@ -208,7 +209,7 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	public Queue<BotWave> GetBotWavesToSpawn()
 	{
-		List<BotWave> botWaves = GetBotWavesList();
+		ReadOnlyCollection<BotWave> botWaves = GetBotWaves();
 		Queue<BotWave> wavesToSpawn = new(botWaves.Count);
 		foreach (BotWave wave in botWaves)
 		{
@@ -445,7 +446,7 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	private void ResetGroupTimers(int groupNum)
 	{
-		foreach (BotWave botWave in GetBotWavesList())
+		foreach (BotWave botWave in GetBotWaves())
 		{
 			if (botWave.GroupNum == groupNum)
 			{

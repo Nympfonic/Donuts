@@ -1,12 +1,14 @@
 ﻿using Donuts.Models;
 using Donuts.Utils;
 using EFT;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace Donuts.Bots;
 
 public class PmcBotSpawnService : BotSpawnService
 {
+	private ReadOnlyCollection<BotWave> _botWaves;
+	
 	protected override bool HasReachedHardCap()
 	{
 		int activeBots = GetAliveBotsCount();
@@ -33,7 +35,7 @@ public class PmcBotSpawnService : BotSpawnService
 		return BotHelper.GetBotGroupSize(DefaultPluginVars.pmcGroupChance.Value, minGroupSize, maxGroupSize);
 	}
 
-	protected override List<BotWave> GetBotWavesList() => MapBotWaves.Pmc;
+	protected override ReadOnlyCollection<BotWave> GetBotWaves() => _botWaves ??= MapBotWaves.Pmc.AsReadOnly();
 	protected override int GetAliveBotsCount() => BotHelper.GetAliveBotsCount(IsPmc);
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsPmc(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledPMC.Value;
