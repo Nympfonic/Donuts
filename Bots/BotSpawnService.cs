@@ -612,6 +612,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			{
 				ActivateBotAtPosition(cachedBotData, spawnPosition);
 				spawned = true;
+				break;
 			}
 		}
 		
