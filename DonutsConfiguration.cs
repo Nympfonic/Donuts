@@ -76,23 +76,33 @@ internal static class DonutsConfiguration
 
 		foreach (FieldInfo field in _settingFields)
 		{
-			if (!field.FieldType.IsGenericType || field.FieldType.GetGenericTypeDefinition() != typeof(Setting<>))
-				return;
+			if (!field.FieldType.IsGenericType ||
+				field.FieldType.GetGenericTypeDefinition() != typeof(Setting<>) ||
+				!settingsDictionary.TryGetValue(field.Name, out object value))
+			{
+				continue;
+			}
 
-			if (!settingsDictionary.TryGetValue(field.Name, out object value))
-				return;
+			// Store the scenario selection values to later initialize
+			if (field.Name == nameof(DefaultPluginVars.pmcScenarioSelection))
+			{
+				DefaultPluginVars.PmcScenarioSelectionValue = value.ToString();
+#if DEBUG
+				DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.PmcScenarioSelectionValue)} to {value}");	
+#endif
+				continue;
+			}
+
+			if (field.Name == nameof(DefaultPluginVars.scavScenarioSelection))
+			{
+				DefaultPluginVars.ScavScenarioSelectionValue = value.ToString();
+#if DEBUG
+				DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.ScavScenarioSelectionValue)} to {value}");	
+#endif
+				continue;
+			}
 
 			ApplySetting(field, value);
-		}
-
-		// Store the scenario selection values to later initialize
-		if (settingsDictionary.TryGetValue(nameof(DefaultPluginVars.pmcScenarioSelection), out object pmcScenarioSelectionValue))
-		{
-			DefaultPluginVars.PmcScenarioSelectionValue = pmcScenarioSelectionValue.ToString();
-		}
-		else if (settingsDictionary.TryGetValue(nameof(DefaultPluginVars.scavScenarioSelection), out object scavScenarioSelectionValue))
-		{
-			DefaultPluginVars.ScavScenarioSelectionValue = scavScenarioSelectionValue.ToString();
 		}
 
 		// Load windowRect position and size from the dictionary, with defaults if not present
@@ -117,23 +127,6 @@ internal static class DonutsConfiguration
 		// Ensure the arrays are initialized before creating the settings
 		DefaultPluginVars.pmcScenarioCombinedArray ??= [];
 		DefaultPluginVars.scavScenarioCombinedArray ??= [];
-
-		// After loading all settings, initialize the scenario settings with the loaded values
-		DefaultPluginVars.pmcScenarioSelection = new Setting<string>(
-			"PMC Raid Spawn Preset Selection",
-			"Select a preset to use when spawning as PMC",
-			DefaultPluginVars.PmcScenarioSelectionValue,
-			"live-like",
-			options: DefaultPluginVars.pmcScenarioCombinedArray
-		);
-
-		DefaultPluginVars.scavScenarioSelection = new Setting<string>(
-			"SCAV Raid Spawn Preset Selection",
-			"Select a preset to use when spawning as SCAV",
-			DefaultPluginVars.ScavScenarioSelectionValue,
-			"live-like",
-			options: DefaultPluginVars.scavScenarioCombinedArray
-		);
 	}
 
 	private static void AddSettingToDictionary(IDictionary<string, object> settingsDictionary, FieldInfo field)
@@ -159,14 +152,14 @@ internal static class DonutsConfiguration
 		object settingValue = settingField.GetValue(null);
 		if (settingValue == null)
 		{
-			Debug.LogError($"Setting value for field {settingField.Name} is null.");
+			DonutsPlugin.Logger.LogError($"Setting value for field {settingField.Name} is null.");
 			return;
 		}
 
 		PropertyInfo valueProperty = settingValue.GetType().GetProperty("Value");
 		if (valueProperty == null)
 		{
-			Debug.LogError($"Value property for setting {settingField.Name} is not found.");
+			DonutsPlugin.Logger.LogError($"Value property for setting {settingField.Name} is not found.");
 			return;
 		}
 

@@ -51,7 +51,6 @@ public class DonutsPlugin : BaseUnityPlugin
 		}
 
 		DonutsConfiguration.ImportConfig(directoryPath);
-		pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
 
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
@@ -65,6 +64,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	private async UniTaskVoid Start()
 	{
 		await SetupScenariosUI();
+		pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
 	}
 
 	private void Update()
@@ -114,15 +114,15 @@ public class DonutsPlugin : BaseUnityPlugin
 		// Dynamically initialize the scenario settings
 		DefaultPluginVars.pmcScenarioSelection = new Setting<string>("PMC Raid Spawn Preset Selection",
 			"Select a preset to use when spawning as PMC",
-			DefaultPluginVars.PmcScenarioSelectionValue ?? "live-like", "live-like", options: 
-			DefaultPluginVars.pmcScenarioCombinedArray);
-
+			DefaultPluginVars.PmcScenarioSelectionValue ?? "live-like",
+			"live-like",
+			options: DefaultPluginVars.pmcScenarioCombinedArray);
+		
 		DefaultPluginVars.scavScenarioSelection = new Setting<string>("SCAV Raid Spawn Preset Selection",
 			"Select a preset to use when spawning as SCAV",
-			DefaultPluginVars.ScavScenarioSelectionValue ?? "live-like", "live-like", options: DefaultPluginVars.scavScenarioCombinedArray);
-
-		// Call InitializeDropdownIndices to ensure scenarios are loaded and indices are set
-		//MainSettingsPage.InitializeDropdownIndices();
+			DefaultPluginVars.ScavScenarioSelectionValue ?? "live-like",
+			"live-like",
+			options: DefaultPluginVars.scavScenarioCombinedArray);
 	}
 
 	private static async UniTask LoadDonutsScenarios()
