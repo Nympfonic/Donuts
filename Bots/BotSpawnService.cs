@@ -245,14 +245,14 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 			
  		ResetGroupTimers(wave.GroupNum);
- #if DEBUG
+#if DEBUG
  		using (var sb = ZString.CreateUtf8StringBuilder())
  		{
  			sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}", DateTime.Now.ToLongTimeString(),
 				GetType().Name, nameof(ResetGroupTimers), wave.GroupNum.ToString(), "Bot wave spawn triggered");
  			Logger.LogDebug(sb.ToString());
  		}
- #endif
+#endif
 		return anySpawned;
 	}
 	
@@ -344,20 +344,24 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		if (furthestBot == null)
 		{
+#if DEBUG
 			using var sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("{0} {1}::{2}: Attempted to despawn a null bot.", DateTime.Now.ToLongTimeString(),
 				GetType().Name, nameof(TryDespawnBot));
 			Logger.LogDebug(sb.ToString());
+#endif
 			return false;
 		}
 
 		BotOwner botOwner = furthestBot.AIData.BotOwner;
 		if (botOwner == null)
 		{
+#if DEBUG
 			using var sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("{0} {1}::{2}: BotOwner is null for the furthest bot.", DateTime.Now.ToLongTimeString(),
 				GetType().Name, nameof(TryDespawnBot));
 			Logger.LogDebug(sb.ToString());
+#endif
 			return false;
 		}
 

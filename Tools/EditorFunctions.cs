@@ -87,7 +87,7 @@ internal static class EditorFunctions
 			FightLocations.Locations.Remove(closestEntry);
 		}
 		else if (SessionLocations.Locations.Count > 0 &&
-		         SessionLocations.Locations.Contains(closestEntry))
+		    SessionLocations.Locations.Contains(closestEntry))
 		{
 			SessionLocations.Locations.Remove(closestEntry);
 		}
@@ -122,12 +122,14 @@ internal static class EditorFunctions
 		}
 
 		// Display a message to the player
-		string spawnMarkerDeletedMsg =
-			string.Format("Spawn Marker Deleted for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", closestEntry.Name,
+		using (var sb = ZString.CreateUtf8StringBuilder())
+		{
+			sb.AppendFormat("Spawn Marker Deleted for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", closestEntry.Name,
 				closestEntry.WildSpawnType, closestEntry.Position.x.ToString(CultureInfo.InvariantCulture),
 				closestEntry.Position.y.ToString(CultureInfo.InvariantCulture),
 				closestEntry.Position.z.ToString(CultureInfo.InvariantCulture));
-		DonutsHelper.DisplayNotification(spawnMarkerDeletedMsg, Color.yellow);
+			DonutsHelper.DisplayNotification(sb.ToString(), Color.yellow);
+		}
 
 		// Edit the DonutComponent.drawnCoordinates and gizmoSpheres list to remove the objects
 		if (DonutsGizmos.GizmoMarkers.TryRemove(closestEntry.Position, out GameObject sphere))
