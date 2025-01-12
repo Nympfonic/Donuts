@@ -243,15 +243,15 @@ public abstract class BotSpawnService : IBotSpawnService
 			anySpawned = true;
 		}
 			
-// 		ResetGroupTimers(wave.GroupNum);
-// #if DEBUG
-// 		using (var sb = ZString.CreateUtf8StringBuilder())
-// 		{
-// 			sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}", DateTime.Now.ToLongTimeString(),
-//				GetType().Name, nameof(ResetGroupTimers), wave.GroupNum.ToString(), "Bot wave spawn triggered");
-// 			Logger.LogDebug(sb.ToString());
-// 		}
-// #endif
+ 		ResetGroupTimers(wave.GroupNum);
+ #if DEBUG
+ 		using (var sb = ZString.CreateUtf8StringBuilder())
+ 		{
+ 			sb.AppendFormat("{0} {1}::{2}: Resetting timer for GroupNum {3}, reason: {4}", DateTime.Now.ToLongTimeString(),
+				GetType().Name, nameof(ResetGroupTimers), wave.GroupNum.ToString(), "Bot wave spawn triggered");
+ 			Logger.LogDebug(sb.ToString());
+ 		}
+ #endif
 		return anySpawned;
 	}
 	
