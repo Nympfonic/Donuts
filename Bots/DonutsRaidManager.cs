@@ -87,7 +87,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	internal static bool IsBotSpawningEnabled =>
 		(bool)ReflectionHelper.BotsController_botEnabled_Field.GetValue(Singleton<IBotGame>.Instance.BotsController);
 
-	public static bool IsBotPreparationComplete { get; private set; }
+	public static bool CanStartRaid { get; private set; }
 	//internal static List<List<Entry>> groupedFightLocations { get; set; } = [];
 
 	static DonutsRaidManager()
@@ -102,7 +102,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			Destroy(this);
 		}
 		
-		IsBotPreparationComplete = false;
+		CanStartRaid = false;
 		base.Awake();
 		
 		DonutsPlugin.ModulePatchManager.EnablePatch<StartSpawningRaidManagerPatch>();
@@ -141,20 +141,17 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 #if DEBUG
 		Logger.LogDebug("Started initializing Donuts Raid Manager");
 #endif
-		if (Instance == null)
+		if (Instance == null || !await Instance.TryCreateDataServices())
 		{
-			return;
-		}
-		
-		if (!await Instance.TryCreateDataServices())
-		{
+			Logger.NotifyLogError("Failed to initialize Donuts Raid Manager, Donuts will not work");
 			DonutsPlugin.ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
+			CanStartRaid = true;
+			return;
 		}
 		
 		Instance.CreateSpawnServices();
 		await Instance.SpawnStartingBots();
-		
-		IsBotPreparationComplete = true;
+		CanStartRaid = true;
 #if DEBUG
 		Logger.LogDebug("Finished initializing Donuts Raid Manager");
 #endif
@@ -190,7 +187,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		
 		base.OnDestroy();
-		IsBotPreparationComplete = false;
+		CanStartRaid = false;
 #if DEBUG
 		Logger.LogDebug($"{nameof(DonutsRaidManager)} component cleaned up and disabled.");
 #endif

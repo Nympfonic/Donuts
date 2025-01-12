@@ -43,7 +43,7 @@ internal class DelayedGameStartPatch : ModulePatch
 		float maxWaitTime = DefaultPluginVars.maxRaidDelay.Value;
 		WaitForEndOfFrame waitInterval = new();
 
-		while (!DonutsRaidManager.IsBotPreparationComplete)
+		while (!DonutsRaidManager.CanStartRaid)
 		{
 			yield return waitInterval; // Check at end of every frame
 
@@ -64,7 +64,7 @@ internal class DelayedGameStartPatch : ModulePatch
 		}
 
 		// Continue with the original task
-		Logger.LogWarning("Donuts bot preparation is complete.");
+		DonutsRaidManager.Logger.LogWarning("Donuts bot preparation is complete.");
 		yield return originalTask;
 	}
 }
