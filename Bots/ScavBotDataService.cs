@@ -11,7 +11,7 @@ public class ScavBotDataService : BotDataService
 	public override DonutsSpawnType SpawnType => DonutsSpawnType.Scav;
 
 	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties { get; } =
-		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesSCAV.Value.ToLower());
+		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesSCAV.Value);
 
 	protected override string GroupChance => DefaultPluginVars.scavGroupChance.Value;
 	
