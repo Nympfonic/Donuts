@@ -11,7 +11,9 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using BepInEx.Bootstrap;
 using UnityEngine;
 using UnityToolkit.Utils;
 
@@ -21,6 +23,7 @@ namespace Donuts;
 [BepInDependency("com.SPT.core", "3.10.0")]
 [BepInDependency("xyz.drakia.waypoints")]
 [BepInDependency("com.Arys.UnityToolkit", "1.1.0")]
+[BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
 {
 	private const KeyCode ESCAPE_KEY = KeyCode.Escape;
@@ -28,6 +31,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	internal static PluginGUIComponent pluginGUIComponent;
 	internal static ConfigEntry<KeyboardShortcut> toggleGUIKey;
 	internal static string directoryPath;
+	public static bool IsFikaPresent { get; private set; }
 
 	private static readonly List<Folder> _emptyScenarioList = [];
 	
@@ -43,6 +47,8 @@ public class DonutsPlugin : BaseUnityPlugin
 		Assembly currentAssembly = Assembly.GetExecutingAssembly();
 		string assemblyPath = currentAssembly.Location;
 		directoryPath = Path.GetDirectoryName(assemblyPath);
+		
+		IsFikaPresent = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
 		
 		// Run dependency checker
 		if (!DependencyChecker.ValidateDependencies(Logger, Info, GetType(), Config))
