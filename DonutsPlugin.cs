@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using Cysharp.Threading.Tasks;
@@ -12,6 +13,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityToolkit.Utils;
@@ -22,7 +24,7 @@ namespace Donuts;
 [BepInDependency("com.SPT.core", "3.10.0")]
 [BepInDependency("xyz.drakia.waypoints")]
 [BepInDependency("com.Arys.UnityToolkit", "1.1.0")]
-//[BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
 {
 	private const KeyCode ESCAPE_KEY = KeyCode.Escape;
@@ -37,7 +39,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	public new static ManualLogSource Logger { get; private set; }
 	internal static ModulePatchManager ModulePatchManager { get; private set; }
-	// internal static bool FikaEnabled { get; set; }
+	internal static bool FikaEnabled { get; private set; }
 
 	private void Awake()
 	{
@@ -47,11 +49,13 @@ public class DonutsPlugin : BaseUnityPlugin
 		string assemblyPath = currentAssembly.Location;
 		directoryPath = Path.GetDirectoryName(assemblyPath);
 		
-		// FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
-		// if (!FikaEnabled)
-		// {
-		// 	ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
-		// }
+		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
+		if (FikaEnabled)
+		{
+			ModulePatchManager.DisablePatch<EnableRaidManagerPatch>();
+			ModulePatchManager.DisablePatch<DelayedGameStartPatch>();
+			//ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
+		}
 		
 		// Run dependency checker
 		if (!DependencyChecker.ValidateDependencies(Logger, Info, GetType(), Config))

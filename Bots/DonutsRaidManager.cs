@@ -138,7 +138,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 		}
 
-		await Initialize();
+		if (!DonutsPlugin.FikaEnabled)
+		{
+			await Initialize();
+		}
 	}
 
 	public static async UniTask Initialize()

@@ -1,4 +1,5 @@
 ﻿using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using Donuts.Bots;
 using EFT;
 using HarmonyLib;
@@ -25,6 +26,20 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 			return;
 		}
 
+		if (DonutsPlugin.FikaEnabled)
+		{
+			InitializeRaidManagerFika().Forget();
+		}
+		else
+		{
+			MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
+		}
+	}
+
+	private static async UniTaskVoid InitializeRaidManagerFika()
+	{
+		DonutsRaidManager.Enable();
+		await DonutsRaidManager.Initialize();
 		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
 	}
 }
