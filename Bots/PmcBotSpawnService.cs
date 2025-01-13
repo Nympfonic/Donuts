@@ -41,7 +41,7 @@ public class PmcBotSpawnService : BotSpawnService
 	}
 
 	protected override ReadOnlyCollection<BotWave> GetBotWaves() => _botWaves ??= MapBotWaves.Pmc.AsReadOnly();
-	protected override int GetAliveBotsCount() => BotHelper.GetAliveBotsCount(IsPmc);
+	protected override int GetAliveBotsCount() => ConfigService.CalculateAliveBotsCount(IsPmc);
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsPmc(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledPMC.Value;
 	protected override bool IsHotspotBoostEnabled() => DefaultPluginVars.hotspotBoostPMC.Value;

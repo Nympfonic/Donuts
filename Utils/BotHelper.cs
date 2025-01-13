@@ -54,33 +54,6 @@ internal static class BotHelper
 		return difficulties.AsReadOnly();
 	}
 
-	/// <summary>
-	/// Gets the number of alive bots. A predicate can be specified to filter for specific bot types, but is optional.
-	/// </summary>
-	internal static int GetAliveBotsCount(Func<WildSpawnType, bool> predicate = null)
-	{
-		GameWorld gameWorld = Singleton<GameWorld>.Instance;
-		if (gameWorld == null)
-		{
-			return -1;
-		}
-
-		var count = 0;
-		List<Player> allAlivePlayers = gameWorld.AllAlivePlayersList;
-		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
-		{
-			Player player = allAlivePlayers[i];
-			if (player == null || !player.IsAI) continue;
-
-			WildSpawnType role = player.Profile.Info.Settings.Role;
-			if (predicate == null || predicate(role))
-			{
-				count++;
-			}
-		}
-		return count;
-	}
-
 	internal static int GetBotGroupSize(string pluginGroupChance, int minGroupSize, int maxGroupSize, int maxCap = int.MaxValue)
 	{
 		if (maxGroupSize < minGroupSize)

@@ -5,6 +5,7 @@ using Donuts.Utils;
 using EFT;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -225,6 +226,27 @@ public class BotConfigService
 			return botLimit;
 		}
 		return -1;
+	}
+
+	/// <summary>
+	/// Counts the number of alive bots. A predicate can be specified to filter for specific bot types, but is optional.
+	/// </summary>
+	public int CalculateAliveBotsCount(Func<WildSpawnType, bool> predicate = null)
+	{
+		var count = 0;
+		List<Player> allAlivePlayers = _gameWorld.AllAlivePlayersList;
+		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
+		{
+			Player player = allAlivePlayers[i];
+			if (player == null || !player.IsAI) continue;
+
+			WildSpawnType role = player.Profile.Info.Settings.Role;
+			if (predicate == null || predicate(role))
+			{
+				count++;
+			}
+		}
+		return count;
 	}
 
 	private void Initialize()
