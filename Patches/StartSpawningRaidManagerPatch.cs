@@ -20,25 +20,25 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 	[PatchPostfix]
 	private static void PatchPostfix()
 	{
-		if (!Singleton<DonutsRaidManager>.Instantiated)
-		{
-			Logger.LogError($"Singleton<{nameof(DonutsRaidManager)}> is not instantiated");
-			return;
-		}
-
+		Logger.LogDebug($"{nameof(DonutsPlugin.FikaEnabled)}: {DonutsPlugin.FikaEnabled.ToString()}");
 		if (DonutsPlugin.FikaEnabled)
 		{
 			InitializeRaidManagerFika().Forget();
 		}
 		else
 		{
+			if (!Singleton<DonutsRaidManager>.Instantiated)
+			{
+				Logger.LogError($"Singleton<{nameof(DonutsRaidManager)}> is not instantiated");
+				return;
+			}
+			
 			MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
 		}
 	}
 
 	private static async UniTaskVoid InitializeRaidManagerFika()
 	{
-		DonutsRaidManager.Enable();
 		await DonutsRaidManager.Initialize();
 		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
 	}

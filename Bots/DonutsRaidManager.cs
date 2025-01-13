@@ -106,8 +106,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		CanStartRaid = false;
 		base.Awake();
 		
-		DonutsPlugin.ModulePatchManager.EnablePatch<StartSpawningRaidManagerPatch>();
-		
 		// TODO: In future release, make services for Bosses, special bots, and event bots. SWAG will become obsolete.
 
 		_gameWorld = Singleton<GameWorld>.Instance;
@@ -142,6 +140,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		{
 			await Initialize();
 		}
+		else
+		{
+			CanStartRaid = true;
+		}
 	}
 
 	public static async UniTask Initialize()
@@ -152,7 +154,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		if (Instance == null || !await Instance.TryCreateDataServices())
 		{
 			Logger.NotifyLogError("Failed to initialize Donuts Raid Manager, Donuts will not work");
-			DonutsPlugin.ModulePatchManager.DisablePatch<StartSpawningRaidManagerPatch>();
+			if (Instance != null)
+			{
+				Destroy(Instance);
+			}
 			CanStartRaid = true;
 			return;
 		}

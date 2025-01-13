@@ -49,14 +49,6 @@ public class DonutsPlugin : BaseUnityPlugin
 		string assemblyPath = currentAssembly.Location;
 		directoryPath = Path.GetDirectoryName(assemblyPath);
 		
-		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
-		if (FikaEnabled)
-		{
-			ModulePatchManager.DisablePatch<EnableRaidManagerPatch>();
-			ModulePatchManager.DisablePatch<DelayedGameStartPatch>();
-			//ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
-		}
-		
 		// Run dependency checker
 		if (!DependencyChecker.ValidateDependencies(Logger, Info, GetType(), Config))
 		{
@@ -70,6 +62,13 @@ public class DonutsPlugin : BaseUnityPlugin
 
 		ModulePatchManager = new ModulePatchManager(currentAssembly);
 		ModulePatchManager.EnableAllPatches();
+		
+		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
+		Logger.LogDebug($"{nameof(FikaEnabled)}: {FikaEnabled.ToString()}");
+		if (FikaEnabled)
+		{
+			//ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
+		}
 	}
 
 	// ReSharper disable once Unity.IncorrectMethodSignature

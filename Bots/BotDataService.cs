@@ -62,7 +62,16 @@ public abstract class BotDataService : IBotDataService
 	{
 		var service = new TBotDataService();
 		service.Initialize(configService, logger, cancellationToken);
-		MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotDataServices.Add(service.SpawnType, service);
+		Dictionary<DonutsSpawnType, IBotDataService> botDataServices =
+			MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotDataServices;
+		if (botDataServices.ContainsKey(service.SpawnType))
+		{
+			DonutsRaidManager.Logger.LogError($"Error initializing {service.GetType().Name}, SpawnType {service.SpawnType.ToString()} is already in the BotDataServices dictionary.");
+		}
+		else
+		{
+			botDataServices.Add(service.SpawnType, service);
+		}
 		await service.SetupInitialBotCache();
 		return service;
 	}
