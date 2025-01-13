@@ -8,12 +8,10 @@ using System;
 using System.Collections;
 using System.Reflection;
 using UnityEngine;
-using UnityToolkit.Utils;
 
 namespace Donuts.Patches;
 
 [UsedImplicitly]
-[DisablePatch]
 internal class DelayedGameStartPatch : ModulePatch
 {
 	/// <remarks>Target method has a return type of <see cref="IEnumerator"/> and has a single <see cref="Action"/> type parameter.</remarks>

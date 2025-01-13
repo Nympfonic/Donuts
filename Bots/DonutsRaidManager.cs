@@ -8,6 +8,7 @@ using Donuts.Patches;
 using Donuts.Tools;
 using Donuts.Utils;
 using EFT;
+using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -65,7 +66,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private CancellationToken _onDestroyToken;
 	private DonutsGizmos _donutsGizmos;
 
-	private readonly TimeSpan _spawnInterval = TimeSpan.FromSeconds(5f);
+	private readonly TimeSpan _spawnInterval = TimeSpan.FromSeconds(1f);
 	private readonly TimeSpan _oneSecondInterval = TimeSpan.FromSeconds(1f);
 
 	private bool _hasSpawnedStartingBots;
@@ -121,7 +122,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		BotConfigService = BotConfigService.Create(Logger);
 	}
 
-	private void Start()
+	// ReSharper disable once Unity.IncorrectMethodSignature
+	[UsedImplicitly]
+	private async UniTaskVoid Start()
 	{
 		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
 		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
@@ -134,9 +137,11 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				player.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
 			}
 		}
+
+		await Initialize();
 	}
 
-	public static async Task Initialize()
+	public static async UniTask Initialize()
 	{
 #if DEBUG
 		Logger.LogDebug("Started initializing Donuts Raid Manager");
@@ -286,6 +291,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			{
 				await service.SpawnStartingBots();
 			}
+
+			await UniTask.Delay(_oneSecondInterval, cancellationToken: _onDestroyToken);
 			_hasSpawnedStartingBots = true;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
