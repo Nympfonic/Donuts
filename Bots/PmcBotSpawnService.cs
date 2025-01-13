@@ -1,4 +1,5 @@
-﻿using Donuts.Models;
+﻿using Cysharp.Text;
+using Donuts.Models;
 using Donuts.Utils;
 using EFT;
 using System.Collections.ObjectModel;
@@ -17,9 +18,13 @@ public class PmcBotSpawnService : BotSpawnService
 			return false;
 		}
 #if DEBUG
-		Logger.LogDebug(string.Format(
-			"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {0}, {0} Bot Limit: {0}",
-			DataService.SpawnType.ToString()));
+		using (var sb = ZString.CreateUtf8StringBuilder())
+		{
+			sb.AppendFormat(
+				"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
+				DataService.SpawnType.ToString(), activeBots.ToString(), DataService.MaxBotLimit.ToString());
+			Logger.LogDebug(sb.ToString());
+		}
 #endif
 		return true;
 	}
