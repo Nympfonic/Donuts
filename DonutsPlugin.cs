@@ -64,7 +64,6 @@ public class DonutsPlugin : BaseUnityPlugin
 		ModulePatchManager.EnableAllPatches();
 		
 		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
-		Logger.LogDebug($"{nameof(FikaEnabled)}: {FikaEnabled.ToString()}");
 		if (FikaEnabled)
 		{
 			//ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();

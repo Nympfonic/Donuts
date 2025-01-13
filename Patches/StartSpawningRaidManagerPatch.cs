@@ -20,7 +20,6 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 	[PatchPostfix]
 	private static void PatchPostfix()
 	{
-		Logger.LogDebug($"{nameof(DonutsPlugin.FikaEnabled)}: {DonutsPlugin.FikaEnabled.ToString()}");
 		if (DonutsPlugin.FikaEnabled)
 		{
 			InitializeRaidManagerFika().Forget();
