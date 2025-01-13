@@ -14,6 +14,7 @@ internal static class DefaultPluginVars
 	internal static Setting<bool> DespawnEnabledPMC;
 	internal static Setting<bool> DespawnEnabledSCAV;
 	internal static Setting<bool> HardCapEnabled;
+	internal static Setting<bool> HardCapIgnoresBoss;
 	internal static Setting<float> coolDownTimer;
 	internal static Setting<string> pmcGroupChance;
 	internal static Setting<string> scavGroupChance;
@@ -222,6 +223,10 @@ internal static class DefaultPluginVars
 		HardCapEnabled = new Setting<bool>("Bot Hard Cap Option",
 			"When enabled, all bot spawns will be hard capped by your preset caps. In other words, if your bot count is at the total Donuts cap then no more bots will spawn until one dies (vanilla SPT behavior).",
 			false, false);
+
+		HardCapIgnoresBoss = new Setting<bool>("Hard Cap Ignores Bosses",
+			"When enabled alongside the hard cap option, the hard cap will only count scavs and PMC's. This can potentially result in a higher number of scavs and PMC's but may have a performance impact.",
+			true, true);
 
 		coolDownTimer = new Setting<float>("Cooldown Timer",
 			"Cooldown Timer for after a spawn has successfully spawned a bot the spawn marker's MaxSpawnsBeforeCooldown",

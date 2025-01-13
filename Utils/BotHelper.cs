@@ -4,6 +4,7 @@ using EFT;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using Random = UnityEngine.Random;
 
 namespace Donuts.Utils;
@@ -56,6 +57,7 @@ internal static class BotHelper
 
 	/// <summary>
 	/// Gets the number of alive bots. A predicate can be specified to filter for specific bot types, but is optional.
+	/// If there's no predicate, find just scavs/pmc's
 	/// </summary>
 	internal static int GetAliveBotsCount(Func<WildSpawnType, bool> predicate = null)
 	{
@@ -67,6 +69,11 @@ internal static class BotHelper
 
 		var count = 0;
 		List<Player> allAlivePlayers = gameWorld.AllAlivePlayersList;
+		if (predicate == null && DefaultPluginVars.HardCapIgnoresBoss.Value)
+		{
+			List<WildSpawnType> filteredTypes = [WildSpawnType.assault, WildSpawnType.pmcBEAR, WildSpawnType.pmcUSEC];
+			allAlivePlayers = gameWorld.AllAlivePlayersList.Where((p) => filteredTypes.Contains(p.Profile.Info.Settings.Role)).ToList();
+		}
 		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = allAlivePlayers[i];

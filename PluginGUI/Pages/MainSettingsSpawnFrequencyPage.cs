@@ -26,6 +26,9 @@ internal class MainSettingsSpawnFrequencyPage : ISettingsPage
 		HardCapEnabled.Value = Toggle(HardCapEnabled.Name, HardCapEnabled.ToolTipText, HardCapEnabled.Value);
 		GUILayout.Space(10);
 
+		HardCapIgnoresBoss.Value = Toggle(HardCapIgnoresBoss.Name, HardCapIgnoresBoss.ToolTipText, HardCapIgnoresBoss.Value);
+		GUILayout.Space(10);
+
 		useTimeBasedHardStop.Value = Toggle(useTimeBasedHardStop.Name, useTimeBasedHardStop.ToolTipText,
 			useTimeBasedHardStop.Value);
 		GUILayout.Space(10);
