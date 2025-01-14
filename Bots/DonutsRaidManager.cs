@@ -139,7 +139,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
 		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
-		//_eftBotSpawner.OnBotRemoved += ClearBotOwnerData;
 		foreach (Player player in BotConfigService.GetHumanPlayerList())
 		{
 			if (player.OrNull()?.HealthController?.IsAlive == true)
@@ -208,7 +207,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		if (_eftBotSpawner != null)
 		{
 			_eftBotSpawner.OnBotRemoved -= EftBotSpawner_OnBotRemoved;
-			//_eftBotSpawner.OnBotRemoved -= ClearBotOwnerData;
 			_eftBotSpawner.OnBotCreated -= EftBotSpawner_OnBotCreated;
 		}
 		
@@ -465,36 +463,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				raidManager.UpdateReplenishBotDataTime();
 				break;
 			}
-		}
-	}
-
-	private static void ClearBotOwnerData(BotOwner botToRemove)
-	{
-		List<Player> humanPlayerList = Singleton<DonutsRaidManager>.Instance.BotConfigService.GetHumanPlayerList();
-		foreach (Player humanPlayer in humanPlayerList)
-		{
-			if (humanPlayer.OrNull()?.HealthController?.IsAlive == true)
-			{
-				botToRemove.Memory.DeleteInfoAboutEnemy(humanPlayer);
-			}
-		}
-
-		botToRemove.EnemiesController.EnemyInfos.Clear();
-
-		List<Player> allAlivePlayers = Singleton<GameWorld>.Instance.AllAlivePlayersList;
-		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
-		{
-			Player player = allAlivePlayers[i];
-			if (player == null || !player.IsAI || player.AIData.BotOwner == botToRemove)
-			{
-				continue;
-			}
-
-			BotOwner botOwner = player.AIData.BotOwner;
-			botOwner.Memory.DeleteInfoAboutEnemy(botToRemove);
-			botOwner.BotsGroup.RemoveInfo(botToRemove);
-			botOwner.BotsGroup.RemoveEnemy(botToRemove, EBotEnemyCause.death);
-			botOwner.BotsGroup.RemoveAlly(botToRemove);
 		}
 	}
 
