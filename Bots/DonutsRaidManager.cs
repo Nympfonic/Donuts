@@ -84,8 +84,19 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 	internal static ManualLogSource Logger { get; }
 	
-	internal static bool IsBotSpawningEnabled =>
-		(bool)ReflectionHelper.BotsController_botEnabled_Field.GetValue(Singleton<IBotGame>.Instance.BotsController);
+	internal static bool IsBotSpawningEnabled
+    {
+        get
+        {
+            bool value = false;
+            if (Singleton<IBotGame>.Instance != null && Singleton<IBotGame>.Instance.BotsController != null)
+            {
+                value = Singleton<IBotGame>.Instance.BotsController.IsEnable;
+            }
+
+            return value;
+        }
+    }
 
 	public static bool CanStartRaid { get; private set; }
 	//internal static List<List<Entry>> groupedFightLocations { get; set; } = [];
@@ -99,7 +110,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		if (!IsBotSpawningEnabled)
 		{
-			Destroy(this);
+#if DEBUG
+            Logger.LogInfo("Bot spawning disabled, skipping DonutsRaidManager::Awake()"); 
+#endif
+            Destroy(this);
 		}
 		
 		CanStartRaid = false;
