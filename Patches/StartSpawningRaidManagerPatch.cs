@@ -38,6 +38,14 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 
 	private static async UniTaskVoid InitializeRaidManagerFika()
 	{
+        if (!DonutsRaidManager.IsBotSpawningEnabled)
+        {
+#if DEBUG
+            Logger.LogInfo("Running as Fika client or something catastrophic happened to the BotsController, skipping DonutsRaidManager::Initialize"); 
+#endif
+            return;
+        }
+
 		await DonutsRaidManager.Initialize();
 		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
 	}
