@@ -139,7 +139,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
 		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
-		_eftBotSpawner.OnBotRemoved += ClearBotOwnerData;
+		//_eftBotSpawner.OnBotRemoved += ClearBotOwnerData;
 		foreach (Player player in BotConfigService.GetHumanPlayerList())
 		{
 			if (player.OrNull()?.HealthController?.IsAlive == true)
@@ -208,7 +208,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		if (_eftBotSpawner != null)
 		{
 			_eftBotSpawner.OnBotRemoved -= EftBotSpawner_OnBotRemoved;
-			_eftBotSpawner.OnBotRemoved -= ClearBotOwnerData;
+			//_eftBotSpawner.OnBotRemoved -= ClearBotOwnerData;
 			_eftBotSpawner.OnBotCreated -= EftBotSpawner_OnBotCreated;
 		}
 		

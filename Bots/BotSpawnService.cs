@@ -6,6 +6,7 @@ using Donuts.Bots.SpawnCheckProcessor;
 using Donuts.Models;
 using Donuts.Utils;
 using EFT;
+using EFT.AssetsManager;
 using JetBrains.Annotations;
 using SPT.SinglePlayer.Utils.InRaid;
 using System;
@@ -382,12 +383,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		IBotGame botGame = Singleton<IBotGame>.Instance;
 		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botOwner.GetPlayer);
 		botOwner.Deactivate();
-		botOwner.Dispose();
-		botGame.BotsController.BotDied(botOwner);
-		botGame.BotsController.DestroyInfo(botOwner.GetPlayer);
-		//DestroyImmediate(botOwner.gameObject);
-		Object.Destroy(botOwner.gameObject);
-		//Destroy(botOwner);
+        botGame.BotDespawn(botOwner);
+        AssetPoolObject.ReturnToPool(botOwner.gameObject);
 
 		// Update the cooldown
 		_despawnCooldownTime = Time.time;
