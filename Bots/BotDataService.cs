@@ -78,13 +78,13 @@ public abstract class BotDataService : IBotDataService
 	
 	public abstract BotDifficulty GetBotDifficulty();
 	
-	protected abstract BotConfig GetBotConfig();
+	protected abstract BotConfig GetStartingBotConfig();
 
 	private async UniTask SetupInitialBotCache()
 	{
 		try
 		{
-			BotConfig botCfg = GetBotConfig();
+			BotConfig botCfg = GetStartingBotConfig();
 			int maxBots = BotHelper.GetRandomBotCap(botCfg.MinCount, botCfg.MaxCount, MaxBotLimit);
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
@@ -103,13 +103,14 @@ public abstract class BotDataService : IBotDataService
 				string selectedZone = SpawnPointHelper.SelectUnusedZone(UsedSpawnZones, ZoneSpawnPoints);
 				List<Vector3> spawnPoints = ZoneSpawnPoints[selectedZone].ShuffleElements();
 				
-				var botInfo = new PrepBotInfo(BotDifficulties.PickRandomElement(), groupSize > 1, groupSize);
-				(bool success, BotCreationDataClass _) = await TryCreateBotData(botInfo);
+				var prepBotInfo = new PrepBotInfo(BotDifficulties.PickRandomElement(), groupSize > 1, groupSize);
+				(bool success, BotCreationDataClass botData) = await TryCreateBotData(prepBotInfo);
 				if (_onDestroyToken.IsCancellationRequested) return;
 				
 				if (success)
 				{
-					BotSpawnInfos.Add(new BotSpawnInfo(botInfo, selectedZone, spawnPoints));
+					prepBotInfo.Bots = botData;
+					BotSpawnInfos.Add(new BotSpawnInfo(prepBotInfo, selectedZone, spawnPoints));
 					totalBots += groupSize;
 				}
 			}

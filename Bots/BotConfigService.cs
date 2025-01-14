@@ -146,7 +146,7 @@ public class BotConfigService
 	}
 
 	[CanBeNull]
-	public StartingBotConfig GetStartingBotConfig()
+	public StartingBotConfig GetAllMapsStartingBotConfig()
 	{
 		if (_startingBotConfig != null)
 		{
@@ -257,7 +257,7 @@ public class BotConfigService
 		GetMapLocation();
 		GetMapName();
 		GetSelectedScenario();
-		GetStartingBotConfig();
+		GetAllMapsStartingBotConfig();
 
 		InitializeBotLimits(_scenarioSelected, _mapLocation);
 	}
