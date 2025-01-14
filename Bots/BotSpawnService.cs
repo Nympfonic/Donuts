@@ -40,6 +40,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	private SpawnCheckProcessorBase _spawnCheckProcessor;
 	
 	private GameWorld _gameWorld;
+	private ReadOnlyCollection<Player> _allAlivePlayersReadOnly;
 	private string _mapLocation;
 	private BotsController _botsController;
 	private IBotCreator _botCreator;
@@ -96,6 +97,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		_onDestroyToken = cancellationToken;
 		
 		_gameWorld = Singleton<GameWorld>.Instance;
+		_allAlivePlayersReadOnly = _gameWorld.AllAlivePlayersList.AsReadOnly();
 		_mapLocation = ConfigService.GetMapLocation();
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
@@ -263,7 +265,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		var furthestSqrMagnitude = float.MinValue;
 		Player furthestBot = null;
-		List<Player> allAlivePlayers = _gameWorld.AllAlivePlayersList;
+		ReadOnlyCollection<Player> allAlivePlayers = _allAlivePlayersReadOnly;
 		List<Player> humanPlayers = ConfigService.GetHumanPlayerList();
 		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
@@ -647,8 +649,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			{
 				if (!ignoreChecks)
 				{
-					var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation,
-						_gameWorld.AllAlivePlayersList.AsReadOnly());
+					var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation, _allAlivePlayersReadOnly);
 					_spawnCheckProcessor.Process(spawnCheckData);
 					if (!spawnCheckData.Success)
 					{
