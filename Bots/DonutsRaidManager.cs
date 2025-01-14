@@ -189,7 +189,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 	public override void OnDestroy()
 	{
-		_donutsGizmos.Dispose();
+		_donutsGizmos?.Dispose();
 		
 		if (_eftBotSpawner != null)
 		{

@@ -276,6 +276,8 @@ public class BotConfigService
 		
 		if (selectedRaidFolder == null) return;
 
+		// TODO: Needs a refactor
+		// Models would need rearranging, bot limits should be initialized in their respective services
 		switch (location)
 		{
 			case "factory4_day" or "factory4_night":
