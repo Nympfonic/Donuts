@@ -141,7 +141,10 @@ internal static class EditorFunctions
 	internal static void CreateSpawnMarker()
 	{
 		// Check if any of the required objects are null
-		if (!Singleton<GameWorld>.Instantiated)
+		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
+		if (!Singleton<GameWorld>.Instantiated ||
+			raidManager == null ||
+			raidManager.BotConfigService == null)
 		{
 			_logger.LogDebug("IBotGame Not Instantiated or gameWorld is null.");
 			return;
@@ -155,7 +158,7 @@ internal static class EditorFunctions
 		{
 			Name = spawnName.Value,
 			GroupNum = groupNum.Value,
-			MapName = MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+			MapName = raidManager.BotConfigService.GetMapLocation(),
 			WildSpawnType = wildSpawns.Value,
 			MinDistance = minSpawnDist.Value,
 			MaxDistance = maxSpawnDist.Value,
@@ -196,9 +199,15 @@ internal static class EditorFunctions
 		DonutsHelper.DisplayNotification(sb.ToString(), Color.yellow);
 	}
 
-	internal static async UniTask WriteToJsonFileAsync(string directoryPath)
+	internal static async UniTask WriteToJsonFile(string directoryPath)
 	{
-		if (!Singleton<GameWorld>.Instantiated) return;
+		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
+		if (!Singleton<GameWorld>.Instantiated ||
+			raidManager == null ||
+			raidManager.BotConfigService == null)
+		{
+			return;
+		}
 
 		string json;
 		string fileName;
@@ -208,7 +217,7 @@ internal static class EditorFunctions
 			// Take the sessionLocations object only and serialize it to json
 			json = JsonConvert.SerializeObject(SessionLocations, Formatting.Indented);
 			fileName = string.Format("{0}_{1}_NewLocOnly.json",
-				MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+				raidManager.BotConfigService.GetMapLocation(),
 				Random.Range(0, 1000).ToString());
 		}
 		else
@@ -221,13 +230,14 @@ internal static class EditorFunctions
 
 			json = JsonConvert.SerializeObject(combinedLocations, Formatting.Indented);
 			fileName = string.Format("{0}_{1}_All.json",
-				MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotConfigService.GetMapLocation(),
+				raidManager.BotConfigService.GetMapLocation(),
 				Random.Range(0, 1000).ToString());
 		}
 
 		// Write json to file with filename == Donuts.DonutComponent.mapLocation + random number
-		await UniTask.SwitchToTaskPool();
 		string jsonFilePath = Path.Combine(directoryPath, "patterns", fileName);
+
+		await UniTask.SwitchToThreadPool();
 		using (var writer = new StreamWriter(jsonFilePath, false))
 		{
 			await writer.WriteAsync(json);

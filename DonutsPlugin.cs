@@ -92,7 +92,7 @@ public class DonutsPlugin : BaseUnityPlugin
 		if (IsKeyPressed(DefaultPluginVars.WriteToFileKey.Value) && !_isWritingToFile)
 		{
 			_isWritingToFile = true;
-			EditorFunctions.WriteToJsonFileAsync(directoryPath)
+			EditorFunctions.WriteToJsonFile(directoryPath)
 				.ContinueWith(() => _isWritingToFile = false)
 				.Forget();
 		}
