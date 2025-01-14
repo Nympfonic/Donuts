@@ -52,10 +52,47 @@ internal static class DonutsHelper
 
 		return await streamReader.ReadToEndAsync();
 	}
-	
-	internal static void LogException(this ManualLogSource logSource, string typeName, string methodName, Exception ex)
+
+	/// <summary>
+	/// <see cref="ManualLogSource.LogDebug"/> but also provides current time, executing type name and method name.
+	/// </summary>
+	/// <param name="logSource">The log source.</param>
+	/// <param name="message">The message to output to the log.</param>
+	/// <param name="typeName">Name of the executing type.</param>
+	/// <param name="methodName">Name of the executing method.</param>
+	internal static void LogDebugDetailed(
+		[NotNull] this ManualLogSource logSource,
+		[NotNull] string message,
+		[NotNull] string typeName,
+		[NotNull] string methodName)
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		sb.Append(DateTime.Now.ToLongTimeString());
+		sb.Append(" ");
+		sb.Append(typeName);
+		sb.Append("::");
+		sb.Append(methodName);
+		sb.Append(": ");
+		sb.Append(message);
+		logSource.LogDebug(sb.ToString());
+	}
+	
+	/// <summary>
+	/// Logs the given exception while also providing current time, executing type name and method name.
+	/// </summary>
+	/// <param name="logSource"></param>
+	/// <param name="typeName">Name of the executing type.</param>
+	/// <param name="methodName">Name of the executing method.</param>
+	/// <param name="ex">Exception to output to the log.</param>
+	internal static void LogException(
+		[NotNull] this ManualLogSource logSource,
+		[NotNull] string typeName,
+		[NotNull] string methodName,
+		[NotNull] Exception ex)
+	{
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		sb.Append(DateTime.Now.ToLongTimeString());
+		sb.Append(" ");
 		sb.Append(typeName);
 		sb.Append("::");
 		sb.Append(methodName);
@@ -110,12 +147,25 @@ internal static class DonutsHelper
 		}
 	}
 
+	/// <summary>
+	/// Creates a list from the specified collection and performs the shuffle on the new list.
+	/// </summary>
+	/// <param name="source">The collection to shuffle.</param>
+	/// <typeparam name="T">The type the collection stores.</typeparam>
+	/// <returns>A new list with shuffled elements.</returns>
 	[NotNull]
 	internal static List<T> ShuffleElements<T>([NotNull] this IEnumerable<T> source)
 	{
 		return source.ToList().ShuffleElements();
 	}
 
+	/// <summary>
+	/// Shuffles elements in the specified list.
+	/// </summary>
+	/// <param name="source">The list to shuffle.</param>
+	/// <typeparam name="T">The type the list stores.</typeparam>
+	/// <returns>The same list with shuffled elements.</returns>
+	/// <remarks>This will actually change the element order in the list!</remarks>
 	[NotNull]
 	internal static List<T> ShuffleElements<T>([NotNull] this List<T> source)
 	{
@@ -129,12 +179,25 @@ internal static class DonutsHelper
 		return source;
 	}
 
+	/// <summary>
+	/// Gets a random element from the collection.
+	/// </summary>
+	/// <param name="source">The collection to operate on.</param>
+	/// <typeparam name="T">The type the collection stores.</typeparam>
+	/// <returns>A random element from the collection or null if the collection is empty.</returns>
+	/// <remarks>This will create a new list to perform <see cref="PickRandomElement{T}(System.Collections.Generic.IReadOnlyList{T})"/> on.</remarks>
 	[CanBeNull]
 	internal static T PickRandomElement<T>([NotNull] this IEnumerable<T> source)
 	{
 		return source.ToList().PickRandomElement();
 	}
 
+	/// <summary>
+	/// Gets a random element from the list.
+	/// </summary>
+	/// <param name="source">The list to operate on.</param>
+	/// <typeparam name="T">The type the list stores.</typeparam>
+	/// <returns>A random element from the list or null if the list is empty.</returns>
 	[CanBeNull]
 	internal static T PickRandomElement<T>([NotNull] this IReadOnlyList<T> source)
 	{

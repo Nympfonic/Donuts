@@ -66,7 +66,10 @@ public abstract class BotDataService : IBotDataService
 			MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotDataServices;
 		if (botDataServices.ContainsKey(service.SpawnType))
 		{
-			DonutsRaidManager.Logger.LogError($"Error initializing {service.GetType().Name}, SpawnType {service.SpawnType.ToString()} is already in the BotDataServices dictionary.");
+			using var sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Error initializing {0}, SpawnType {1} is already in the BotDataServices dictionary.",
+				service.GetType().Name, service.SpawnType.ToString());
+			logger.LogDebugDetailed(sb.ToString(), nameof(BotDataService), nameof(Create));
 		}
 		else
 		{
@@ -89,9 +92,8 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0} {1}::{2}: Max starting bots set to {3}", DateTime.Now.ToLongTimeString(),
-					GetType().Name, nameof(SetupInitialBotCache), maxBots.ToString());
-				Logger.LogDebug(sb.ToString());
+				sb.AppendFormat("Max starting bots set to {0}", maxBots.ToString());
+				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SetupInitialBotCache));
 			}
 #endif
 			var totalBots = 0;
@@ -139,10 +141,9 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0} {1}::{2}: Creating bot: Type={3}, Difficulty={4}, Side={5}, GroupSize={6}",
-					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(TryCreateBotData), spawnType.ToString(),
-					botInfo.Difficulty.ToString(), side.ToString(), botInfo.GroupSize.ToString());
-				Logger.LogDebug(sb.ToString());
+				sb.AppendFormat("Creating bot: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
+					spawnType.ToString(), botInfo.Difficulty.ToString(), side.ToString(), botInfo.GroupSize.ToString());
+				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryCreateBotData));
 			}
 #endif
 			var botProfileData = new BotProfileData(side, spawnType, botInfo.Difficulty, 0f);
@@ -159,11 +160,10 @@ public abstract class BotDataService : IBotDataService
 #if DEBUG
 			using (var sb = ZString.CreateUtf8StringBuilder())
 			{
-				sb.AppendFormat("{0} {1}::{2}: Bot created and assigned successfully; {3} profiles loaded. IDs: {4}",
-					DateTime.Now.ToLongTimeString(), GetType().Name, nameof(TryCreateBotData),
+				sb.AppendFormat("Bot created and assigned successfully; {0} profiles loaded. IDs: {1}",
 					botCreationData.Profiles.Count.ToString(),
 					string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
-				Logger.LogDebug(sb.ToString());
+				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryCreateBotData));
 			}
 #endif
 			return (true, botCreationData);
@@ -198,26 +198,20 @@ public abstract class BotDataService : IBotDataService
 				{
 					groupBotsCount++;
 #if DEBUG
-					using (var sb = ZString.CreateUtf8StringBuilder())
-					{
-						sb.AppendFormat("{0} {1}::{2}: Replenishing group bot: {3} {4} {5} Count: {6}.",
-							DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ReplenishBotData), role.ToString(),
-							botInfo.Difficulty.ToString(), botData.Side.ToString(), botInfo.GroupSize.ToString());
-						Logger.LogDebug(sb.ToString());
-					}
+					using var sb = ZString.CreateUtf8StringBuilder();
+					sb.AppendFormat("Replenishing group bot: {0} {1} {2} Count: {3}.",
+						botInfo.Difficulty.ToString(), botData.Side.ToString(), botInfo.GroupSize.ToString());
+					Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ReplenishBotData));
 #endif
 				}
 				else if (!botInfo.IsGroup && singleBotsCount < 3)
 				{
 					singleBotsCount++;
 #if DEBUG
-					using (var sb = ZString.CreateUtf8StringBuilder())
-					{
-						sb.AppendFormat("{0} {1}::{2}: Replenishing single bot: {3} {4} {5} Count: 1.",
-							DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ReplenishBotData), role.ToString(),
-							botInfo.Difficulty.ToString(), botData.Side.ToString());
-						Logger.LogDebug(sb.ToString());
-					}
+					using var sb = ZString.CreateUtf8StringBuilder();
+					sb.AppendFormat("Replenishing single bot: {0} {1} {2} Count: 1.",
+						role.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString());
+					Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ReplenishBotData));
 #endif
 				}
 
@@ -245,13 +239,10 @@ public abstract class BotDataService : IBotDataService
 			}
 		}
 #if DEBUG
-		using (var sb = ZString.CreateUtf8StringBuilder())
-		{
-			sb.AppendFormat("{0} {1}::{2}: No cached bots found for difficulty {3}, and target count {4}.",
-				DateTime.Now.ToLongTimeString(), GetType().Name, nameof(FindCachedBotData), difficulty.ToString(),
-				groupSize.ToString());
-			Logger.LogWarning(sb.ToString());
-		}
+		using var sb = ZString.CreateUtf8StringBuilder();
+		sb.AppendFormat("No cached bots found for difficulty {0}, and target count {1}.",
+			difficulty.ToString(), groupSize.ToString());
+		Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(FindCachedBotData));
 #endif
 		return null;
 	}
@@ -265,12 +256,9 @@ public abstract class BotDataService : IBotDataService
 			{
 				botInfo.Bots = null;
 #if DEBUG
-				using (var sb = ZString.CreateUtf8StringBuilder())
-				{
-					sb.AppendFormat("{0} {1}::{2}: Cleared cached bot info for bot type: {3}",
-						DateTime.Now.ToLongTimeString(), GetType().Name, nameof(ClearBotCache), SpawnType.ToString());
-					Logger.LogDebug(sb.ToString());
-				}
+				using var sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Cleared cached bot info for bot type: {0}", SpawnType.ToString());
+				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ClearBotCache));
 #endif
 				return;
 			}
