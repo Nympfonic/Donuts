@@ -4,7 +4,6 @@ using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using Cysharp.Threading.Tasks.Linq;
 using Donuts.Models;
-using Donuts.Patches;
 using Donuts.Tools;
 using Donuts.Utils;
 using EFT;
@@ -153,7 +152,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 #endif
 		if (Instance == null || !await Instance.TryCreateDataServices())
 		{
-			Logger.NotifyLogError("Failed to initialize Donuts Raid Manager, Donuts will not work");
+			Logger.NotifyLogError("Donuts: Failed to initialize Donuts Raid Manager, Donuts will not function.");
 			if (Instance != null)
 			{
 				Destroy(Instance);

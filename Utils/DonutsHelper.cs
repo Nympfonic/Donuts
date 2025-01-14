@@ -1,8 +1,8 @@
 ﻿using BepInEx.Logging;
 using Cysharp.Text;
 using Cysharp.Threading.Tasks;
+using Donuts.Utils.LoggerProcessor;
 using EFT.Communications;
-using EFT.UI;
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
@@ -10,13 +10,28 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using LogLevel = Donuts.Utils.LoggerProcessor.LogLevel;
 using Random = System.Random;
 
 namespace Donuts.Utils;
 
 internal static class DonutsHelper
 {
-	private static readonly Random _random = new(unchecked((int)EFTDateTimeClass.Now.Ticks));
+	private static readonly Random _random;
+	private static readonly LoggerProcessorBase _configGuiNotificationProcessor;
+	private static readonly LoggerProcessorBase _fullLoggerProcessor;
+
+	static DonutsHelper()
+	{
+		_random = new Random(unchecked((int)EFTDateTimeClass.Now.Ticks));
+		
+		_configGuiNotificationProcessor = new BepInExLoggerProcessor();
+		_configGuiNotificationProcessor.SetNext(new NotificationLoggerProcessor());
+		
+		_fullLoggerProcessor = new BepInExLoggerProcessor();
+		_fullLoggerProcessor.SetNext(new ConsoleLoggerProcessor())
+			.SetNext(new NotificationLoggerProcessor());
+	}
 	
 	/// <summary>
 	/// Custom implementation of ReadAllTextAsync since it isn't available on .NET Framework 4.7.1
@@ -51,43 +66,35 @@ internal static class DonutsHelper
 		logSource.LogError(sb.ToString());
 	}
 
-	internal static void NotifyLog(
-		[NotNull] this ManualLogSource logger,
-		[NotNull] string message,
-		bool logToConsole = true)
-	{
-		logger.LogError(message);
-		if (logToConsole)
-		{
-			ConsoleScreen.LogError(message);
-		}
-	}
-
 	/// <summary>
-	/// Output error message to BepInEx client logs, with the option to output to the EFT console and notify the player in-game.
+	/// Output error message to BepInEx client log, to the EFT console and notify the player in-game.
 	/// </summary>
 	/// <param name="logger">The BepInEx logger to be used.</param>
 	/// <param name="message">Text to be output.</param>
-	/// <param name="logToConsole">Should the message be logged to the EFT console?</param>
-	/// <param name="notifyPlayer">Should the player be notified in-game via the EFT toast notification?</param>
-	internal static void NotifyLogError(
-		[NotNull] this ManualLogSource logger,
-		[NotNull] string message,
-		bool logToConsole = true,
-		bool notifyPlayer = true)
+	internal static void NotifyLogError([NotNull] this ManualLogSource logger, [NotNull] string message)
 	{
-		logger.NotifyLog(message, logToConsole);
-		if (notifyPlayer)
-		{
-			DisplayNotification(message, Color.yellow, ENotificationIconType.Alert);
-		}
+		var loggerData =
+			new NotificationLoggerData(message, logger, LogLevel.Error, Color.yellow, ENotificationIconType.Alert);
+		_fullLoggerProcessor.Process(loggerData);
 	}
 
-	internal static void NotifyModSettingsStatus([NotNull] string message)
+	/// <summary>
+	/// Outputs a warning message to BepInEx client log and notify the player in-game. Used for Donuts' F9 Config GUI.
+	/// </summary>
+	/// <inheritdoc cref="NotifyLogError"/>
+	internal static void NotifyModSettingsStatus([NotNull] this ManualLogSource logger, [NotNull] string message)
 	{
-		DisplayNotification(message, Color.cyan, ENotificationIconType.Alert);
+		var loggerData =
+			new NotificationLoggerData(message, logger, LogLevel.Warning, Color.cyan, ENotificationIconType.Alert);
+		_configGuiNotificationProcessor.Process(loggerData);
 	}
 
+	/// <summary>
+	/// Displays an in-game notification to the player
+	/// </summary>
+	/// <param name="message">Text to be output.</param>
+	/// <param name="color">Text color.</param>
+	/// <param name="iconType">Notification icon type, shown on the left of the text.</param>
 	internal static void DisplayNotification(
 		[NotNull] string message,
 		Color color,
@@ -97,7 +104,7 @@ internal static class DonutsHelper
 		{
 			NotificationManagerClass.DisplayMessageNotification(message, ENotificationDurationType.Long, iconType, color);
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
+		catch (Exception ex)
 		{
 			DonutsPlugin.Logger.LogException(nameof(DonutsHelper), nameof(DisplayNotification), ex);
 		}

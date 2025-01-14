@@ -60,8 +60,8 @@ public class BotConfigService
 		}
 
 		string jsonString = File.ReadAllText(jsonFilePath);
-		_botWavesConfig = JsonConvert.DeserializeObject<BotWavesConfig>(jsonString);
-		if (_botWavesConfig == null)
+		var botWavesConfig = JsonConvert.DeserializeObject<BotWavesConfig>(jsonString);
+		if (botWavesConfig == null)
 		{
 			_logger.LogError($"Failed to deserialize {_mapName}_waves.json for preset: {_scenarioSelected}");
 			return null;
@@ -69,7 +69,8 @@ public class BotConfigService
 #if DEBUG
 		_logger.LogDebug($"Successfully loaded {_mapName}_waves.json for preset: {_scenarioSelected}");
 #endif
-		_botWavesConfig.EnsureUniqueGroupNumForBotWaves();
+		botWavesConfig.EnsureUniqueGroupNumForBotWaves();
+		_botWavesConfig = botWavesConfig;
 		return _botWavesConfig;
 	}
 
@@ -187,7 +188,8 @@ public class BotConfigService
 		if (jsonFiles.Length == 0)
 		{
 			// TODO: Implement generating default JSONs for the patterns if not found.
-			_logger.NotifyLogError($"Donuts: No JSON Pattern files found in folder: {patternFolderPath}\nDonuts will not function properly.");
+			_logger.NotifyLogError(
+				$"Donuts: No JSON Pattern files found in folder: {patternFolderPath}\nDonuts will not function properly.");
 			return false;
 		}
 
@@ -195,7 +197,7 @@ public class BotConfigService
 		// Display selected preset
 		if (DefaultPluginVars.ShowRandomFolderChoice.Value)
 		{
-			_logger.NotifyLog($"Donuts: Selected Spawn Preset: {_scenarioSelected}");
+			_logger.NotifyModSettingsStatus($"Donuts: Selected Spawn Preset: {_scenarioSelected}");
 		}
 		return true;
 	}

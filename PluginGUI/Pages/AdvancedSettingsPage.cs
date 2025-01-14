@@ -54,9 +54,8 @@ internal class AdvancedSettingsPage : ISettingsPage
     {
 	    // TODO: Needs a refactor
 	    PluginGUIComponent.ResetSettingsToDefaults();
-	    const string msg = "All Donuts settings have been reset to default values, but they still need to be saved.";
-	    DonutsHelper.NotifyModSettingsStatus(msg);
-	    DonutsPlugin.Logger.LogWarning(msg);
+	    DonutsPlugin.Logger.NotifyModSettingsStatus(
+		    "All Donuts settings have been reset to default values, but they still need to be saved.");
 	    PluginGUIComponent.RestartPluginGUI();
     }
 }
