@@ -67,6 +67,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 	private readonly TimeSpan _spawnInterval = TimeSpan.FromSeconds(1f);
 	private readonly TimeSpan _oneSecondInterval = TimeSpan.FromSeconds(1f);
+	private readonly TimeSpan _delayBeforeStartingBotsSpawn = TimeSpan.FromSeconds(3f);
 
 	private bool _hasSpawnedStartingBots;
 	
@@ -148,38 +149,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 		}
 
-		if (!DonutsPlugin.FikaEnabled)
-		{
-			await Initialize();
-		}
-		else
-		{
-			CanStartRaid = true;
-		}
-	}
-
-	public static async UniTask Initialize()
-	{
-#if DEBUG
-		Logger.LogDebug("Started initializing Donuts Raid Manager");
-#endif
-		if (Instance == null || !await Instance.TryCreateDataServices())
-		{
-			Logger.NotifyLogError("Donuts: Failed to initialize Donuts Raid Manager, Donuts will not function.");
-			if (Instance != null)
-			{
-				Destroy(Instance);
-			}
-			CanStartRaid = true;
-			return;
-		}
-		
-		Instance.CreateSpawnServices();
-		await Instance.SpawnStartingBots();
-		CanStartRaid = true;
-#if DEBUG
-		Logger.LogDebug("Finished initializing Donuts Raid Manager");
-#endif
+		await Initialize();
 	}
 
 	private void Update()
@@ -233,9 +203,31 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		Logger.LogDebug($"{nameof(DonutsRaidManager)} component enabled");
 #endif
 	}
-
-	public void StartBotSpawnController()
+	
+	public async UniTask Initialize()
 	{
+#if DEBUG
+		Logger.LogDebug("Started initializing Donuts Raid Manager");
+#endif
+		if (!await TryCreateDataServices())
+		{
+			Logger.NotifyLogError("Donuts: Failed to initialize Donuts Raid Manager, Donuts will not function.");
+			Destroy(this);
+			CanStartRaid = true;
+			return;
+		}
+		
+		CreateSpawnServices();
+		CanStartRaid = true;
+#if DEBUG
+		Logger.LogDebug("Finished initializing Donuts Raid Manager");
+#endif
+	}
+
+	public async UniTaskVoid StartBotSpawnController()
+	{
+		await Instance.SpawnStartingBots();
+		
 		float currentTime = Time.time;
 		_replenishBotDataPrevTime = currentTime;
 		_botSpawnPrevTime = currentTime;
@@ -306,12 +298,11 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		try
 		{
+			await UniTask.Delay(_delayBeforeStartingBotsSpawn, cancellationToken: _onDestroyToken);
 			foreach (IBotSpawnService service in BotSpawnServices.Values)
 			{
 				await service.SpawnStartingBots();
 			}
-
-			await UniTask.Delay(_oneSecondInterval, cancellationToken: _onDestroyToken);
 			_hasSpawnedStartingBots = true;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)

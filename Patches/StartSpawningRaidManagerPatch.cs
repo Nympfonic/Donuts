@@ -1,6 +1,4 @@
-﻿using Comfort.Common;
-using Cysharp.Threading.Tasks;
-using Donuts.Bots;
+﻿using Donuts.Bots;
 using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -20,33 +18,21 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 	[PatchPostfix]
 	private static void PatchPostfix()
 	{
-		if (DonutsPlugin.FikaEnabled)
+		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
+		if (raidManager == null)
 		{
-			InitializeRaidManagerFika().Forget();
+			Logger.LogError($"Singleton<{nameof(DonutsRaidManager)}> is not instantiated");
+			return;
 		}
-		else
+		
+		if (!DonutsRaidManager.IsBotSpawningEnabled)
 		{
-			if (!Singleton<DonutsRaidManager>.Instantiated)
-			{
-				Logger.LogError($"Singleton<{nameof(DonutsRaidManager)}> is not instantiated");
-				return;
-			}
-			
-			MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
-		}
-	}
-
-	private static async UniTaskVoid InitializeRaidManagerFika()
-	{
-        if (!DonutsRaidManager.IsBotSpawningEnabled)
-        {
 #if DEBUG
-            Logger.LogInfo("Running as Fika client or something catastrophic happened to the BotsController, skipping DonutsRaidManager::Initialize"); 
+			Logger.LogInfo("Running as Fika client or something catastrophic happened to the BotsController, skipping DonutsRaidManager::Initialize"); 
 #endif
-            return;
-        }
-
-		await DonutsRaidManager.Initialize();
-		MonoBehaviourSingleton<DonutsRaidManager>.Instance.StartBotSpawnController();
+			return;
+		}
+			
+		raidManager.StartBotSpawnController().Forget();
 	}
 }

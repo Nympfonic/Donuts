@@ -64,10 +64,10 @@ public class DonutsPlugin : BaseUnityPlugin
 		ModulePatchManager.EnableAllPatches();
 		
 		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
-		if (FikaEnabled)
-		{
-			//ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
-		}
+		// if (FikaEnabled)
+		// {
+		// 	ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
+		// }
 	}
 
 	// ReSharper disable once Unity.IncorrectMethodSignature

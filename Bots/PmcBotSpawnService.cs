@@ -18,13 +18,11 @@ public class PmcBotSpawnService : BotSpawnService
 			return false;
 		}
 #if DEBUG
-		using (var sb = ZString.CreateUtf8StringBuilder())
-		{
-			sb.AppendFormat(
-				"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
-				DataService.SpawnType.ToString(), activeBots.ToString(), DataService.MaxBotLimit.ToString());
-			Logger.LogDebug(sb.ToString());
-		}
+		using var sb = ZString.CreateUtf8StringBuilder();
+		sb.AppendFormat(
+			"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
+			DataService.SpawnType.ToString(), activeBots.ToString(), DataService.MaxBotLimit.ToString());
+		Logger.LogDebugDetailed(sb.ToString(), nameof(PmcBotSpawnService), nameof(HasReachedHardCap));
 #endif
 		return true;
 	}
