@@ -26,7 +26,7 @@ internal class DelayedGameStartPatch : ModulePatch
 	{
 		if (!Singleton<AbstractGame>.Instance.InRaid) return;
 
-		if (DonutsRaidManager.IsBotSpawningEnabled)
+		if (MonoBehaviourSingleton<DonutsRaidManager>.Instantiated && DonutsRaidManager.IsBotSpawningEnabled)
 		{
 			__result = AddIterationsToWaitForBotGenerators(__result); // Thanks danW
 		}

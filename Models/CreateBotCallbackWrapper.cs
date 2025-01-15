@@ -32,9 +32,10 @@ public class CreateBotCallbackWrapper([NotNull] BotCreationDataClass botData)
 				ReflectionHelper.BotSpawner_method11_Method, botSpawner, false);
 		}
 
-		bool shallBeGroup = botData.SpawnParams?.ShallBeGroup != null;
+		//bool shallBeGroup = botData.SpawnParams?.ShallBeGroup != null;
 		
-		//ReflectionCache.BotSpawner_method11_Method.Invoke(botSpawner, [bot, botData, null, shallBeGroup, stopWatch]);
-		_createBotCallbackDelegate(bot, botData, null, shallBeGroup, _stopwatch);
+		// BSG wants a stopwatch, we'll give em a stopwatch
+		// TODO: transpile patch out the stopwatch
+		_createBotCallbackDelegate(bot, botData, null, false, _stopwatch);
 	}
 }

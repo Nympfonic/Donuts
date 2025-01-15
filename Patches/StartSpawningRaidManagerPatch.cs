@@ -18,18 +18,18 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 	[PatchPostfix]
 	private static void PatchPostfix()
 	{
-		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
-		if (raidManager == null)
-		{
-			Logger.LogError($"Singleton<{nameof(DonutsRaidManager)}> is not instantiated");
-			return;
-		}
-		
 		if (!DonutsRaidManager.IsBotSpawningEnabled)
 		{
 #if DEBUG
 			Logger.LogInfo("Running as Fika client or something catastrophic happened to the BotsController, skipping DonutsRaidManager::Initialize"); 
 #endif
+			return;
+		}
+		
+		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
+		if (raidManager == null)
+		{
+			Logger.LogError($"MonoBehaviourSingleton<{nameof(DonutsRaidManager)}> is not instantiated");
 			return;
 		}
 			
