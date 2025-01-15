@@ -199,7 +199,7 @@ public abstract class BotDataService : IBotDataService
 					groupBotsCount++;
 #if DEBUG
 					using var sb = ZString.CreateUtf8StringBuilder();
-					sb.AppendFormat("Replenishing group bot: {0} {1} {2} Count: {3}.",
+					sb.AppendFormat("Replenishing group bot: {0} {1} {2} Count: {3}.", role.ToString(),
 						botInfo.Difficulty.ToString(), botData.Side.ToString(), botInfo.GroupSize.ToString());
 					Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ReplenishBotData));
 #endif
@@ -209,8 +209,8 @@ public abstract class BotDataService : IBotDataService
 					singleBotsCount++;
 #if DEBUG
 					using var sb = ZString.CreateUtf8StringBuilder();
-					sb.AppendFormat("Replenishing single bot: {0} {1} {2} Count: 1.",
-						role.ToString(), botInfo.Difficulty.ToString(), botData.Side.ToString());
+					sb.AppendFormat("Replenishing single bot: {0} {1} {2} Count: 1.", role.ToString(),
+						botInfo.Difficulty.ToString(), botData.Side.ToString());
 					Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ReplenishBotData));
 #endif
 				}
