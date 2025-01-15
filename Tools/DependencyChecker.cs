@@ -30,6 +30,12 @@ internal static class DependencyChecker
 		
 		foreach (BepInDependency dependency in dependencies)
 		{
+			// Ignore soft dependencies
+			if (dependency.Flags.HasFlag(BepInDependency.DependencyFlags.SoftDependency))
+			{
+				continue;
+			}
+			
 			if (!Chainloader.PluginInfos.TryGetValue(dependency.DependencyGUID, out PluginInfo pluginInfo))
 			{
 				logger.LogError($"No pluginInfo found for {dependency.DependencyGUID}, requires fixing");
