@@ -6,6 +6,7 @@ using Donuts.Bots.SpawnCheckProcessor;
 using Donuts.Models;
 using Donuts.Utils;
 using EFT;
+using EFT.AssetsManager;
 using JetBrains.Annotations;
 using SPT.SinglePlayer.Utils.InRaid;
 using System;
@@ -359,13 +360,21 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 #endif
 
+		Player botPlayer = botOwner.GetPlayer;
 		_gameWorld.RegisteredPlayers.Remove(botOwner);
-		_gameWorld.AllAlivePlayersList.Remove(botOwner.GetPlayer);
+		_gameWorld.AllAlivePlayersList.Remove(botPlayer);
 
-		IBotGame botGame = Singleton<IBotGame>.Instance;
-		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botOwner.GetPlayer);
+		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botPlayer);
 		botOwner.Deactivate();
-        botGame.BotDespawn(botOwner);
+		/*
+		 * Context: Users reported floating guns left over from bots despawning
+		 * BSG's BaseLocalGame<TPlayerOwner>::BotDespawn() method is likely the culprit
+         * They destroy the bot gameobject immediately which probably causes this problem
+		 */
+        _botsController.BotDied(botOwner);
+        _botsController.DestroyInfo(botPlayer);
+        AssetPoolObject.ReturnToPool(botOwner.gameObject, false);
+		botOwner?.Dispose(); // Added this here because Fika's CoopGame::DespawnBot() does the same
 
 		// Update the cooldown
 		_despawnCooldownTime = Time.time;
