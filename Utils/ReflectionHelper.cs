@@ -6,7 +6,6 @@ namespace Donuts.Utils;
 
 internal static class ReflectionHelper
 {
-	internal static readonly FieldInfo BotsController_botEnabled_Field = AccessTools.Field(typeof(BotsController), "_botEnabled");
 	internal static readonly FieldInfo BotSpawner_botCreator_Field = AccessTools.Field(typeof(BotSpawner), "_botCreator");
 	//internal static readonly FieldInfo BotSpawner_cancellationTokenSource_Field = AccessTools.Field(typeof(BotSpawner), "_cancellationTokenSource");
 
