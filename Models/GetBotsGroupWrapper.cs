@@ -17,6 +17,12 @@ public class GetBotsGroupWrapper(BotSpawner botSpawner)
 			_group = botSpawner.GetGroupAndSetEnemies(bot, zone);
 			_group.Lock();
 		}
+		// For the rest of the bots in the same group, check if the bot should be added to other bot groups' allies/enemies list
+		// This is normally performed in BotSpawner::GetGroupAndSetEnemies(BotOwner, BotZone)
+		else
+		{
+			botSpawner.method_5(bot);
+		}
 		return _group;
 	}
 }
