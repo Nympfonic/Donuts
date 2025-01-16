@@ -338,14 +338,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			_isSpawnProcessOngoing = true;
 			
 			List<IBotSpawnService> spawnServices = BotSpawnServices.Values.ShuffleElements();
-			var hasDespawnedBot = false;
 			foreach (IBotSpawnService service in spawnServices)
 			{
-				// Only despawn if a bot hasn't been despawned during this current spawn process
-				if (!hasDespawnedBot)
-				{
-					hasDespawnedBot = service.TryDespawnFurthestBot();
-				}
+				service.TryDespawnFurthestBot();
 
 				// Preparation for bot wave spawning
 				if (!_botWavesToSpawn.ContainsKey(service))
