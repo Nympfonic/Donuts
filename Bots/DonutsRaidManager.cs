@@ -340,7 +340,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			List<IBotSpawnService> spawnServices = BotSpawnServices.Values.ShuffleElements();
 			foreach (IBotSpawnService service in spawnServices)
 			{
-				service.TryDespawnFurthestBot();
+				service.DespawnExcessBots();
 
 				// Preparation for bot wave spawning
 				if (!_botWavesToSpawn.ContainsKey(service))

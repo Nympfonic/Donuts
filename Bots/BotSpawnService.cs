@@ -28,7 +28,7 @@ public interface IBotSpawnService
 	UniTask SpawnStartingBots();
 	Queue<BotWave> GetBotWavesToSpawn();
 	UniTask<bool> TrySpawnBotWave(BotWave wave);
-	bool TryDespawnFurthestBot();
+	void DespawnExcessBots();
 	void RestartPlayerHitTimer();
 }
 
@@ -253,6 +253,10 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	protected abstract bool IsCorrectSpawnType(WildSpawnType role);
 	
+	/// <summary>
+	/// Finds the furthest bot away from all human players
+	/// </summary>
+	/// <returns></returns>
 	[CanBeNull]
 	private Player FindFurthestBot()
 	{
@@ -260,19 +264,29 @@ public abstract class BotSpawnService : IBotSpawnService
 		Player furthestBot = null;
 		ReadOnlyCollection<Player> allAlivePlayers = _allAlivePlayersReadOnly;
 		List<Player> humanPlayers = ConfigService.GetHumanPlayerList();
+		// Iterate through alive players
 		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = allAlivePlayers[i];
-			if (!player.IsAI || player.AIData.BotOwner == null || !IsCorrectSpawnType(player.Profile.Info.Settings.Role))
+			// Ignore players that aren't bots and aren't the correct spawn type
+			if (!player.IsAI ||
+				player.AIData?.BotOwner == null ||
+				!IsCorrectSpawnType(player.Profile.Info.Settings.Role))
 			{
 				continue;
 			}
-
+			
+			// Iterate through all human players
 			for (int j = humanPlayers.Count - 1; j >= 0; j--)
 			{
 				Player humanPlayer = humanPlayers[j];
+				// Ignore dead human players
+				if (humanPlayer.HealthController == null || !humanPlayer.HealthController.IsAlive)
+				{
+					continue;
+				}
 				
-				// Get distance of bot to player using squared distance
+				// Get distance of bot to human player using squared distance
 				float sqrMagnitude = (humanPlayer.Transform.position - player.Transform.position).sqrMagnitude;
 
 				// Check if this is the furthest distance
@@ -301,34 +315,78 @@ public abstract class BotSpawnService : IBotSpawnService
 		return furthestBot;
 	}
 	
-	// Only consider despawning if the number of active bots of the type exceeds the limit
-	private bool CanDespawnBot() => GetAliveBotsCount() > DataService.MaxBotLimit;
-
-	public bool TryDespawnFurthestBot()
+	private bool IsOverBotLimit(out int excess)
 	{
+		var isOverBotLimit = false;
+		int aliveBots = GetAliveBotsCount();
+		int botLimit = DataService.MaxBotLimit;
+		if (aliveBots > botLimit)
+		{
+			excess = aliveBots - botLimit;
+			isOverBotLimit = true;
+		}
+		else
+		{
+			excess = 0;
+		}
+		return isOverBotLimit;
+	}
+
+	public void DespawnExcessBots()
+	{
+#if DEBUG
+		using var sb = ZString.CreateUtf8StringBuilder();
+		string typeName = GetType().Name;
+		const string methodName = nameof(DespawnExcessBots);
+		var spawnTypeName = DataService.SpawnType.ToString();
+#endif
+		
 		if (!IsDespawnBotEnabled())
 		{
-			return false;
-		}
-
-		float currentTime = Time.time;
-		float timeSinceLastDespawn = currentTime - _despawnCooldownTime;
-
-		if (timeSinceLastDespawn < DefaultPluginVars.despawnInterval.Value || !CanDespawnBot())
-		{
-			return false;
-		}
-
-		Player furthestBot = FindFurthestBot();
-
-		if (furthestBot != null)
-		{
-			return TryDespawnBot(furthestBot);
-		}
 #if DEBUG
-		Logger.LogDebug($"No {DataService.SpawnType.ToString()} bot found to despawn.");
+			sb.Clear();
+			sb.AppendFormat("Despawning for {0} bots is disabled.", spawnTypeName);
+			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
 #endif
-		return false;
+			return;
+		}
+		
+		float timeSinceLastDespawn = Time.time - _despawnCooldownTime;
+		bool hasReachedTimeToDespawn = timeSinceLastDespawn >= DefaultPluginVars.despawnInterval.Value;
+		if (!IsOverBotLimit(out int excessBots) || !hasReachedTimeToDespawn)
+		{
+#if DEBUG
+			sb.Clear();
+			sb.AppendFormat("Haven't met conditions to despawn {0] bots yet.", spawnTypeName);
+			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
+#endif
+			return;
+		}
+		
+		if (excessBots <= 0)
+		{
+#if DEBUG
+			Logger.LogDebugDetailed($"{nameof(excessBots)} should be greater than zero! Verify if statements are correct!",
+				nameof(BotSpawnService), methodName);
+#endif
+			return;
+		}
+		
+		for (var i = 0; i < excessBots; i++)
+		{
+			Player furthestBot = FindFurthestBot();
+			if (furthestBot == null)
+			{
+#if DEBUG
+				sb.Clear();
+				sb.AppendFormat("No {0} bot found to despawn. Aborting despawn logic!", spawnTypeName);
+				Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
+#endif
+				return;
+			}
+			
+			TryDespawnBot(furthestBot);
+		}
 	}
 
 	protected abstract bool IsDespawnBotEnabled();
