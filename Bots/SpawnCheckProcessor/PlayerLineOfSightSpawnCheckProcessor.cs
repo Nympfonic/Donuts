@@ -7,9 +7,10 @@ public class PlayerLineOfSightSpawnCheckProcessor : SpawnCheckProcessorBase
 {
 	public override void Process(SpawnCheckData data)
 	{
-		foreach (Player player in data.alivePlayers)
+		for (int i = data.alivePlayers.Count - 1; i >= 0; i--)
 		{
-			if (player.IsAI)
+			Player player = data.alivePlayers[i];
+			if (player == null || player.IsAI || !player.HealthController.IsAlive)
 			{
 				continue;
 			}

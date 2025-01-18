@@ -23,20 +23,32 @@ public class WallSpawnCheckProcessor : SpawnCheckProcessorBase
 		for (var i = 0; i < size; i++)
 		{
 			Transform currentTransform = _spawnCheckColliderBuffer[i].transform;
-			// Recursively check for "WALLS" string in the game object's name, going upwards to root of hierarchy
-			while (currentTransform != null)
+			if (RecursiveFindWallsGameObject(currentTransform))
 			{
-				if (currentTransform.gameObject.name.ToUpper().Contains(WALL_OBJECT_NAME_UPPER))
-				{
-					data.Success = false;
-					return;
-				}
-
-				currentTransform = currentTransform.parent;
+				data.Success = false;
+				return;
 			}
 		}
 		
 		data.Success = true;
 		base.Process(data);
+	}
+
+	/// <summary>
+	/// Recursively check for "WALLS" string in the game object's name, going upwards to root of hierarchy.
+	/// </summary>
+	private bool RecursiveFindWallsGameObject(Transform transform)
+	{
+		while (transform != null)
+		{
+			if (transform.gameObject.name.ToUpper().Contains(WALL_OBJECT_NAME_UPPER))
+			{
+				return true;
+			}
+
+			transform = transform.parent;
+		}
+		
+		return false;
 	}
 }
