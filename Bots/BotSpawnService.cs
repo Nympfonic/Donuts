@@ -262,7 +262,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		var furthestSqrMagnitude = float.MinValue;
 		Player furthestBot = null;
 		ReadOnlyCollection<Player> allAlivePlayers = _allAlivePlayersReadOnly;
-		List<Player> humanPlayers = ConfigService.GetHumanPlayerList();
+		ReadOnlyCollection<Player> humanPlayers = ConfigService.GetHumanPlayerList();
 		// Iterate through alive players
 		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
@@ -520,7 +520,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		int triggerSqrMagnitude = triggerDistance * triggerDistance;
 
-		List<Player> humanPlayerList = ConfigService.GetHumanPlayerList();
+		ReadOnlyCollection<Player> humanPlayerList = ConfigService.GetHumanPlayerList();
 		for (int i = humanPlayerList.Count - 1; i >= 0; i--)
 		{
 			Player player = humanPlayerList[i];

@@ -7,7 +7,9 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 
 namespace Donuts.Bots;
 
@@ -17,8 +19,9 @@ public class BotConfigService
 	
 	private readonly Dictionary<DonutsSpawnType, int> _botCountLimits = [];
 	
-	private static readonly List<Player> _emptyPlayerList = [];
-	private readonly List<Player> _playerList = new(5);
+	private static readonly ReadOnlyCollection<Player> _emptyPlayerList = new(Array.Empty<Player>());
+	private readonly List<Player> _humanPlayerList;
+	private readonly ReadOnlyCollection<Player> _humanPlayerListReadOnly;
 	
 	private GameWorld _gameWorld;
 	private string _scenarioSelected;
@@ -33,6 +36,9 @@ public class BotConfigService
 	private BotConfigService(ManualLogSource logger)
 	{
 		_logger = logger;
+		
+		_humanPlayerList = new List<Player>(5);
+		_humanPlayerListReadOnly = _humanPlayerList.AsReadOnly();
 	}
 
 	[NotNull]
@@ -203,22 +209,23 @@ public class BotConfigService
 	}
 	
 	[NotNull]
-	public List<Player> GetHumanPlayerList()
+	public ReadOnlyCollection<Player> GetHumanPlayerList()
 	{
 		if (_gameWorld.RegisteredPlayers.Count == 0)
 		{
 			return _emptyPlayerList;
 		}
 
-		IEnumerable<Player> allPlayers = _gameWorld.AllPlayersEverExisted;
+		List<Player> allPlayers = _gameWorld.AllPlayersEverExisted.ToList();
 		foreach (Player player in allPlayers)
 		{
-			if (!player.IsAI && !_playerList.Contains(player))
+			if (player != null && !player.IsAI && !_humanPlayerList.Contains(player))
 			{
-				_playerList.Add(player);
+				_humanPlayerList.Add(player);
 			}
 		}
-		return _playerList;
+		
+		return _humanPlayerListReadOnly;
 	}
 
 	public int GetMaxBotLimit(DonutsSpawnType spawnType)

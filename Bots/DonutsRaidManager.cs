@@ -10,8 +10,8 @@ using EFT;
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityToolkit.Extensions;
 
@@ -423,7 +423,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 		BotMemoryClass memory = bot.Memory;
 		EnemyInfo goalEnemy = memory.GoalEnemy;
-		List<Player> humanPlayers = raidManager.BotConfigService.GetHumanPlayerList();
+		ReadOnlyCollection<Player> humanPlayers = raidManager.BotConfigService.GetHumanPlayerList();
 		for (int i = humanPlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = humanPlayers[i];
