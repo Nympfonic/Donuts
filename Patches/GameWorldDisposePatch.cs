@@ -1,4 +1,5 @@
-﻿using EFT;
+﻿using Donuts.Models;
+using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
@@ -17,7 +18,6 @@ internal class GameWorldDisposePatch : ModulePatch
 	[PatchPostfix]
 	private static void PatchPostfix()
 	{
-		PatchStandbyTeleport.MethodDelegates.Clear();
-		// PatchStandbyTeleport.MethodDelegates.Clear();
+		ActivateBotCallbackWrapper.ActivateBotDelegate = null;
 	}
 }
