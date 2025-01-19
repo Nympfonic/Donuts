@@ -18,5 +18,6 @@ internal class GameWorldDisposePatch : ModulePatch
 	private static void PatchPostfix()
 	{
 		PatchStandbyTeleport.MethodDelegates.Clear();
+		// PatchStandbyTeleport.MethodDelegates.Clear();
 	}
 }

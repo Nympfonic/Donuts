@@ -5,10 +5,12 @@ using SPT.Reflection.Patching;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityToolkit.Utils;
 
 namespace Donuts.Patches;
 
 [UsedImplicitly]
+[DisablePatch]
 internal class PatchStandbyTeleport : ModulePatch
 {
 	private static MethodInfo _method;
