@@ -183,10 +183,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		AICorePoint closestCorePoint = GetClosestCorePoint(spawnPosition);
 		botData.AddPosition(spawnPosition, closestCorePoint!.Id);
 		
-		var createBotCallbackWrapper = new CreateBotCallbackWrapper(botData);
-		var getGroupWrapper = new GetBotsGroupWrapper(_eftBotSpawner);
-		var groupAction = new Func<BotOwner, BotZone, BotsGroup>(getGroupWrapper.GetGroupAndSetEnemies);
-		var callback = new Action<BotOwner>(createBotCallbackWrapper.CreateBotCallback);
+		var activateBotCallbackWrapper = new ActivateBotCallbackWrapper(_eftBotSpawner, botData);
+		var groupAction = new Func<BotOwner, BotZone, BotsGroup>(activateBotCallbackWrapper.GetGroupAndSetEnemies);
+		var callback = new Action<BotOwner>(activateBotCallbackWrapper.CreateBotCallback);
 
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
 		DataService.ClearBotCache(botData);
