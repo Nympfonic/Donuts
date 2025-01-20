@@ -2,7 +2,6 @@ using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
-using System.Collections.Generic;
 using System.Reflection;
 
 // Stolen from DanW's Questing Bots, thanks Dan!
@@ -21,7 +20,7 @@ internal class BotGroupAddEnemyPatch : ModulePatch
 	private static bool PatchPrefix(BotsGroup __instance, IPlayer person, EBotEnemyCause cause)
 	{
 		// Don't add invalid enemies
-		if (person == null || (person.IsAI && person.AIData?.BotOwner?.GetPlayer == null))
+		if (person == null || (person.IsAI && person.AIData?.BotOwner == null))
 		{
 			return false;
 		}
