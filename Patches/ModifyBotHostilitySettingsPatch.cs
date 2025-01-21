@@ -8,9 +8,10 @@ using System.Linq;
 using System.Reflection;
 using UnityToolkit.Utils;
 
-namespace Donuts.Patches.PmcHostilityFix;
+namespace Donuts.Patches;
 
 [UsedImplicitly]
+[DisablePatch]
 public class ModifyBotHostilitySettingsPatch : ModulePatch
 {
 	private static readonly WildSpawnType[] _emptySpawnTypes = [];
