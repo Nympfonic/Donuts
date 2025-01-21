@@ -14,11 +14,11 @@ namespace Donuts.Models;
 public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNull] BotCreationDataClass botData)
 {
 	private static readonly Stopwatch _stopwatch = new();
-	private static readonly WaitForSeconds _checkInterval = new(0.01f);
+	// private static readonly WaitForSeconds _checkInterval = new(0.01f);
 	
 	private BotsGroup _group;
-	private int _groupBotCounter = 0;
-	private Coroutine _bossWaitForFollowerSpawnCoroutine;
+	// private int _groupBotCounter = 0;
+	// private Coroutine _bossWaitForFollowerSpawnCoroutine;
 	
 	internal static ActivateBotCallbackDelegate ActivateBotDelegate { get; set; }
 
@@ -34,11 +34,11 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 				ReflectionHelper.BotSpawner_method11_Method, botSpawner, false);
 		}
 
-		//bool shallBeGroup = botData.SpawnParams?.ShallBeGroup != null;
+		bool shallBeGroup = botData.SpawnParams?.ShallBeGroup != null;
 		
 		// BSG wants a stopwatch, we'll give em a stopwatch
 		// TODO: transpile patch out the stopwatch
-		ActivateBotDelegate(bot, botData, null, false, _stopwatch);
+		ActivateBotDelegate(bot, botData, null, shallBeGroup, _stopwatch);
 		
 		// BossWithFollowersCheck(bot);
 	}

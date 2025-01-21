@@ -175,18 +175,28 @@ public abstract class BotSpawnService : IBotSpawnService
 	private AICorePoint GetClosestCorePoint(Vector3 position) =>
 		_botsController.CoversData.GetClosest(position)?.CorePointInGame;
 
-	private void ActivateBotAtPosition(
-		[NotNull] BotCreationDataClass botData,
-		Vector3 spawnPosition)
+	private void ActivateBotAtPosition([NotNull] BotCreationDataClass botData, Vector3 spawnPosition)
 	{
+		// Add spawn point to the BotCreationDataClass
 		BotZone closestBotZone = _eftBotSpawner.GetClosestZone(spawnPosition, out _);
 		AICorePoint closestCorePoint = GetClosestCorePoint(spawnPosition);
 		botData.AddPosition(spawnPosition, closestCorePoint!.Id);
 		
+		// Set SpawnParams so the bots are grouped correctly
+		bool isGroup = botData.Count > 1;
+		bool isBossGroup = botData._profileData.TryGetRole(out WildSpawnType role, out _) && role.IsBoss();
+		int groupCount = botData.Count;
+		var newSpawnParams = new BotSpawnParams
+		{
+			ShallBeGroup = new ShallBeGroupParams(isGroup, isBossGroup, groupCount),
+			TriggerType = SpawnTriggerType.none
+		};
+		botData._profileData.SpawnParams = newSpawnParams;
+		
 		var activateBotCallbackWrapper = new ActivateBotCallbackWrapper(_eftBotSpawner, botData);
 		var groupAction = new Func<BotOwner, BotZone, BotsGroup>(activateBotCallbackWrapper.GetGroupAndSetEnemies);
 		var callback = new Action<BotOwner>(activateBotCallbackWrapper.CreateBotCallback);
-
+		
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
 		DataService.ClearBotCache(botData);
 		MonoBehaviourSingleton<DonutsRaidManager>.Instance.UpdateReplenishBotDataTime();
