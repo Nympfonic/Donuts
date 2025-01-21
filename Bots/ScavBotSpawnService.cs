@@ -18,7 +18,7 @@ public class ScavBotSpawnService : BotSpawnService
 			return false;
 		}
 #if DEBUG
-		using var sb = ZString.CreateUtf8StringBuilder();
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		sb.AppendFormat(
 			"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
 			DataService.SpawnType.ToString(), activeBots.ToString(), DataService.MaxBotLimit.ToString());
@@ -26,13 +26,13 @@ public class ScavBotSpawnService : BotSpawnService
 #endif
 		return true;
 	}
-
+	
 	protected override bool IsHardStopEnabled() => DefaultPluginVars.hardStopOptionSCAV.Value;
 	
 	protected override int GetHardStopTime() => DefaultPluginVars.useTimeBasedHardStop.Value
 		? DefaultPluginVars.hardStopTimeSCAV.Value
 		: DefaultPluginVars.hardStopPercentSCAV.Value;
-
+	
 	protected override int GetBotGroupSize(int minGroupSize, int maxGroupSize)
 	{
 		return BotHelper.GetBotGroupSize(DefaultPluginVars.scavGroupChance.Value, minGroupSize, maxGroupSize);

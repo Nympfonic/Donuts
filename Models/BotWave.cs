@@ -8,7 +8,7 @@ public class BotWave
 {
 	private float _timer;
 	private float _cooldownTimer;
-
+	
 	[JsonProperty("groupNum")]
 	public int GroupNum { get; set; }
 	
@@ -35,9 +35,9 @@ public class BotWave
 	
 	[JsonProperty("zones")]
 	public List<string> Zones { get; set; }
-
-	[JsonIgnore] public bool OnCooldown { get; set; }
-	[JsonIgnore] public int TimesSpawned { get; set; }
+	
+	[JsonIgnore] public bool OnCooldown { get; private set; }
+	[JsonIgnore] public int TimesSpawned { get; private set; }
 
 	public void UpdateTimer(float deltaTime, float coolDownDuration)
 	{
@@ -45,7 +45,7 @@ public class BotWave
 		if (!OnCooldown) return;
 		
 		_cooldownTimer += deltaTime;
-
+		
 		if (_cooldownTimer >= coolDownDuration)
 		{
 			OnCooldown = false;
@@ -53,29 +53,38 @@ public class BotWave
 			TimesSpawned = 0;
 		}
 	}
-
+	
 	public bool ShouldSpawn()
 	{
 		if (OnCooldown)
 		{
 			return false;
 		}
-
+		
 		if (IgnoreTimerFirstSpawn)
 		{
 			IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
 			return true;
 		}
-
+		
 		return _timer >= TriggerTimer;
 	}
-
+	
+	public void SpawnTriggered()
+	{
+		TimesSpawned++;
+		if (TimesSpawned >= MaxTriggersBeforeCooldown)
+		{
+			TriggerCooldown();
+		}
+	}
+	
 	public void ResetTimer()
 	{
 		_timer = 0f;
 	}
-
-	public void TriggerCooldown()
+	
+	private void TriggerCooldown()
 	{
 		OnCooldown = true;
 		_cooldownTimer = 0f;

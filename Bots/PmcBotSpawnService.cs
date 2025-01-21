@@ -18,7 +18,7 @@ public class PmcBotSpawnService : BotSpawnService
 			return false;
 		}
 #if DEBUG
-		using var sb = ZString.CreateUtf8StringBuilder();
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		sb.AppendFormat(
 			"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
 			DataService.SpawnType.ToString(), activeBots.ToString(), DataService.MaxBotLimit.ToString());
@@ -26,18 +26,18 @@ public class PmcBotSpawnService : BotSpawnService
 #endif
 		return true;
 	}
-
+	
 	protected override bool IsHardStopEnabled() => DefaultPluginVars.hardStopOptionPMC.Value;
-
+	
 	protected override int GetHardStopTime() => DefaultPluginVars.useTimeBasedHardStop.Value
 		? DefaultPluginVars.hardStopTimePMC.Value
 		: DefaultPluginVars.hardStopPercentPMC.Value;
-
+	
 	protected override int GetBotGroupSize(int minGroupSize, int maxGroupSize)
 	{
 		return BotHelper.GetBotGroupSize(DefaultPluginVars.pmcGroupChance.Value, minGroupSize, maxGroupSize);
 	}
-
+	
 	protected override ReadOnlyCollection<BotWave> GetBotWaves() => _botWaves ??= MapBotWaves.Pmc.AsReadOnly();
 	protected override int GetAliveBotsCount() => ConfigService.CalculateAliveBotsCount(IsPmc);
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsPmc(role);

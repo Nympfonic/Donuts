@@ -20,7 +20,7 @@ internal static class DonutsHelper
 	private static readonly Random _random;
 	private static readonly LoggerProcessorBase _configGuiNotificationProcessor;
 	private static readonly LoggerProcessorBase _fullLoggerProcessor;
-
+	
 	static DonutsHelper()
 	{
 		_random = new Random(unchecked((int)EFTDateTimeClass.Now.Ticks));
@@ -43,16 +43,16 @@ internal static class DonutsHelper
 	{
 		if (string.IsNullOrEmpty(path))
 			throw new ArgumentException("Empty path name is not legal.", nameof(path));
-
+		
 		using var sourceStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
 			useAsync: true);
 		using var streamReader = new StreamReader(sourceStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
 		// detectEncodingFromByteOrderMarks allows you to handle files with BOM correctly,
 		// otherwise you may get chinese characters even when your text does not contain any
-
+		
 		return await streamReader.ReadToEndAsync();
 	}
-
+	
 	/// <summary>
 	/// <see cref="ManualLogSource.LogDebug"/> but also provides current time, executing type name and method name.
 	/// </summary>
@@ -67,13 +67,7 @@ internal static class DonutsHelper
 		[NotNull] string methodName)
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.Append(DateTime.Now.ToLongTimeString());
-		sb.Append(" ");
-		sb.Append(typeName);
-		sb.Append("::");
-		sb.Append(methodName);
-		sb.Append(": ");
-		sb.Append(message);
+		sb.AppendFormat("{0} {1}::{2}: {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
 		logSource.LogDebug(sb.ToString());
 	}
 	
@@ -91,18 +85,11 @@ internal static class DonutsHelper
 		[NotNull] Exception ex)
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.Append(DateTime.Now.ToLongTimeString());
-		sb.Append(" ");
-		sb.Append(typeName);
-		sb.Append("::");
-		sb.Append(methodName);
-		sb.Append(": ");
-		sb.Append(ex.Message);
-		sb.Append("\n");
-		sb.Append(ex.StackTrace);
+		sb.AppendFormat("{0} {1}::{2}: {3}\n{4}", DateTime.Now.ToLongTimeString(), typeName, methodName, ex.Message,
+			ex.StackTrace);
 		logSource.LogError(sb.ToString());
 	}
-
+	
 	/// <summary>
 	/// Output error message to BepInEx client log, to the EFT console and notify the player in-game.
 	/// </summary>
@@ -114,7 +101,7 @@ internal static class DonutsHelper
 			new NotificationLoggerData(message, logger, LogLevel.Error, Color.yellow, ENotificationIconType.Alert);
 		_fullLoggerProcessor.Process(loggerData);
 	}
-
+	
 	/// <summary>
 	/// Outputs a warning message to BepInEx client log and notify the player in-game. Used for Donuts' F9 Config GUI.
 	/// </summary>
@@ -125,7 +112,7 @@ internal static class DonutsHelper
 			new NotificationLoggerData(message, logger, LogLevel.Warning, Color.cyan, ENotificationIconType.Alert);
 		_configGuiNotificationProcessor.Process(loggerData);
 	}
-
+	
 	/// <summary>
 	/// Displays an in-game notification to the player
 	/// </summary>
@@ -146,7 +133,7 @@ internal static class DonutsHelper
 			DonutsPlugin.Logger.LogException(nameof(DonutsHelper), nameof(DisplayNotification), ex);
 		}
 	}
-
+	
 	/// <summary>
 	/// Creates a list from the specified collection and performs the shuffle on the new list.
 	/// </summary>
@@ -158,27 +145,28 @@ internal static class DonutsHelper
 	{
 		return source.ToList().ShuffleElements();
 	}
-
+	
 	/// <summary>
 	/// Shuffles elements in the specified list.
 	/// </summary>
 	/// <param name="source">The list to shuffle.</param>
+	/// <param name="createNewList">Whether or not a new list should be created to perform the shuffle on.</param>
 	/// <typeparam name="T">The type the list stores.</typeparam>
-	/// <returns>The same list with shuffled elements.</returns>
-	/// <remarks>This will actually change the element order in the list!</remarks>
+	/// <returns>A list with shuffled elements.</returns>
 	[NotNull]
-	internal static List<T> ShuffleElements<T>([NotNull] this List<T> source)
+	internal static List<T> ShuffleElements<T>([NotNull] this List<T> source, bool createNewList = false)
 	{
-		int n = source.Count;
+		List<T> list = createNewList ? source.ToList() : source;
+		int n = list.Count;
 		while (n > 1)
 		{
 			n--;
 			int k = _random.Next(n + 1);
-			(source[k], source[n]) = (source[n], source[k]);
+			(list[k], list[n]) = (list[n], list[k]);
 		}
-		return source;
+		return list;
 	}
-
+	
 	/// <summary>
 	/// Gets a random element from the collection.
 	/// </summary>
@@ -191,7 +179,7 @@ internal static class DonutsHelper
 	{
 		return source.ToList().PickRandomElement();
 	}
-
+	
 	/// <summary>
 	/// Gets a random element from the list.
 	/// </summary>
@@ -209,7 +197,7 @@ internal static class DonutsHelper
 		int randomIndex = _random.Next(n);
 		return source[randomIndex];
 	}
-
+	
 	[NotNull]
 	internal static Random GetRandom() => _random;
 }
