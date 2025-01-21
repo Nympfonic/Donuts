@@ -3,6 +3,7 @@ using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
+using System;
 using System.Linq;
 using System.Reflection;
 using UnityToolkit.Utils;
@@ -14,14 +15,17 @@ public class ModifyBotHostilitySettingsPatch : ModulePatch
 {
 	private static readonly WildSpawnType[] _emptySpawnTypes = [];
 	
-	protected override MethodBase GetTargetMethod() =>
-		AccessTools.Method(typeof(RaidSettings), nameof(RaidSettings.Apply));
+	protected override MethodBase GetTargetMethod()
+	{
+		Type targetType = typeof(BaseLocalGame<EftGamePlayerOwner>);
+		return AccessTools.Property(targetType, "Location_0").GetSetMethod();
+	}
 
 	[PatchPostfix]
-	private static void PatchPostfix(LocationSettingsClass.Location ____selectedLocation)
+	private static void PatchPostfix(LocationSettingsClass.Location ___location_0)
 	{
 		AdditionalHostilitySettings[] hostilitySettings =
-			____selectedLocation.BotLocationModifier?.AdditionalHostilitySettings;
+			___location_0.BotLocationModifier?.AdditionalHostilitySettings;
 
 		if (hostilitySettings == null) return;
 
@@ -34,38 +38,29 @@ public class ModifyBotHostilitySettingsPatch : ModulePatch
 			
 #if DEBUG
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendLine(setting.BotRole);
-			sb.AppendLine(setting.BearPlayerBehaviour.ToString());
-			sb.AppendLine(setting.UsecPlayerBehaviour.ToString());
-			sb.AppendLine(setting.SavagePlayerBehaviour.ToString());
+			sb.AppendFormat("BotRole: {0}\n", setting.BotRole);
+			sb.AppendFormat("BearPlayerBehaviour: {0}\n", setting.BearPlayerBehaviour);
+			sb.AppendFormat("UsecPlayerBehaviour: {0}\n", setting.UsecPlayerBehaviour);
+			sb.AppendFormat("SavagePlayerBehaviour: {0}\n", setting.SavagePlayerBehaviour);
 			if (setting.AlwaysEnemies != null && setting.AlwaysEnemies.Length > 0)
 			{
-				sb.AppendLine(string.Join(", ", setting.AlwaysEnemies));
+				sb.AppendFormat("AlwaysEnemies:\n{0}\n", string.Join("\n", setting.AlwaysEnemies));
 			}
 			if (setting.AlwaysFriends != null && setting.AlwaysFriends.Length > 0)
 			{
-				sb.AppendLine(string.Join(", ", setting.AlwaysFriends));
+				sb.AppendFormat("AlwaysFriends:\n{0}\n", string.Join("\n", setting.AlwaysFriends));
 			}
 			if (setting.Neutral != null && setting.Neutral.Length > 0)
 			{
-				sb.AppendLine(string.Join(", ", setting.Neutral));
+				sb.AppendFormat("Neutral:\n{0}\n", string.Join("\n", setting.Neutral));
 			}
-
 			if (setting.Warn != null && setting.Warn.Length > 0)
 			{
-				sb.AppendLine(string.Join(", ", setting.Warn));
+				sb.AppendFormat("Warn:\n{0}\n", string.Join("\n", setting.Warn));
 			}
 			if (setting.ChancedEnemies != null && setting.ChancedEnemies.Length > 0)
 			{
-				for (var i = 0; i < setting.ChancedEnemies.Length; i++)
-				{
-					AdditionalHostilitySettings.ChancedEnemy enemy = setting.ChancedEnemies[i];
-					sb.Append(enemy.Role);
-					if (i + 1 < setting.ChancedEnemies.Length)
-					{
-						sb.Append(", ");
-					}
-				}
+				sb.AppendFormat("ChancedEnemies:\n{0}\n", string.Join("\n", setting.ChancedEnemies.Select(e => e.Role)));
 			}
 			Logger.LogDebug(sb.ToString());
 #endif
