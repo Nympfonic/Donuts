@@ -177,6 +177,12 @@ public abstract class BotSpawnService : IBotSpawnService
 
 	private void ActivateBotAtPosition([NotNull] BotCreationDataClass botData, Vector3 spawnPosition)
 	{
+		// Must add to _inSpawnProcess so the bot count managed by BotSpawner is correct
+		// Normally BotSpawner::method_7() handles this but we skip it to directly call GClass888::ActivateBot()
+		var currentInSpawnProcess = (int)ReflectionHelper.BotSpawner_inSpawnProcess_Field.GetValue(_eftBotSpawner);
+		int newInSpawnProcess = currentInSpawnProcess + botData.Count;
+		ReflectionHelper.BotSpawner_inSpawnProcess_Field.SetValue(_eftBotSpawner, newInSpawnProcess);
+		
 		// Add spawn point to the BotCreationDataClass
 		BotZone closestBotZone = _eftBotSpawner.GetClosestZone(spawnPosition, out _);
 		AICorePoint closestCorePoint = GetClosestCorePoint(spawnPosition);
