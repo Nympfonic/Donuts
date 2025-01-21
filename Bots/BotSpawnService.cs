@@ -307,6 +307,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		var groupAction = new Func<BotOwner, BotZone, BotsGroup>(activateBotCallbackWrapper.GetGroupAndSetEnemies);
 		var callback = new Action<BotOwner>(activateBotCallbackWrapper.CreateBotCallback);
 		
+		// shallBeGroup doesn't matter at this stage, it only matters in the callback action
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
 		DataService.ScheduleForClearBotData(botData);
 		MonoBehaviourSingleton<DonutsRaidManager>.Instance.UpdateReplenishBotDataTime();
