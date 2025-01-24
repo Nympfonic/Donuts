@@ -2,14 +2,19 @@ using Donuts.Utils;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace Donuts.Patches.BotCreationDataClassPatches;
+using SpawnPointData = GClass649;
+
+namespace Donuts.Patches.BotFixes;
 
 [UsedImplicitly]
-public partial class BotCreationDataClassPatches
+public class BotCreationDataClassPatches
 {
+	private static readonly Type _targetType = typeof(BotCreationDataClass);
+	
 	/*
 	 * As of SPT 3.10.X
 	 * ___list_0 is a List<GClass649> where GClass649 has a constructor signature:
@@ -28,19 +33,21 @@ public partial class BotCreationDataClassPatches
 	public class GetPositionPatch : ModulePatch
 	{
 		protected override MethodBase GetTargetMethod() =>
-			AccessTools.Method(typeof(BotCreationDataClass), nameof(BotCreationDataClass.GetPosition));
+			AccessTools.Method(_targetType, nameof(BotCreationDataClass.GetPosition));
 
 		[PatchPrefix]
-		private static bool PatchPrefix(ref GClass649 __result, List<GClass649> ___list_0)
+		private static bool PatchPrefix(ref SpawnPointData __result, List<SpawnPointData> ___list_0)
 		{
 			int count = ___list_0.Count;
 			if (count == 0)
 			{
 				__result = null;
+				return false;
 			}
 			else if (count == 1)
 			{
 				__result = ___list_0[0];
+				return false;
 			}
 			
 			__result = ___list_0.PickRandomElement();

@@ -135,6 +135,32 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
+	/// Adds a range of data from an input list to target dictionary at the specified key.
+	/// <p>If key is already initialized, the new data is appended to the end of the key's list.</p>
+	/// </summary>
+	/// <param name="source">The target dictionary.</param>
+	/// <param name="key">The key to append data to.</param>
+	/// <param name="values">The range of data to append.</param>
+	/// <typeparam name="TKey">The type of the key in the dictionary.</typeparam>
+	/// <typeparam name="TValue">The type of list.</typeparam>
+	internal static void AddRangeToKey<TKey, TValue>(
+		this IDictionary<TKey, List<TValue>> source,
+		TKey key,
+		List<TValue> values)
+	where TKey : notnull
+	where TValue : notnull
+	{
+		if (source.ContainsKey(key))
+		{
+			source[key].AddRange(values);
+		}
+		else
+		{
+			source.Add(key, values);
+		}
+	}
+	
+	/// <summary>
 	/// Creates a list from the specified collection and performs the shuffle on the new list.
 	/// </summary>
 	/// <param name="source">The collection to shuffle.</param>
@@ -175,10 +201,7 @@ internal static class DonutsHelper
 	/// <returns>A random element from the collection or null if the collection is empty.</returns>
 	/// <remarks>This will create a new list to perform <see cref="PickRandomElement{T}(System.Collections.Generic.IReadOnlyList{T})"/> on.</remarks>
 	[CanBeNull]
-	internal static T PickRandomElement<T>([NotNull] this IEnumerable<T> source)
-	{
-		return source.ToList().PickRandomElement();
-	}
+	internal static T PickRandomElement<T>([NotNull] this IEnumerable<T> source) => source.ToList().PickRandomElement();
 	
 	/// <summary>
 	/// Gets a random element from the list.
@@ -187,14 +210,19 @@ internal static class DonutsHelper
 	/// <typeparam name="T">The type the list stores.</typeparam>
 	/// <returns>A random element from the list or null if the list is empty.</returns>
 	[CanBeNull]
-	internal static T PickRandomElement<T>([NotNull] this IReadOnlyList<T> source)
+	internal static T PickRandomElement<T>([NotNull] this IReadOnlyList<T> source) => source.PickRandomElement(out _);
+	
+	[CanBeNull]
+	internal static T PickRandomElement<T>([NotNull] this IReadOnlyList<T> source, out int index)
 	{
-		int n = source.Count;
-		if (n == 0)
+		int count = source.Count;
+		if (count == 0)
 		{
+			index = -1;
 			return default;
 		}
-		int randomIndex = _random.Next(n);
+		int randomIndex = _random.Next(count);
+		index = randomIndex;
 		return source[randomIndex];
 	}
 	

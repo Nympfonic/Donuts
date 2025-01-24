@@ -2,10 +2,10 @@
 
 public class SpawnTypeConfig(
 	string difficultySetting,
-	BotConfig botConfig,
+	StartingBotConfig startingBotConfig,
 	int maxBotCount)
 {
 	public string DifficultySetting { get; } = difficultySetting;
-	public BotConfig BotConfig { get; } = botConfig;
+	public StartingBotConfig StartingBotConfig { get; } = startingBotConfig;
 	public int MaxBotCount { get; } = maxBotCount;
 }

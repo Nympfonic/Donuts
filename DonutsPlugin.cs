@@ -4,7 +4,6 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using Cysharp.Threading.Tasks;
 using Donuts.Models;
-using Donuts.Patches;
 using Donuts.PluginGUI;
 using Donuts.Tools;
 using Donuts.Utils;

@@ -4,8 +4,11 @@ using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System.Reflection;
 
-namespace Donuts.Patches;
+namespace Donuts.Patches.NullRefFixes;
 
+/// <summary>
+/// Patches a <see cref="ShootData"/> method to prevent NREs.
+/// </summary>
 [UsedImplicitly]
 internal class ShootDataNullRefPatch : ModulePatch
 {

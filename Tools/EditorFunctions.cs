@@ -122,7 +122,7 @@ internal static class EditorFunctions
 		}
 
 		// Display a message to the player
-		using (var sb = ZString.CreateUtf8StringBuilder())
+		using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
 		{
 			sb.AppendFormat("Spawn Marker Deleted for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", closestEntry.Name,
 				closestEntry.WildSpawnType, closestEntry.Position.x.ToString(CultureInfo.InvariantCulture),
@@ -142,11 +142,9 @@ internal static class EditorFunctions
 	{
 		// Check if any of the required objects are null
 		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
-		if (!Singleton<GameWorld>.Instantiated ||
-			raidManager == null ||
-			raidManager.BotConfigService == null)
+		if (raidManager == null || raidManager.BotConfigService == null)
 		{
-			_logger.LogDebug("IBotGame Not Instantiated or gameWorld is null.");
+			_logger.NotifyLogError("Donuts: You must be in a raid to create a spawn marker!");
 			return;
 		}
 			
@@ -166,12 +164,7 @@ internal static class EditorFunctions
 			SpawnChance = spawnChance.Value,
 			BotTimerTrigger = botTimerTrigger.Value,
 			BotTriggerDistance = botTriggerDistance.Value,
-			Position = new Position
-			{
-				x = mainPlayer.Position.x,
-				y = mainPlayer.Position.y,
-				z = mainPlayer.Position.z
-			},
+			Position = (Position)mainPlayer.Position,
 			MaxSpawnsBeforeCoolDown = maxSpawnsBeforeCooldown.Value,
 			IgnoreTimerFirstSpawn = ignoreTimerFirstSpawn.Value,
 			MinSpawnDistanceFromPlayer = minSpawnDistanceFromPlayer.Value
@@ -191,7 +184,7 @@ internal static class EditorFunctions
 		var timer = new HotspotTimer(newEntry);
 		_groupedHotspotTimers[newEntry.GroupNum].Add(timer);
 
-		using var sb = ZString.CreateUtf8StringBuilder();
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		sb.AppendFormat("Donuts: Wrote Entry for {0}\nSpawnType: {1}\nPosition: {2}, {3}, {4}", newEntry.Name,
 			newEntry.WildSpawnType, newEntry.Position.x.ToString(CultureInfo.InvariantCulture),
 			newEntry.Position.y.ToString(CultureInfo.InvariantCulture),
@@ -202,10 +195,9 @@ internal static class EditorFunctions
 	internal static async UniTask WriteToJsonFile(string directoryPath)
 	{
 		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
-		if (!Singleton<GameWorld>.Instantiated ||
-			raidManager == null ||
-			raidManager.BotConfigService == null)
+		if (raidManager == null || raidManager.BotConfigService == null)
 		{
+			_logger.NotifyLogError("Donuts: You must be in a raid to use this functionality!");
 			return;
 		}
 

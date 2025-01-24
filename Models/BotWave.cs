@@ -9,31 +9,31 @@ public class BotWave
 	private float _timer;
 	private float _cooldownTimer;
 	
-	[JsonProperty("groupNum")]
+	[JsonProperty("GroupNum")]
 	public int GroupNum { get; set; }
 	
-	[JsonProperty("triggerTimer")]
+	[JsonProperty("TriggerTimer")]
 	public int TriggerTimer { get; set; }
 	
-	[JsonProperty("triggerDistance")]
+	[JsonProperty("TriggerDistance")]
 	public int TriggerDistance { get; set; }
 	
-	[JsonProperty("spawnChance")]
+	[JsonProperty("SpawnChance")]
 	public int SpawnChance { get; set; }
 	
-	[JsonProperty("maxTriggersBeforeCooldown")]
+	[JsonProperty("MaxTriggersBeforeCooldown")]
 	public int MaxTriggersBeforeCooldown { get; set; }
 	
-	[JsonProperty("ignoreTimerFirstSpawn")]
+	[JsonProperty("IgnoreTimerFirstSpawn")]
 	public bool IgnoreTimerFirstSpawn { get; set; }
 	
-	[JsonProperty("minGroupSize")]
+	[JsonProperty("MinGroupSize")]
 	public int MinGroupSize { get; set; }
 	
-	[JsonProperty("maxGroupSize")]
+	[JsonProperty("MaxGroupSize")]
 	public int MaxGroupSize { get; set; }
 	
-	[JsonProperty("zones")]
+	[JsonProperty("Zones")]
 	public List<string> Zones { get; set; }
 	
 	[JsonIgnore] public bool OnCooldown { get; private set; }

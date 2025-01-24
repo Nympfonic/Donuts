@@ -4,32 +4,34 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System;
-using System.Linq;
 using System.Reflection;
 using UnityToolkit.Utils;
 
 namespace Donuts.Patches;
 
+/// <summary>
+/// TODO: Allow customizing AdditionalHostilitySettings in-game with Donuts without needing to restart game
+/// </summary>
 [UsedImplicitly]
 [DisablePatch]
 public class ModifyBotHostilitySettingsPatch : ModulePatch
 {
-	private static readonly WildSpawnType[] _emptySpawnTypes = [];
+	// private static readonly WildSpawnType[] _emptySpawnTypes = [];
 	
 	protected override MethodBase GetTargetMethod()
 	{
 		Type targetType = typeof(BaseLocalGame<EftGamePlayerOwner>);
 		return AccessTools.Property(targetType, "Location_0").GetSetMethod();
 	}
-
+	
 	[PatchPostfix]
 	private static void PatchPostfix(LocationSettingsClass.Location ___location_0)
 	{
 		AdditionalHostilitySettings[] hostilitySettings =
 			___location_0.BotLocationModifier?.AdditionalHostilitySettings;
-
+		
 		if (hostilitySettings == null) return;
-
+		
 		foreach (AdditionalHostilitySettings setting in hostilitySettings)
 		{
 			if (setting.BotRole != WildSpawnType.pmcBEAR && setting.BotRole != WildSpawnType.pmcUSEC)

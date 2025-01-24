@@ -8,8 +8,12 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace Donuts.Patches;
+namespace Donuts.Patches.NullRefFixes;
 
+/// <summary>
+/// Patches a static <see cref="BaseLocalGame{TPlayerOwner}"/> method, which handles disposing of player game objects at
+/// the end of a raid, to avoid NREs.
+/// </summary>
 [UsedImplicitly]
 internal class MatchEndPlayerDisposePatch : ModulePatch
 {

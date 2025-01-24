@@ -1,112 +1,167 @@
+using Donuts.Utils;
 using JetBrains.Annotations;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 using UnityEngine;
 
 namespace Donuts.Models;
 
+[Serializable]
 public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 {
-	private readonly ReadOnlyCollection<KeyValuePair<string, List<Vector3>>> _emptyZoneSpawnPoints =
-		new(new List<KeyValuePair<string, List<Vector3>>>());
-	private readonly HashSet<string> _usedZones = [];
+	private List<Vector3> _unusedStartingSpawnPoints;
 	
 	/// <summary>
-	/// Initializes the zone spawn points based on the provided data.
+	/// The original JSON deserialized into a Dictionary&lt;string, List&lt;Vector3&gt;&gt; without filtering into Donuts' keyword zones (all/start/hotspot).
+	/// <p>Used for serializing back into JSON while maintaining the original zones from deserialization.</p>
 	/// </summary>
-	/// <param name="inputZoneSpawnPoints">The zone spawn points data that was deserialized from the JSON config.</param>
-	/// <param name="zoneNames">The list of zone names used to determine how they are added to the dictionary.</param>
-	public void SetZones(
-		[NotNull] IDictionary<string, List<Position>> inputZoneSpawnPoints,
-		[NotNull] IList<string> zoneNames)
+	[CanBeNull] public Dictionary<string, List<Vector3>> OriginalSerialization { get; set; }
+	
+	public new void Clear()
 	{
-		foreach (string zoneName in zoneNames)
-		{
-			if (zoneName == "all")
-				AddAllZones(inputZoneSpawnPoints);
-			else if (zoneName is "start" or "hotspot")
-				AddHotspotStartZones(inputZoneSpawnPoints, zoneName);
-			else
-				AddSingleZone(inputZoneSpawnPoints, zoneName);
-		}
+		OriginalSerialization = null;
+		_unusedStartingSpawnPoints = null;
+		base.Clear();
 	}
 	
 	/// <summary>
-	/// Adds a zone by name to the <see cref="_usedZones"/> hashset.
+	/// Removes the spawn point from the <see cref="_unusedStartingSpawnPoints"/> list at the specified index.
 	/// </summary>
-	/// <returns>True if it was successful at adding the zone to the hashset or otherwise false.</returns>
-	public bool AddZoneToUsedZones(string zoneName) => _usedZones.Add(zoneName);
+	public bool SetStartingSpawnPointAsUsed(int index)
+	{
+		if (_unusedStartingSpawnPoints == null)
+		{
+			return false;
+		}
+		_unusedStartingSpawnPoints.RemoveAt(index);
+		return true;
+	}
 	
 	/// <summary>
-	/// A read-only list of unused zones and their spawn points.
+	/// Gets a random unused starting spawn point, along with its index number from the list.
 	/// </summary>
-	/// <returns>A read-only list of unused zones and their spawn points or an empty list.</returns>
-	[NotNull]
-	public ReadOnlyCollection<KeyValuePair<string, List<Vector3>>> GetUnusedZoneSpawnPoints()
+	/// <returns>A random unused starting spawn point or otherwise null.</returns>
+	[CanBeNull]
+	public Vector3? GetUnusedStartingSpawnPoint(out int index)
 	{
-		if (Count == 0)
+		if (Count == 0 || !TryGetValue("start", out List<Vector3> startingSpawnPoints) || startingSpawnPoints.Count == 0)
 		{
-			return _emptyZoneSpawnPoints;
+			index = -1;
+			return null;
+		}
+
+		// If used up all zones, reset the _usedStartingSpawnPoints list
+		if (_unusedStartingSpawnPoints == null || _unusedStartingSpawnPoints.Count == 0)
+		{
+			_unusedStartingSpawnPoints = [..startingSpawnPoints];
 		}
 		
-		if (_usedZones.Count == Count)
+		return _unusedStartingSpawnPoints.PickRandomElement(out index);
+	}
+
+	public static bool IsKeywordZone([NotNull] string zoneName, [CanBeNull] out string keyword)
+	{
+		if (zoneName.ToLower() == "all")
 		{
-			_usedZones.Clear();
-			return this.ToList().AsReadOnly();
+			keyword = "all";
+			return true;
+		}
+
+		return IsStartOrHotspotZone(zoneName, out keyword);
+	}
+	
+	public static bool IsStartOrHotspotZone([NotNull] string zoneName, [CanBeNull] out string keyword)
+	{
+		if (zoneName.IndexOf("start", StringComparison.OrdinalIgnoreCase) >= 0)
+		{
+			keyword = "start";
+			return true;
 		}
 		
-		var list = new List<KeyValuePair<string, List<Vector3>>>(Count - _usedZones.Count);
-		foreach (KeyValuePair<string, List<Vector3>> zoneSpawnPoint in this)
+		return IsHotspotZone(zoneName, out keyword);
+	}
+
+	public static bool IsHotspotZone([NotNull] string zoneName, [CanBeNull] out string keyword)
+	{
+		if (zoneName.IndexOf("hotspot", StringComparison.OrdinalIgnoreCase) >= 0)
 		{
-			if (!_usedZones.Contains(zoneSpawnPoint.Key))
+			keyword = "hotspot";
+			return true;
+		}
+		
+		keyword = null;
+		return false;
+	}
+}
+
+/// <summary>
+/// JsonConverter to convert <see cref="ZoneSpawnPoints"/> to and from JSON.
+/// </summary>
+public class ZoneSpawnPointsConverter : JsonConverter<ZoneSpawnPoints>
+{
+	public override void WriteJson(JsonWriter writer, ZoneSpawnPoints value, JsonSerializer serializer)
+	{
+		if (value == null)
+		{
+			throw new JsonSerializationException("ZoneSpawnPoints cannot be null!");
+		}
+		
+		writer.WriteStartObject();
+		
+		Dictionary<string, List<Vector3>> zoneSpawnPoints = value.OriginalSerialization ?? value;
+		
+		foreach (KeyValuePair<string, List<Vector3>> zoneSpawnPoint in zoneSpawnPoints)
+		{
+			writer.WritePropertyName(zoneSpawnPoint.Key);
+			serializer.Serialize(writer, zoneSpawnPoint.Value);
+		}
+		
+		writer.WriteEndObject();
+	}
+	
+	public override ZoneSpawnPoints ReadJson(
+		JsonReader reader,
+		Type objectType,
+		ZoneSpawnPoints existingValue,
+		bool hasExistingValue,
+		JsonSerializer serializer)
+	{
+		ZoneSpawnPoints zoneSpawnPoints;
+		if (hasExistingValue)
+		{
+			zoneSpawnPoints = existingValue;
+			zoneSpawnPoints.Clear();
+		}
+		else
+		{
+			zoneSpawnPoints = new ZoneSpawnPoints();
+		}
+		
+		var originalZoneSpawnPoints = new Dictionary<string, List<Vector3>>();
+		JObject obj = JObject.Load(reader);
+		
+		foreach ((string zoneName, JToken value) in obj)
+		{
+			var spawnPoints = value.ToObject<List<Vector3>>();
+			// Save the original for serialization
+			originalZoneSpawnPoints.AddRangeToKey(zoneName, spawnPoints);
+			// Add zone to "all" key
+			zoneSpawnPoints.AddRangeToKey("all", spawnPoints);
+			// If someone accidentally specified a zone name as simply "All" or "all", continue to next iteration
+			if (zoneName.ToLower() == "all")
 			{
-				list.Add(zoneSpawnPoint);
+				continue;
 			}
+			// Add zone to start/hotspot key if it contains matching keywords, otherwise add to the specified zone name key
+			zoneSpawnPoints.AddRangeToKey(
+				ZoneSpawnPoints.IsStartOrHotspotZone(zoneName, out string keywordZoneName) ? keywordZoneName : zoneName,
+				spawnPoints);
 		}
 		
-		return list.AsReadOnly();
-	}
-
-	private void AddAllZones([NotNull] IDictionary<string, List<Position>> inputZoneSpawnPoints)
-	{
-		foreach (KeyValuePair<string, List<Position>> zoneSpawnPoint in inputZoneSpawnPoints)
-		{
-			AddZoneSpawnPoint(zoneSpawnPoint.Key, zoneSpawnPoint.Value);
-		}
-	}
-
-	private void AddHotspotStartZones(
-		[NotNull] IDictionary<string, List<Position>> inputZoneSpawnPoints,
-		[NotNull] string zoneName)
-	{
-		foreach (KeyValuePair<string, List<Position>> zoneSpawnPoint in inputZoneSpawnPoints)
-		{
-			if (zoneSpawnPoint.Key.IndexOf(zoneName, StringComparison.OrdinalIgnoreCase) >= 0)
-			{
-				AddZoneSpawnPoint(zoneSpawnPoint.Key, zoneSpawnPoint.Value);
-			}
-		}
-	}
-
-	private void AddSingleZone(
-		[NotNull] IDictionary<string, List<Position>> inputZoneSpawnPoints,
-		[NotNull] string zoneName)
-	{
-		if (inputZoneSpawnPoints.TryGetValue(zoneName, out List<Position> spawnPoints))
-		{
-			AddZoneSpawnPoint(zoneName, spawnPoints);
-		}
-	}
-
-	private void AddZoneSpawnPoint([NotNull] string zoneName, [NotNull] IList<Position> spawnPoints)
-	{
-		if (!ContainsKey(zoneName))
-		{
-			this[zoneName] = [];
-		}
+		zoneSpawnPoints.OriginalSerialization = originalZoneSpawnPoints;
 		
-		this[zoneName].AddRange(spawnPoints.Select(p => (Vector3)p));
+		return zoneSpawnPoints;
 	}
 }

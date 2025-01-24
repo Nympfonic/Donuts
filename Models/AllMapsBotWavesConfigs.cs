@@ -7,9 +7,9 @@ using System.Linq;
 namespace Donuts.Models;
 
 [JsonObject]
-public class BotWavesConfig
+public class AllMapsBotWavesConfigs
 {
-	[JsonProperty("maps")]
+	[JsonProperty("Maps")]
 	public Dictionary<string, MapBotWaves> Maps { get; set; }
 
 	public void EnsureUniqueGroupNumForBotWaves()
@@ -36,4 +36,14 @@ public class BotWavesConfig
 		}
 		return uniqueWaves;
 	}
+}
+
+[JsonObject]
+public class MapBotWaves
+{
+	[JsonProperty("PMC")]
+	public List<BotWave> Pmc { get; set; }
+	
+	[JsonProperty("SCAV")]
+	public List<BotWave> Scav { get; set; }
 }

@@ -2,6 +2,7 @@
 
 namespace Donuts.Models;
 
+// TODO: Currently unused - implement Hotspot timer into Donuts logic
 public class HotspotTimer(Entry hotspot)
 {
 	private float _timer = 0f;

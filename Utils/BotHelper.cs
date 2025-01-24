@@ -1,6 +1,4 @@
-using Comfort.Common;
 using Cysharp.Text;
-using EFT;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -42,7 +40,7 @@ internal static class BotHelper
 				difficulties = _impossibleDifficulty;
 				break;
 			default:
-				using (var sb = ZString.CreateUtf8StringBuilder())
+				using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
 				{
 					sb.AppendFormat("{0} {1}::{2}: Unsupported difficulty setting: {3}", DateTime.Now.ToLongTimeString(),
 						nameof(BotHelper), nameof(GetSettingDifficulties), difficultySetting);

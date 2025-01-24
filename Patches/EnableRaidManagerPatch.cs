@@ -7,6 +7,9 @@ using System.Reflection;
 
 namespace Donuts.Patches;
 
+/// <summary>
+/// Patch to add and enable Donuts' raid manager MonoBehaviour.
+/// </summary>
 [UsedImplicitly]
 internal class EnableRaidManagerPatch : ModulePatch
 {

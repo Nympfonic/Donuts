@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
+
 using BotProfileData = GClass652; // Implements IGetProfileData
 using Random = UnityEngine.Random;
 
@@ -39,7 +40,7 @@ public abstract class BotDataService : IBotDataService
 	private BotSpawner _eftBotSpawner;
 	private CancellationToken _onDestroyToken;
 	
-	protected BotConfig botConfig;
+	protected StartingBotConfig startingBotConfig;
 	
 	protected BotConfigService ConfigService { get; private set; }
 	protected ManualLogSource Logger { get; private set; }
@@ -48,7 +49,7 @@ public abstract class BotDataService : IBotDataService
 	protected abstract ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
 	public List<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
-	public ZoneSpawnPoints ZoneSpawnPoints { get; } = [];
+	public ZoneSpawnPoints ZoneSpawnPoints { get; private set; } = [];
 	public abstract DonutsSpawnType SpawnType { get; }
 	public int MaxBotLimit => ConfigService.GetMaxBotLimit(SpawnType);
 	
@@ -230,14 +231,14 @@ public abstract class BotDataService : IBotDataService
 		return service;
 	}
 	
-	protected abstract BotConfig GetStartingBotConfig();
+	protected abstract StartingBotConfig GetStartingBotConfig();
 	
 	private async UniTask SetupInitialBotCache()
 	{
 		try
 		{
-			BotConfig botCfg = GetStartingBotConfig();
-			int maxBots = BotHelper.GetRandomBotCap(botCfg.MinCount, botCfg.MaxCount, MaxBotLimit);
+			StartingBotConfig startingBotCfg = GetStartingBotConfig();
+			int maxBots = BotHelper.GetRandomBotCap(startingBotCfg.MinCount, startingBotCfg.MaxCount, MaxBotLimit);
 #if DEBUG
 			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
 			{
@@ -248,7 +249,7 @@ public abstract class BotDataService : IBotDataService
 			var totalBots = 0;
 			while (totalBots < maxBots && !_onDestroyToken.IsCancellationRequested)
 			{
-				int groupSize = BotHelper.GetBotGroupSize(GroupChance, botCfg.MinGroupSize, botCfg.MaxGroupSize,
+				int groupSize = BotHelper.GetBotGroupSize(GroupChance, startingBotCfg.MinGroupSize, startingBotCfg.MaxGroupSize,
 					maxBots - totalBots);
 				
 				var prepBotInfo = new PrepBotInfo(BotDifficulties.PickRandomElement(), groupSize > 1, groupSize);
@@ -293,8 +294,6 @@ public abstract class BotDataService : IBotDataService
 		}
 	}
 	
-	protected abstract List<string> GetZoneNames(string location);
-	
 	private void Initialize(
 		[NotNull] BotConfigService configService,
 		[NotNull] ManualLogSource logger,
@@ -307,7 +306,6 @@ public abstract class BotDataService : IBotDataService
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
 		
 		string location = ConfigService.GetMapLocation();
-		Dictionary<string,List<Position>> zones = ConfigService.GetAllMapsZoneConfig()!.Maps[location].Zones;
-		ZoneSpawnPoints.SetZones(zones, GetZoneNames(location));
+		ZoneSpawnPoints = ConfigService.GetAllMapsZoneConfigs()!.Maps[location].Zones;
 	}
 }

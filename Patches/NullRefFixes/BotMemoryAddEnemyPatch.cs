@@ -4,8 +4,11 @@ using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System.Reflection;
 
-namespace Donuts.Patches;
+namespace Donuts.Patches.NullRefFixes;
 
+/// <summary>
+/// Patch <see cref="BotMemoryClass.AddEnemy"/> to prevent NREs.
+/// </summary>
 [UsedImplicitly]
 internal class BotMemoryAddEnemyPatch : ModulePatch
 {
@@ -14,7 +17,7 @@ internal class BotMemoryAddEnemyPatch : ModulePatch
 	[PatchPrefix]
 	private static bool PatchPrefix(IPlayer enemy)
 	{
-		if (enemy == null || (enemy.IsAI && enemy.AIData?.BotOwner?.GetPlayer == null))
+		if (enemy == null || (enemy.IsAI && enemy.AIData?.BotOwner == null))
 		{
 			return false;
 		}

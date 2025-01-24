@@ -5,26 +5,28 @@ using SPT.Reflection.Patching;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using UnityToolkit.Utils;
 
 namespace Donuts.Patches;
 
+/// <summary>
+/// Patches the <see cref="BotStandBy"/> state to prevent bots from teleporting away from their spawn location if
+/// they're too far from their target core point.
+/// </summary>
 [UsedImplicitly]
-[DisablePatch]
-internal class PatchStandbyTeleport : ModulePatch
+internal class BotStandbyTeleportPatch : ModulePatch
 {
 	private static MethodInfo _method;
 	private static readonly Dictionary<BotStandBy, Action> _methodDelegates = [];
 	
 	internal static Dictionary<BotStandBy, Action> MethodDelegates => _methodDelegates;
-
+	
 	protected override MethodBase GetTargetMethod()
 	{
 		Type standbyClassType = typeof(BotStandBy);
 		_method = AccessTools.Method(standbyClassType, "method_1");
 		return AccessTools.Method(standbyClassType, nameof(BotStandBy.UpdateNode));
 	}
-
+	
 	[PatchPrefix]
 	private static bool PatchPrefix(BotStandBy __instance, BotStandByType ___standByType, BotOwner ___botOwner_0)
 	{
@@ -39,13 +41,12 @@ internal class PatchStandbyTeleport : ModulePatch
 		{
 			return false;
 		}
-
+		
 		if (___standByType == BotStandByType.goToSave)
 		{
-			//_method.Invoke(__instance, []);
 			_methodDelegates[__instance]();
 		}
-
+		
 		return false;
 	}
 }

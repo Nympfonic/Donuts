@@ -5,33 +5,33 @@ namespace Donuts.Models;
 [JsonObject]
 public class BotLimitPresets
 {
-	[JsonProperty("factoryBotLimit")]
+	[JsonProperty("FactoryBotLimit")]
 	public int FactoryBotLimit { get; set; }
 	
-	[JsonProperty("interchangeBotLimit")]
+	[JsonProperty("InterchangeBotLimit")]
 	public int InterchangeBotLimit { get; set; }
 	
-	[JsonProperty("laboratoryBotLimit")]
+	[JsonProperty("LaboratoryBotLimit")]
 	public int LaboratoryBotLimit { get; set; }
 	
-	[JsonProperty("lighthouseBotLimit")]
+	[JsonProperty("LighthouseBotLimit")]
 	public int LighthouseBotLimit { get; set; }
 	
-	[JsonProperty("reserveBotLimit")]
+	[JsonProperty("ReserveBotLimit")]
 	public int ReserveBotLimit { get; set; }
 	
-	[JsonProperty("shorelineBotLimit")]
+	[JsonProperty("ShorelineBotLimit")]
 	public int ShorelineBotLimit { get; set; }
 	
-	[JsonProperty("woodsBotLimit")]
+	[JsonProperty("WoodsBotLimit")]
 	public int WoodsBotLimit { get; set; }
 	
-	[JsonProperty("customsBotLimit")]
+	[JsonProperty("CustomsBotLimit")]
 	public int CustomsBotLimit { get; set; }
 	
-	[JsonProperty("tarkovStreetsBotLimit")]
+	[JsonProperty("TarkovStreetsBotLimit")]
 	public int TarkovStreetsBotLimit { get; set; }
 	
-	[JsonProperty("groundZeroBotLimit")]
+	[JsonProperty("GroundZeroBotLimit")]
 	public int GroundZeroBotLimit { get; set; }
 }

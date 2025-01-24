@@ -6,24 +6,24 @@ namespace Donuts.Models;
 [JsonObject]
 public class Folder
 {
-	[JsonProperty("name")]
+	[JsonProperty("Name")]
 	public string Name { get; set; }
 	
-	[JsonProperty("weight")]
+	[JsonProperty("Weight")]
 	public int Weight { get; set; }
 	
-	[JsonProperty("randomSelection")]
+	[JsonProperty("RandomSelection")]
 	public bool RandomSelection { get; set; }
 	
-	[JsonProperty("pmcBotLimitPresets")]
+	[JsonProperty("PmcBotLimitPresets")]
 	public BotLimitPresets PmcBotLimitPresets { get; set; }
 	
-	[JsonProperty("scavBotLimitPresets")]
+	[JsonProperty("ScavBotLimitPresets")]
 	public BotLimitPresets ScavBotLimitPresets { get; set; }
 	
-	[JsonProperty("randomScenarioConfig")]
+	[JsonProperty("RandomScenarioConfig")]
 	public string RandomScenarioConfig { get; set; }
 	
-	[JsonProperty("presets")]
+	[JsonProperty("Presets")]
 	public List<Preset> Presets { get; set; }
 }

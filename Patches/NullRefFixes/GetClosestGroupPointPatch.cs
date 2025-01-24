@@ -5,8 +5,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-namespace Donuts.Patches;
+namespace Donuts.Patches.NullRefFixes;
 
+/// <summary>
+/// Patches <see cref="AICoversData.GetClosest(Vector3)"/> to avoid a closure allocation and prevent an error with Donuts.
+/// </summary>
 [UsedImplicitly]
 public class GetClosestGroupPointPatch : ModulePatch
 {

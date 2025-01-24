@@ -34,13 +34,10 @@ public class PmcBotDataService : BotDataService
 				"Must provide a PMC WildSpawnType (WildSpawnType.pmcUSEC or WildSpawnType.pmcBEAR).", nameof(spawnType))
 		};
 
-	protected override BotConfig GetStartingBotConfig() =>
-		botConfig ??= ConfigService.GetAllMapsStartingBotConfig()!.Maps[ConfigService.GetMapLocation()].Pmc;
+	protected override StartingBotConfig GetStartingBotConfig() =>
+		startingBotConfig ??= ConfigService.GetAllMapsStartingBotConfigs()!.Maps[ConfigService.GetMapLocation()].Pmc;
 
 	public override BotDifficulty GetBotDifficulty() => GetBotDifficulty(DefaultPluginVars.botDifficultiesPMC.Value);
-
-	protected override List<string> GetZoneNames(string location) =>
-		ConfigService.GetAllMapsStartingBotConfig()!.Maps[location].Pmc.Zones;
 
 	private static WildSpawnType GetPmcFactionBasedOnRatio() =>
 		Random.Range(0, 100) < DefaultPluginVars.pmcFactionRatio.Value

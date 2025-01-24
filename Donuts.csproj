@@ -136,8 +136,6 @@
     <None Include="Patterns\ReservePMC.json" />
   </ItemGroup>
 
-  <PropertyGroup />
-
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="copy &quot;$(TargetPath)&quot; &quot;E:\SPT-3.10\BepInEx\plugins\Donuts\$(TargetName).dll&quot;&#xA;&#xA;if &quot;$(ConfigurationName)&quot;==&quot;Debug&quot; (&#xA;    if exist &quot;$(TargetDir)$(TargetName).pdb&quot; (&#xA;        copy &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;E:\SPT-3.10\BepInEx\plugins\Donuts\$(TargetName).pdb&quot;&#xA;    ) else (&#xA;        echo Debug symbols not found!&#xA;    )&#xA;) else (&#xA;    if exist &quot;E:\SPT-3.10\BepInEx\plugins\Donuts\$(TargetName).pdb&quot; (&#xA;        del &quot;E:\SPT-3.10\BepInEx\plugins\Donuts\$(TargetName).pdb&quot;&#xA;    )&#xA;)" />
   </Target>

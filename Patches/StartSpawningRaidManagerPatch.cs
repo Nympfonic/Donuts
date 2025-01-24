@@ -8,7 +8,7 @@ using System.Reflection;
 namespace Donuts.Patches;
 
 /// <summary>
-/// Re-initializes each new game
+/// Patch to start Donuts' bot spawning.
 /// </summary>
 [UsedImplicitly]
 internal class StartSpawningRaidManagerPatch : ModulePatch

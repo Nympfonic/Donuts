@@ -7,6 +7,9 @@ using System.Reflection;
 
 namespace Donuts.Patches;
 
+/// <summary>
+/// Patch <see cref="Player.FirearmController.IsTriggerPressed"/> to prevent player from shooting while in Donuts' F9 menu.
+/// </summary>
 [UsedImplicitly]
 internal class PlayerFireControlPatchGetter : ModulePatch
 {
@@ -15,7 +18,7 @@ internal class PlayerFireControlPatchGetter : ModulePatch
 		Type playerType = typeof(Player.FirearmController);
 		return AccessTools.PropertyGetter(playerType, nameof(Player.FirearmController.IsTriggerPressed));
 	}
-
+	
 	[PatchPrefix]
 	private static bool PatchPrefix(ref bool __result)
 	{
@@ -36,7 +39,7 @@ internal class PlayerFireControlPatchSetter : ModulePatch
 		Type playerType = typeof(Player.FirearmController);
 		return AccessTools.PropertySetter(playerType, nameof(Player.FirearmController.IsTriggerPressed));
 	}
-
+	
 	[PatchPrefix]
 	private static bool PatchPrefix(ref bool value)
 	{

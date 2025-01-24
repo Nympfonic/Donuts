@@ -18,11 +18,8 @@ public class ScavBotDataService : BotDataService
 	protected override WildSpawnType GetWildSpawnType() => WildSpawnType.assault;
 	protected override EPlayerSide GetPlayerSide(WildSpawnType spawnType) => EPlayerSide.Savage;
 
-	protected override BotConfig GetStartingBotConfig() =>
-		botConfig ??= ConfigService.GetAllMapsStartingBotConfig()!.Maps[ConfigService.GetMapLocation()].Scav;
+	protected override StartingBotConfig GetStartingBotConfig() =>
+		startingBotConfig ??= ConfigService.GetAllMapsStartingBotConfigs()!.Maps[ConfigService.GetMapLocation()].Scav;
 
 	public override BotDifficulty GetBotDifficulty() => GetBotDifficulty(DefaultPluginVars.botDifficultiesSCAV.Value);
-
-	protected override List<string> GetZoneNames(string location) =>
-		ConfigService.GetAllMapsStartingBotConfig()!.Maps[location].Scav.Zones;
 }

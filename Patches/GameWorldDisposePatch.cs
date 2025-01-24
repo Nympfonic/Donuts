@@ -19,5 +19,6 @@ internal class GameWorldDisposePatch : ModulePatch
 	private static void PatchPostfix()
 	{
 		ActivateBotCallbackWrapper.ActivateBotDelegate = null;
+		BotStandbyTeleportPatch.MethodDelegates.Clear();
 	}
 }

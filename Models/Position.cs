@@ -15,8 +15,15 @@ public class Position
 	[JsonProperty("z")]
 	public float z { get; set; }
 
-	public static implicit operator Vector3(Position p)
+	public Position() {}
+
+	public Position(Vector3 position)
 	{
-		return new Vector3(p.x, p.y, p.z);
+		x = position.x;
+		y = position.y;
+		z = position.z;
 	}
+
+	public static explicit operator Position(Vector3 p) => new(p);
+	public static implicit operator Vector3(Position p) => new(p.x, p.y, p.z);
 }

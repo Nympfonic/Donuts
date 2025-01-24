@@ -27,9 +27,9 @@ public class BotConfigService
 	private string _scenarioSelected;
 	private string _mapLocation;
 	private string _mapName;
-	private AllMapsZoneConfig _allMapsZoneConfig;
-	private StartingBotConfig _startingBotConfig;
-	private BotWavesConfig _botWavesConfig;
+	private AllMapsZoneConfigs _allMapsZoneConfigs;
+	private AllMapsStartingBotConfigs _allMapsStartingBotConfigs;
+	private AllMapsBotWavesConfigs _allMapsBotWavesConfigs;
 	
 	private bool _patternsLoaded;
 
@@ -50,11 +50,11 @@ public class BotConfigService
 	}
 	
 	[CanBeNull]
-	public BotWavesConfig GetBotWavesConfig()
+	public AllMapsBotWavesConfigs GetAllMapsBotWavesConfigs()
 	{
-		if (_botWavesConfig != null)
+		if (_allMapsBotWavesConfigs != null)
 		{
-			return _botWavesConfig;
+			return _allMapsBotWavesConfigs;
 		}
 		
 		string jsonFilePath = Path.Combine(DonutsPlugin.directoryPath, "patterns", _scenarioSelected, $"{_mapName}_waves.json");
@@ -66,7 +66,7 @@ public class BotConfigService
 		}
 
 		string jsonString = File.ReadAllText(jsonFilePath);
-		var botWavesConfig = JsonConvert.DeserializeObject<BotWavesConfig>(jsonString);
+		var botWavesConfig = JsonConvert.DeserializeObject<AllMapsBotWavesConfigs>(jsonString);
 		if (botWavesConfig == null)
 		{
 			_logger.LogError($"Failed to deserialize {_mapName}_waves.json for preset: {_scenarioSelected}");
@@ -76,8 +76,8 @@ public class BotConfigService
 		_logger.LogDebug($"Successfully loaded {_mapName}_waves.json for preset: {_scenarioSelected}");
 #endif
 		botWavesConfig.EnsureUniqueGroupNumForBotWaves();
-		_botWavesConfig = botWavesConfig;
-		return _botWavesConfig;
+		_allMapsBotWavesConfigs = botWavesConfig;
+		return _allMapsBotWavesConfigs;
 	}
 
 	[NotNull]
@@ -123,20 +123,20 @@ public class BotConfigService
 	}
 
 	[CanBeNull]
-	public AllMapsZoneConfig GetAllMapsZoneConfig()
+	public AllMapsZoneConfigs GetAllMapsZoneConfigs()
 	{
-		if (_allMapsZoneConfig == null)
+		if (_allMapsZoneConfigs == null)
 		{
 			string zoneSpawnPointsPath = Path.Combine(DonutsPlugin.directoryPath, "zoneSpawnPoints");
-			AllMapsZoneConfig allMapsZoneConfig = AllMapsZoneConfig.LoadFromDirectory(zoneSpawnPointsPath);
-			if (allMapsZoneConfig == null)
+			AllMapsZoneConfigs allMapsZoneConfigs = AllMapsZoneConfigs.LoadFromDirectory(zoneSpawnPointsPath);
+			if (allMapsZoneConfigs == null)
 			{
 				_logger.NotifyLogError("Donuts: Failed to load AllMapZoneConfig. Donuts will not function properly.");
 				return null;
 			}
-			_allMapsZoneConfig = allMapsZoneConfig;
+			_allMapsZoneConfigs = allMapsZoneConfigs;
 		}
-		return _allMapsZoneConfig;
+		return _allMapsZoneConfigs;
 	}
 	
 	[CanBeNull]
@@ -152,11 +152,11 @@ public class BotConfigService
 	}
 
 	[CanBeNull]
-	public StartingBotConfig GetAllMapsStartingBotConfig()
+	public AllMapsStartingBotConfigs GetAllMapsStartingBotConfigs()
 	{
-		if (_startingBotConfig != null)
+		if (_allMapsStartingBotConfigs != null)
 		{
-			return _startingBotConfig;
+			return _allMapsStartingBotConfigs;
 		}
 		
 		string jsonFilePath = Path.Combine(
@@ -174,8 +174,8 @@ public class BotConfigService
 
 		using var reader = new StreamReader(jsonFilePath);
 		string jsonString = reader.ReadToEnd();
-		_startingBotConfig = JsonConvert.DeserializeObject<StartingBotConfig>(jsonString);
-		return _startingBotConfig;
+		_allMapsStartingBotConfigs = JsonConvert.DeserializeObject<AllMapsStartingBotConfigs>(jsonString);
+		return _allMapsStartingBotConfigs;
 	}
 	
 	public bool CheckForAnyScenarioPatterns()
@@ -264,7 +264,7 @@ public class BotConfigService
 		GetMapLocation();
 		GetMapName();
 		GetSelectedScenario();
-		GetAllMapsStartingBotConfig();
+		GetAllMapsStartingBotConfigs();
 
 		InitializeBotLimits(_scenarioSelected, _mapLocation);
 	}
