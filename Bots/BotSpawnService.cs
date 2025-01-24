@@ -178,8 +178,11 @@ public abstract class BotSpawnService : IBotSpawnService
 #endif
 				return;
 			}
-			
-			TryDespawnBot(furthestBot);
+
+			if (!TryDespawnBot(furthestBot))
+			{
+				return;
+			}
 		}
 	}
 	
@@ -541,17 +544,27 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (ZoneSpawnPoints.IsKeywordZone(waveZones[0], out string keywordZoneName))
 			{
-				AdjustSpawnChanceIfHotspot(wave, keywordZoneName);
-				return await TrySpawnBotIfValidZone(keywordZoneName!, wave, zoneSpawnPoints);
+				AdjustSpawnChanceIfHotspot(wave, keywordZoneName!);
+				return await TrySpawnBotIfValidZone(keywordZoneName, wave, zoneSpawnPoints);
 			}
 			
 			return await TrySpawnBotIfValidZone(waveZones[0], wave, zoneSpawnPoints);
 		}
 		
 		// Iterate through shuffled wave zones, adjust for hotspot zones and attempt spawning
-		foreach (string zoneName in waveZones.ShuffleElements(true))
+		foreach (string zoneName in waveZones.ShuffleElements(createNewList: true))
 		{
-			AdjustSpawnChanceIfHotspot(wave, zoneName);
+			if (ZoneSpawnPoints.IsHotspotZone(zoneName, out string keywordZoneName))
+			{
+				AdjustSpawnChanceIfHotspot(wave, keywordZoneName!);
+				
+				if (await TrySpawnBotIfValidZone(keywordZoneName, wave, zoneSpawnPoints))
+				{
+					return true;
+				}
+				
+				continue;
+			}
 			
 			if (await TrySpawnBotIfValidZone(zoneName, wave, zoneSpawnPoints))
 			{
@@ -595,7 +608,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	/// <summary>
 	/// Sets the bot wave's spawn chance to 100% if the zone is a hotspot.
 	/// </summary>
-	private void AdjustSpawnChanceIfHotspot([NotNull] BotWave wave, string zoneName)
+	private void AdjustSpawnChanceIfHotspot([NotNull] BotWave wave, [NotNull] string zoneName)
 	{
 		if (!IsHotspotBoostEnabled() || !ZoneSpawnPoints.IsHotspotZone(zoneName, out _))
 		{

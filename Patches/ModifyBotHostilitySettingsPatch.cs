@@ -4,6 +4,7 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
 using System;
+using System.Linq;
 using System.Reflection;
 using UnityToolkit.Utils;
 
