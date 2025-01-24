@@ -347,8 +347,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		[NotNull] PrepBotInfo botSpawnInfo)
 	{
 		// Iterate through unused zone spawn points
-		var hasSpawned = false;
-		while (!hasSpawned)
+		var failsafeCounter = 0;
+		while (failsafeCounter < 3)
 		{
 			Vector3? spawnPoint = zoneSpawnPoints.GetUnusedStartingSpawnPoint(out int index);
 			if (!spawnPoint.HasValue) return;
@@ -357,6 +357,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			if (_onDestroyToken.IsCancellationRequested) return;
 			if (!positionOnNavMesh.HasValue)
 			{
+				failsafeCounter++;
 				await UniTask.Delay(_retryInterval, cancellationToken: _onDestroyToken);
 				continue;
 			}
@@ -364,7 +365,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			Vector3 actualSpawnPoint = positionOnNavMesh.Value;
 			ActivateBotAtPosition(botSpawnInfo.Bots, actualSpawnPoint);
 			zoneSpawnPoints.SetStartingSpawnPointAsUsed(index);
-			hasSpawned = true;
+			return;
 		}
 #if DEBUG
 		Logger.LogDebugDetailed("Failed to spawn some starting bots!", GetType().Name, nameof(StartingBotsSpawnPointsCheck));
