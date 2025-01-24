@@ -54,8 +54,6 @@ public class DonutsPlugin : BaseUnityPlugin
 			throw new Exception("Missing Dependencies");
 		}
 
-		DonutsConfiguration.ImportConfig(directoryPath);
-
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
 
@@ -74,6 +72,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	private async UniTaskVoid Start()
 	{
 		await SetupScenariosUI();
+		DonutsConfiguration.ImportConfig(directoryPath);
 		pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
 	}
 
