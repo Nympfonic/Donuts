@@ -2,7 +2,6 @@
 using Donuts.Utils;
 using EFT;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Random = UnityEngine.Random;
 
@@ -11,6 +10,9 @@ namespace Donuts.Bots;
 public class PmcBotDataService : BotDataService
 {
 	public override DonutsSpawnType SpawnType => DonutsSpawnType.Pmc;
+
+	public override StartingBotConfig StartingBotConfig =>
+		startingBotConfig ??= ConfigService.GetAllMapsStartingBotConfigs()!.Maps[ConfigService.GetMapLocation()].Pmc;
 
 	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties { get; } =
 		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value);
@@ -33,9 +35,6 @@ public class PmcBotDataService : BotDataService
 			_ => throw new ArgumentException(
 				"Must provide a PMC WildSpawnType (WildSpawnType.pmcUSEC or WildSpawnType.pmcBEAR).", nameof(spawnType))
 		};
-
-	protected override StartingBotConfig GetStartingBotConfig() =>
-		startingBotConfig ??= ConfigService.GetAllMapsStartingBotConfigs()!.Maps[ConfigService.GetMapLocation()].Pmc;
 
 	public override BotDifficulty GetBotDifficulty() => GetBotDifficulty(DefaultPluginVars.botDifficultiesPMC.Value);
 

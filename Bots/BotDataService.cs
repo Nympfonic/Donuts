@@ -19,6 +19,7 @@ namespace Donuts.Bots;
 
 public interface IBotDataService
 {
+	public StartingBotConfig StartingBotConfig { get; }
 	public List<PrepBotInfo> StartingBotsCache { get; }
 	public ZoneSpawnPoints ZoneSpawnPoints { get; }
 	public DonutsSpawnType SpawnType { get; }
@@ -48,6 +49,7 @@ public abstract class BotDataService : IBotDataService
 	protected abstract string GroupChance { get; }
 	protected abstract ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
+	public abstract StartingBotConfig StartingBotConfig { get; }
 	public List<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
 	public ZoneSpawnPoints ZoneSpawnPoints { get; private set; } = [];
 	public abstract DonutsSpawnType SpawnType { get; }
@@ -231,13 +233,11 @@ public abstract class BotDataService : IBotDataService
 		return service;
 	}
 	
-	protected abstract StartingBotConfig GetStartingBotConfig();
-	
 	private async UniTask SetupInitialBotCache()
 	{
 		try
 		{
-			StartingBotConfig startingBotCfg = GetStartingBotConfig();
+			StartingBotConfig startingBotCfg = StartingBotConfig;
 			int maxBots = BotHelper.GetRandomBotCap(startingBotCfg.MinCount, startingBotCfg.MaxCount, MaxBotLimit);
 #if DEBUG
 			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())

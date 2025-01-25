@@ -167,11 +167,8 @@ internal static class DonutsHelper
 	/// <typeparam name="T">The type the collection stores.</typeparam>
 	/// <returns>A new list with shuffled elements.</returns>
 	[NotNull]
-	internal static List<T> ShuffleElements<T>([NotNull] this IEnumerable<T> source)
-	{
-		return source.ToList().ShuffleElements();
-	}
-	
+	internal static List<T> ShuffleElements<T>([NotNull] this IEnumerable<T> source) => source.ToList().ShuffleElements();
+
 	/// <summary>
 	/// Shuffles elements in the specified list.
 	/// </summary>
@@ -183,13 +180,20 @@ internal static class DonutsHelper
 	internal static List<T> ShuffleElements<T>([NotNull] this List<T> source, bool createNewList = false)
 	{
 		List<T> list = createNewList ? source.ToList() : source;
-		int n = list.Count;
-		while (n > 1)
+		int count = list.Count;
+		
+		if (count == 1)
 		{
-			n--;
-			int k = _random.Next(n + 1);
-			(list[k], list[n]) = (list[n], list[k]);
+			return list;
 		}
+		
+		while (count > 1)
+		{
+			count--;
+			int k = _random.Next(count + 1);
+			(list[k], list[count]) = (list[count], list[k]);
+		}
+		
 		return list;
 	}
 	
@@ -216,11 +220,19 @@ internal static class DonutsHelper
 	internal static T PickRandomElement<T>([NotNull] this IReadOnlyList<T> source, out int index)
 	{
 		int count = source.Count;
+		
 		if (count == 0)
 		{
 			index = -1;
 			return default;
 		}
+
+		if (count == 1)
+		{
+			index = 0;
+			return source[0];
+		}
+		
 		int randomIndex = _random.Next(count);
 		index = randomIndex;
 		return source[randomIndex];

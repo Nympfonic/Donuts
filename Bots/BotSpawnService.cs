@@ -74,12 +74,15 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		List<PrepBotInfo> startingBotsCache = DataService.StartingBotsCache;
 		ZoneSpawnPoints zoneSpawnPoints = DataService.ZoneSpawnPoints;
+		List<string> zoneNames = DataService.StartingBotConfig.Zones;
+		
 		for (int i = startingBotsCache.Count - 1; i >= 0; i--)
 		{
-			PrepBotInfo botSpawnInfo = startingBotsCache[i];
 			if (_onDestroyToken.IsCancellationRequested) return;
+			PrepBotInfo botSpawnInfo = startingBotsCache[i];
 			
-			await StartingBotsSpawnPointsCheck(zoneSpawnPoints, botSpawnInfo);
+			await StartingBotsSpawnPointsCheck(zoneSpawnPoints, botSpawnInfo, zoneNames);
+			
 			// Wait until next frame between spawns to reduce the chances of stalling the game
 			if (i > 0)
 			{
@@ -344,13 +347,15 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	private async UniTask StartingBotsSpawnPointsCheck(
 		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
-		[NotNull] PrepBotInfo botSpawnInfo)
+		[NotNull] PrepBotInfo botSpawnInfo,
+		[CanBeNull] IList<string> zoneNames)
 	{
 		// Iterate through unused zone spawn points
 		var failsafeCounter = 0;
 		while (failsafeCounter < 3)
 		{
-			Vector3? spawnPoint = zoneSpawnPoints.GetUnusedStartingSpawnPoint(out int index);
+			if (_onDestroyToken.IsCancellationRequested) return;
+			Vector3? spawnPoint = zoneSpawnPoints.GetUnusedStartingSpawnPoint(zoneNames, out string zoneName);
 			if (!spawnPoint.HasValue) return;
 			
 			Vector3? positionOnNavMesh = await GetValidSpawnPosition(spawnPoint.Value, _spawnCheckProcessor);
@@ -362,9 +367,8 @@ public abstract class BotSpawnService : IBotSpawnService
 				continue;
 			}
 			
-			Vector3 actualSpawnPoint = positionOnNavMesh.Value;
-			ActivateBotAtPosition(botSpawnInfo.Bots, actualSpawnPoint);
-			zoneSpawnPoints.SetStartingSpawnPointAsUsed(index);
+			ActivateBotAtPosition(botSpawnInfo.Bots, positionOnNavMesh.Value);
+			zoneSpawnPoints.SetStartingSpawnPointAsUsed(zoneName, spawnPoint.Value);
 			return;
 		}
 #if DEBUG
@@ -510,8 +514,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 #if DEBUG
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(TryProcessBotWave);
 #endif
 		ZoneSpawnPoints zoneSpawnPoints = DataService.ZoneSpawnPoints;
 		if (zoneSpawnPoints.Count == 0)
@@ -519,9 +521,9 @@ public abstract class BotSpawnService : IBotSpawnService
 			ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 			sb.Clear();
-			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: {1}", wave.GroupNum.ToString(),
-				"No zone spawn points found");
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
+			sb.AppendFormat("Resetting timer for GroupNum {0}\nReason: {1}", wave.GroupNum.ToString(),
+				"Fatal Error: No zone spawn points were loaded. Check your zoneSpawnPoints folder!");
+			Logger.NotifyLogError(sb.ToString());
 #endif
 			return false;
 		}
@@ -533,44 +535,32 @@ public abstract class BotSpawnService : IBotSpawnService
 			ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 			sb.Clear();
-			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: {1}", wave.GroupNum.ToString(),
-				"No zones specified in bot wave");
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
+			sb.AppendFormat("Resetting timer for GroupNum {0}\nReason: {1}", wave.GroupNum.ToString(),
+				"Fatal Error: No zones specified in bot wave. Check your scenario wave patterns are set up correctly!");
+			Logger.NotifyLogError(sb.ToString());
 #endif
 			return false;
 		}
 		
-		// Only check for keyword zones if there is only a single zone defined in the BotWave
-		if (waveZones.Count == 1)
-		{
-			if (ZoneSpawnPoints.IsKeywordZone(waveZones[0], out string keywordZoneName))
-			{
-				AdjustSpawnChanceIfHotspot(wave, keywordZoneName!);
-				return await TrySpawnBotIfValidZone(keywordZoneName, wave, zoneSpawnPoints);
-			}
-			
-			return await TrySpawnBotIfValidZone(waveZones[0], wave, zoneSpawnPoints);
-		}
-		
-		// Iterate through shuffled wave zones, adjust for hotspot zones and attempt spawning
+		// Iterate through shuffled wave zones, adjust for keyword zones and attempt spawning
 		foreach (string zoneName in waveZones.ShuffleElements(createNewList: true))
 		{
-			if (ZoneSpawnPoints.IsHotspotZone(zoneName, out string keywordZoneName))
+			if (ZoneSpawnPoints.IsKeywordZone(zoneName, out ZoneSpawnPoints.KeywordZoneType keyword))
 			{
-				AdjustSpawnChanceIfHotspot(wave, keywordZoneName!);
-				
-				if (await TrySpawnBotIfValidZone(keywordZoneName, wave, zoneSpawnPoints))
+				if (keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot)
 				{
-					return true;
+					AdjustSpawnChanceIfHotspot(wave, zoneName);
 				}
+				
+				if (await TrySpawnBotIfValidZone(keyword, wave, zoneSpawnPoints)) return true;
+				
+				// If keyword is 'all' and it still failed to spawn, just return false
+				if (keyword == ZoneSpawnPoints.KeywordZoneType.All) return false;
 				
 				continue;
 			}
 			
-			if (await TrySpawnBotIfValidZone(zoneName, wave, zoneSpawnPoints))
-			{
-				return true;
-			}
+			if (await TrySpawnBotIfValidZone(zoneName, wave, zoneSpawnPoints)) return true;
 		}
 		
 		return false;
@@ -601,6 +591,37 @@ public abstract class BotSpawnService : IBotSpawnService
 			}
 		}
 		
+		return false;
+	}
+	
+	private async UniTask<bool> TrySpawnBotIfValidZone(
+		ZoneSpawnPoints.KeywordZoneType keyword,
+		[NotNull] BotWave wave,
+		[NotNull] ZoneSpawnPoints zoneSpawnPoints)
+	{
+		List<KeyValuePair<string, List<Vector3>>> keywordZones = zoneSpawnPoints.GetSpawnPointsFromKeyword(keyword);
+		if (keywordZones.Count == 0)
+		{
+			return false;
+		}
+		
+		KeyValuePair<string, List<Vector3>> pair = keywordZones.PickRandomElement();
+		
+		foreach (Vector3 spawnPoint in pair.Value.ShuffleElements(createNewList: true))
+		{
+			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
+				await TrySpawnBot(wave, spawnPoint))
+			{
+#if DEBUG
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1} (Keyword: {2}), {3}", wave.GroupNum, pair.Key,
+					keyword.ToString(), spawnPoint.ToString());
+				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
+#endif
+				return true;
+			}
+		}
+
 		return false;
 	}
 	
