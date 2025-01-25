@@ -159,7 +159,10 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 		return spawnPoints.PickRandomElement();
 	}
 	
-	public static bool IsKeywordZone([NotNull] string zoneName, out KeywordZoneType keyword)
+	/// <summary>
+	/// Check if the zone name matches the keyword zones Donuts uses (all/start/hotspot).
+	/// </summary>
+	public static bool IsKeywordZone([NotNull] string zoneName, out KeywordZoneType keyword, bool exactMatch = false)
 	{
 		if (zoneName.ToLower() == "all")
 		{
@@ -167,17 +170,18 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 			return true;
 		}
 
-		return IsStartOrHotspotZone(zoneName, out keyword);
+		return IsStartOrHotspotZone(zoneName, out keyword, exactMatch);
 	}
 	
-	public static bool IsStartOrHotspotZone([NotNull] string zoneName, out KeywordZoneType keyword)
+	public static bool IsStartOrHotspotZone([NotNull] string zoneName, out KeywordZoneType keyword, bool exactMatch = false)
 	{
-		return IsStartZone(zoneName, out keyword) || IsHotspotZone(zoneName, out keyword);
+		return IsStartZone(zoneName, out keyword, exactMatch) || IsHotspotZone(zoneName, out keyword, exactMatch);
 	}
 	
-	public static bool IsStartZone([NotNull] string zoneName, out KeywordZoneType keyword)
+	public static bool IsStartZone([NotNull] string zoneName, out KeywordZoneType keyword, bool exactMatch = false)
 	{
-		if (zoneName.IndexOf("start", StringComparison.OrdinalIgnoreCase) >= 0)
+		if ((exactMatch && zoneName.ToLower() == "start") ||
+			(!exactMatch && zoneName.IndexOf("start", StringComparison.OrdinalIgnoreCase) >= 0))
 		{
 			keyword = KeywordZoneType.Start;
 			return true;
@@ -187,9 +191,10 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 		return false;
 	}
 	
-	public static bool IsHotspotZone([NotNull] string zoneName, out KeywordZoneType keyword)
+	public static bool IsHotspotZone([NotNull] string zoneName, out KeywordZoneType keyword, bool exactMatch = false)
 	{
-		if (zoneName.IndexOf("hotspot", StringComparison.OrdinalIgnoreCase) >= 0)
+		if ((exactMatch && zoneName.ToLower() == "hotspot") ||
+			(!exactMatch && zoneName.IndexOf("hotspot", StringComparison.OrdinalIgnoreCase) >= 0))
 		{
 			keyword = KeywordZoneType.Hotspot;
 			return true;

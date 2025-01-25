@@ -545,22 +545,29 @@ public abstract class BotSpawnService : IBotSpawnService
 		// Iterate through shuffled wave zones, adjust for keyword zones and attempt spawning
 		foreach (string zoneName in waveZones.ShuffleElements(createNewList: true))
 		{
-			if (ZoneSpawnPoints.IsKeywordZone(zoneName, out ZoneSpawnPoints.KeywordZoneType keyword))
+			// Instead of loosely matching, we do an exact match so we know if the wave is specifying all hotspots or just a few hotspots
+			if (!ZoneSpawnPoints.IsKeywordZone(zoneName, out ZoneSpawnPoints.KeywordZoneType keyword, exactMatch: true))
 			{
-				if (keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot)
+				bool isHotspot = ZoneSpawnPoints.IsHotspotZone(zoneName, out _);
+				if (isHotspot)
 				{
-					AdjustSpawnChanceIfHotspot(wave, zoneName);
+					AdjustHotspotSpawnChance(wave, zoneName);
 				}
 				
-				if (await TrySpawnBotIfValidZone(keyword, wave, zoneSpawnPoints)) return true;
-				
-				// If keyword is 'all' and it still failed to spawn, just return false
-				if (keyword == ZoneSpawnPoints.KeywordZoneType.All) return false;
+				if (await TrySpawnBotIfValidZone(zoneName, wave, zoneSpawnPoints, isHotspot)) return true;
 				
 				continue;
 			}
 			
-			if (await TrySpawnBotIfValidZone(zoneName, wave, zoneSpawnPoints)) return true;
+			if (keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot)
+			{
+				AdjustHotspotSpawnChance(wave, zoneName);
+			}
+
+			// If we matched a keyword zone and it still failed to spawn, return false
+			// A wave should not contain multiple zones if a keyword is used
+			return await TrySpawnBotIfValidZone(keyword, wave, zoneSpawnPoints,
+				isHotspot: keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot);
 		}
 		
 		return false;
@@ -569,7 +576,8 @@ public abstract class BotSpawnService : IBotSpawnService
 	private async UniTask<bool> TrySpawnBotIfValidZone(
 		[NotNull] string zoneName,
 		[NotNull] BotWave wave,
-		[NotNull] ZoneSpawnPoints zoneSpawnPoints)
+		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
+		bool isHotspot)
 	{
 		if (!zoneSpawnPoints.TryGetValue(zoneName, out List<Vector3> spawnPoints))
 		{
@@ -579,7 +587,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		foreach (Vector3 spawnPoint in spawnPoints.ShuffleElements(createNewList: true))
 		{
 			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
-				await TrySpawnBot(wave, spawnPoint))
+				await TrySpawnBot(wave, spawnPoint, isHotspot))
 			{
 #if DEBUG
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
@@ -597,7 +605,8 @@ public abstract class BotSpawnService : IBotSpawnService
 	private async UniTask<bool> TrySpawnBotIfValidZone(
 		ZoneSpawnPoints.KeywordZoneType keyword,
 		[NotNull] BotWave wave,
-		[NotNull] ZoneSpawnPoints zoneSpawnPoints)
+		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
+		bool isHotspot)
 	{
 		List<KeyValuePair<string, List<Vector3>>> keywordZones = zoneSpawnPoints.GetSpawnPointsFromKeyword(keyword);
 		if (keywordZones.Count == 0)
@@ -610,7 +619,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		foreach (Vector3 spawnPoint in pair.Value.ShuffleElements(createNewList: true))
 		{
 			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
-				await TrySpawnBot(wave, spawnPoint))
+				await TrySpawnBot(wave, spawnPoint, isHotspot))
 			{
 #if DEBUG
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
@@ -628,11 +637,11 @@ public abstract class BotSpawnService : IBotSpawnService
 	protected abstract bool IsHotspotBoostEnabled();
 	
 	/// <summary>
-	/// Sets the bot wave's spawn chance to 100% if the zone is a hotspot.
+	/// Sets the bot wave's spawn chance to 100% if hotspot boost setting is enabled.
 	/// </summary>
-	private void AdjustSpawnChanceIfHotspot([NotNull] BotWave wave, [NotNull] string zoneName)
+	private void AdjustHotspotSpawnChance([NotNull] BotWave wave, [NotNull] string zoneName)
 	{
-		if (!IsHotspotBoostEnabled() || !ZoneSpawnPoints.IsHotspotZone(zoneName, out _))
+		if (!IsHotspotBoostEnabled())
 		{
 			return;
 		}
@@ -641,7 +650,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
 		{
 			sb.AppendFormat("{0} is a hotspot; hotspot boost is enabled, setting spawn chance to 100", zoneName);
-			Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustSpawnChanceIfHotspot));
+			Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustHotspotSpawnChance));
 		}
 #endif
 		wave.SpawnChance = 100;
@@ -669,14 +678,14 @@ public abstract class BotSpawnService : IBotSpawnService
 		return false;
 	}
 	
-	protected abstract bool HasReachedHardCap();
+	protected abstract bool HasReachedHardCap(bool isHotspot);
 	
 	/// <summary>
 	/// Checks certain spawn options, reset groups timers.
 	/// </summary>
-	private async UniTask<bool> TrySpawnBot([NotNull] BotWave wave, Vector3 spawnPoint)
+	private async UniTask<bool> TrySpawnBot([NotNull] BotWave wave, Vector3 spawnPoint, bool isHotspot)
 	{
-		if ((DefaultPluginVars.HardCapEnabled.Value && HasReachedHardCap()) || HasReachedHardStopTime())
+		if ((DefaultPluginVars.HardCapEnabled.Value && HasReachedHardCap(isHotspot)) || HasReachedHardStopTime())
 		{
 			return false;
 		}

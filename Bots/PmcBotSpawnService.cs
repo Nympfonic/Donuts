@@ -10,10 +10,10 @@ public class PmcBotSpawnService : BotSpawnService
 {
 	private ReadOnlyCollection<BotWave> _botWaves;
 	
-	protected override bool HasReachedHardCap()
+	protected override bool HasReachedHardCap(bool isHotspot)
 	{
 		int activeBots = GetAliveBotsCount();
-		if (activeBots < DataService.MaxBotLimit || DefaultPluginVars.hotspotIgnoreHardCapPMC.Value)
+		if (activeBots < DataService.MaxBotLimit || (isHotspot && DefaultPluginVars.hotspotIgnoreHardCapPMC.Value))
 		{
 			return false;
 		}

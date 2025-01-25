@@ -10,10 +10,10 @@ public class ScavBotSpawnService : BotSpawnService
 {
 	private ReadOnlyCollection<BotWave> _botWaves;
 	
-	protected override bool HasReachedHardCap()
+	protected override bool HasReachedHardCap(bool isHotspot)
 	{
 		int activeBots = GetAliveBotsCount();
-		if (activeBots < DataService.MaxBotLimit || DefaultPluginVars.hotspotIgnoreHardCapSCAV.Value)
+		if (activeBots < DataService.MaxBotLimit || (isHotspot && DefaultPluginVars.hotspotIgnoreHardCapSCAV.Value))
 		{
 			return false;
 		}
