@@ -2,7 +2,7 @@ namespace Donuts.Utils.LoggerProcessor;
 
 public class BepInExLoggerProcessor : LoggerProcessorBase
 {
-	public override void Process(LoggerData data)
+	public override bool Process(LoggerData data)
 	{
 		switch (data.logLevel)
 		{
@@ -20,6 +20,6 @@ public class BepInExLoggerProcessor : LoggerProcessorBase
 				break;
 		}
 		
-		base.Process(data);
+		return base.Process(data);
 	}
 }

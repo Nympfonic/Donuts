@@ -243,9 +243,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		_botWaves = GetBotWaves();
 		_botWavesByGroupNum = _botWaves.ToLookup(wave => wave.GroupNum);
 		
-		_spawnCheckProcessor = new EntityVicinitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
-		_spawnCheckProcessor.SetNext(new PlayerLineOfSightSpawnCheckProcessor(_allAlivePlayersReadOnly))
-			.SetNext(new WallSpawnCheckProcessor())
+		_spawnCheckProcessor = new EntitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
+		_spawnCheckProcessor.SetNext(new WallSpawnCheckProcessor())
 			.SetNext(new GroundSpawnCheckProcessor());
 	}
 	

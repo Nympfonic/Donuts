@@ -5,7 +5,7 @@ namespace Donuts.Utils.LoggerProcessor;
 
 public class NotificationLoggerProcessor : LoggerProcessorBase
 {
-	public override void Process(LoggerData data)
+	public override bool Process(LoggerData data)
 	{
 		if (data is NotificationLoggerData notificationData)
 		{
@@ -27,6 +27,6 @@ public class NotificationLoggerProcessor : LoggerProcessorBase
 			data.logSource.LogError(sb.ToString());
 		}
 		
-		base.Process(data);
+		return base.Process(data);
 	}
 }

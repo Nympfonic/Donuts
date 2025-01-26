@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Donuts.Bots.SpawnCheckProcessor;
 
-public class EntityVicinitySpawnCheckProcessor(
+public class EntitySpawnCheckProcessor(
 	[NotNull] string mapLocation,
 	[NotNull] ReadOnlyCollection<Player> alivePlayers) : SpawnCheckProcessorBase
 {
@@ -13,11 +13,6 @@ public class EntityVicinitySpawnCheckProcessor(
 	{
 		bool checkPlayerVicinity = DefaultPluginVars.globalMinSpawnDistanceFromPlayerBool.Value;
 		bool checkBotVicinity = DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsBool.Value;
-		
-		if (!checkPlayerVicinity && !checkBotVicinity)
-		{
-			return base.Process(spawnPoint);
-		}
 		
 		float minDistancePlayer = GetMinDistanceFromPlayer(mapLocation);
 		float minSqrMagnitudePlayer = minDistancePlayer * minDistancePlayer;
@@ -35,8 +30,20 @@ public class EntityVicinitySpawnCheckProcessor(
 			
 			float actualSqrMagnitude = (((IPlayer)player).Position - spawnPoint).sqrMagnitude;
 			
-			if (IsEntityTooClose(player, checkPlayerVicinity, checkBotVicinity, actualSqrMagnitude,
-				minSqrMagnitudePlayer, minSqrMagnitudeBot))
+			// If it's a bot
+			if (player.IsAI)
+			{
+				if (checkBotVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudeBot))
+				{
+					return false;
+				}
+				
+				continue;
+			}
+			
+			// If it's a player
+			if ((checkPlayerVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudePlayer)) ||
+				IsInPlayerLineOfSight(player, spawnPoint))
 			{
 				return false;
 			}
@@ -45,16 +52,19 @@ public class EntityVicinitySpawnCheckProcessor(
 		return base.Process(spawnPoint);
 	}
 	
-	private static bool IsEntityTooClose(
-		[NotNull] Player player,
-		bool checkPlayerVicinity,
-		bool checkBotVicinity,
-		float actualSqrMagnitude,
-		float minSqrMagnitudePlayer,
-		float minSqrMagnitudeBot)
+	private static bool IsEntityTooClose(float actualSqrMagnitude, float minSqrMagnitude)
 	{
-		return (!player.IsAI && checkPlayerVicinity && actualSqrMagnitude < minSqrMagnitudePlayer) ||
-			(player.IsAI && checkBotVicinity && actualSqrMagnitude < minSqrMagnitudeBot);
+		return actualSqrMagnitude < minSqrMagnitude;
+	}
+	
+	private static bool IsInPlayerLineOfSight(Player player, Vector3 spawnPosition)
+	{
+		EnemyPart playerHead = player.MainParts[BodyPartType.head];
+		Vector3 playerHeadDirection = playerHead.Position - spawnPosition;
+		
+		return Physics.Raycast(spawnPosition, playerHeadDirection, out RaycastHit hitInfo,
+				playerHeadDirection.magnitude, LayerMaskClass.HighPolyWithTerrainMask) &&
+			hitInfo.collider == playerHead.Collider.Collider;
 	}
 	
 	private static float GetMinDistanceFromPlayer(string mapLocation) =>
