@@ -243,9 +243,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		_botWaves = GetBotWaves();
 		_botWavesByGroupNum = _botWaves.ToLookup(wave => wave.GroupNum);
 		
-		_spawnCheckProcessor = new PlayerVicinitySpawnCheckProcessor();
-		_spawnCheckProcessor.SetNext(new BotVicinitySpawnCheckProcessor())
-			.SetNext(new PlayerLineOfSightSpawnCheckProcessor())
+		_spawnCheckProcessor = new EntityVicinitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
+		_spawnCheckProcessor.SetNext(new PlayerLineOfSightSpawnCheckProcessor(_allAlivePlayersReadOnly))
 			.SetNext(new WallSpawnCheckProcessor())
 			.SetNext(new GroundSpawnCheckProcessor());
 	}
@@ -781,21 +780,11 @@ public abstract class BotSpawnService : IBotSpawnService
 				return null;
 			}
 			
-			if (!NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
+			if (!NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas) ||
+				(spawnCheckProcessor != null && !spawnCheckProcessor.Process(navHit.position)))
 			{
 				await UniTask.Delay(_retryInterval, cancellationToken: _onDestroyToken);
 				continue;
-			}
-			
-			if (spawnCheckProcessor != null)
-			{
-				var spawnCheckData = new SpawnCheckData(navHit.position, _mapLocation, _allAlivePlayersReadOnly);
-				spawnCheckProcessor.Process(spawnCheckData);
-				if (!spawnCheckData.Success)
-				{
-					await UniTask.Delay(_retryInterval, cancellationToken: _onDestroyToken);
-					continue;
-				}
 			}
 			
 			Vector3 spawnPosition = navHit.position;

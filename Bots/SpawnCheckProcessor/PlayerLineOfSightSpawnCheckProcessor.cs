@@ -1,37 +1,38 @@
 ﻿using EFT;
+using JetBrains.Annotations;
+using System.Collections.ObjectModel;
 using UnityEngine;
 
 namespace Donuts.Bots.SpawnCheckProcessor;
 
-public class PlayerLineOfSightSpawnCheckProcessor : SpawnCheckProcessorBase
+public class PlayerLineOfSightSpawnCheckProcessor(
+	[NotNull] ReadOnlyCollection<Player> alivePlayers) : SpawnCheckProcessorBase
 {
-	public override void Process(SpawnCheckData data)
+	public override bool Process(Vector3 spawnPoint)
 	{
-		for (int i = data.alivePlayers.Count - 1; i >= 0; i--)
+		for (int i = alivePlayers.Count - 1; i >= 0; i--)
 		{
-			Player player = data.alivePlayers[i];
-			if (player == null || player.IsAI || !player.HealthController.IsAlive)
+			Player player = alivePlayers[i];
+			if (player == null || player.IsAI || player.HealthController == null || !player.HealthController.IsAlive)
 			{
 				continue;
 			}
-
+			
 			// If the spawn position is in at least one player's line of sight, cancel the spawn
-			if (IsInPlayerLineOfSight(player, data.position))
+			if (IsInPlayerLineOfSight(player, spawnPoint))
 			{
-				data.Success = false;
-				return;
+				return false;
 			}
 		}
-
-		data.Success = true;
-		base.Process(data);
+		
+		return base.Process(spawnPoint);
 	}
 	
 	private static bool IsInPlayerLineOfSight(Player player, Vector3 spawnPosition)
 	{
 		EnemyPart playerHead = player.MainParts[BodyPartType.head];
 		Vector3 playerHeadDirection = playerHead.Position - spawnPosition;
-
+		
 		return Physics.Raycast(spawnPosition, playerHeadDirection, out RaycastHit hitInfo,
 				playerHeadDirection.magnitude, LayerMaskClass.HighPolyWithTerrainMask) &&
 			hitInfo.collider == playerHead.Collider.Collider;

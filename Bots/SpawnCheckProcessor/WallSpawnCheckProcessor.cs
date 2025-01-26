@@ -8,16 +8,14 @@ public class WallSpawnCheckProcessor : SpawnCheckProcessorBase
 	private readonly Collider[] _spawnCheckColliderBuffer = new Collider[50];
 	private readonly Vector3 _boxCheckScale = Vector3.one;
 	
-	public override void Process(SpawnCheckData data)
+	public override bool Process(Vector3 spawnPoint)
 	{
-		int size = Physics.OverlapBoxNonAlloc(data.position, _boxCheckScale, _spawnCheckColliderBuffer,
+		int size = Physics.OverlapBoxNonAlloc(spawnPoint, _boxCheckScale, _spawnCheckColliderBuffer,
 			Quaternion.identity, LayerMaskClass.LowPolyColliderLayer);
-
+		
 		if (size <= 0)
 		{
-			data.Success = true;
-			base.Process(data);
-			return;
+			return base.Process(spawnPoint);
 		}
 		
 		for (var i = 0; i < size; i++)
@@ -25,19 +23,17 @@ public class WallSpawnCheckProcessor : SpawnCheckProcessorBase
 			Transform currentTransform = _spawnCheckColliderBuffer[i].transform;
 			if (RecursiveFindWallsGameObject(currentTransform))
 			{
-				data.Success = false;
-				return;
+				return false;
 			}
 		}
 		
-		data.Success = true;
-		base.Process(data);
+		return base.Process(spawnPoint);
 	}
-
+	
 	/// <summary>
 	/// Recursively check for "WALLS" string in the game object's name, going upwards to root of hierarchy.
 	/// </summary>
-	private bool RecursiveFindWallsGameObject(Transform transform)
+	private static bool RecursiveFindWallsGameObject(Transform transform)
 	{
 		while (transform != null)
 		{
@@ -45,7 +41,7 @@ public class WallSpawnCheckProcessor : SpawnCheckProcessorBase
 			{
 				return true;
 			}
-
+			
 			transform = transform.parent;
 		}
 		
