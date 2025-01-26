@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using Systems.Effects;
 using UnityEngine;
@@ -40,6 +41,9 @@ public abstract class BotSpawnService : IBotSpawnService
 	private GameWorld _gameWorld;
 	private string _mapLocation;
 	private CancellationToken _onDestroyToken;
+	
+	private List<BotWave> _botWaves;
+	private ILookup<int, BotWave> _botWavesByGroupNum;
 	
 	private SpawnCheckProcessorBase _spawnCheckProcessor;
 	
@@ -91,13 +95,15 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 	}
 	
+	/// <summary>
+	/// Gets a queue of bot waves which meet the time requirement to spawn.
+	/// </summary>
 	[NotNull]
 	public Queue<BotWave> GetBotWavesToSpawn()
 	{
-		ReadOnlyCollection<BotWave> botWaves = GetBotWaves();
-		Queue<BotWave> wavesToSpawn = new(botWaves.Count);
+		Queue<BotWave> wavesToSpawn = new(_botWaves.Count);
 		
-		foreach (BotWave wave in botWaves)
+		foreach (BotWave wave in _botWaves.ShuffleElements(createNewList: true))
 		{
 			if (wave.ShouldSpawn())
 			{
@@ -234,6 +240,9 @@ public abstract class BotSpawnService : IBotSpawnService
 			return;
 		}
 		
+		_botWaves = GetBotWaves();
+		_botWavesByGroupNum = _botWaves.ToLookup(wave => wave.GroupNum);
+		
 		_spawnCheckProcessor = new PlayerVicinitySpawnCheckProcessor();
 		_spawnCheckProcessor.SetNext(new BotVicinitySpawnCheckProcessor())
 			.SetNext(new PlayerLineOfSightSpawnCheckProcessor())
@@ -282,12 +291,18 @@ public abstract class BotSpawnService : IBotSpawnService
 		return raidTimeLeftPercent <= hardStopPercent;
 	}
 	
-	protected abstract ReadOnlyCollection<BotWave> GetBotWaves();
+	/// <summary>
+	/// Should only be used in <see cref="Initialize"/> to initialize <see cref="_botWaves"/>.
+	/// </summary>
+	protected abstract List<BotWave> GetBotWaves();
 	
+	/// <summary>
+	/// Updates all bot wave timers, incrementing by the delta time.
+	/// </summary>
 	private void UpdateBotWaveTimers(float deltaTime)
 	{
 		float cooldownDuration = DefaultPluginVars.coolDownTimer.Value;
-		foreach (BotWave wave in GetBotWaves())
+		foreach (BotWave wave in _botWaves)
 		{
 			wave.UpdateTimer(deltaTime, cooldownDuration);
 		}
@@ -298,12 +313,9 @@ public abstract class BotSpawnService : IBotSpawnService
 	/// </summary>
 	private void ResetGroupTimers(int groupNum)
 	{
-		foreach (BotWave wave in GetBotWaves())
+		foreach (BotWave wave in _botWavesByGroupNum[groupNum])
 		{
-			if (wave.GroupNum == groupNum)
-			{
-				wave.ResetTimer();
-			}
+			wave.ResetTimer();
 		}
 	}
 	

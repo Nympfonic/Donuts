@@ -2,14 +2,12 @@
 using Donuts.Models;
 using Donuts.Utils;
 using EFT;
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 
 namespace Donuts.Bots;
 
 public class ScavBotSpawnService : BotSpawnService
 {
-	private ReadOnlyCollection<BotWave> _botWaves;
-	
 	protected override bool HasReachedHardCap(bool isHotspot)
 	{
 		int activeBots = GetAliveBotsCount();
@@ -38,7 +36,7 @@ public class ScavBotSpawnService : BotSpawnService
 		return BotHelper.GetBotGroupSize(DefaultPluginVars.scavGroupChance.Value, minGroupSize, maxGroupSize);
 	}
 	
-	protected override ReadOnlyCollection<BotWave> GetBotWaves() => _botWaves ??= MapBotWaves.Scav.AsReadOnly();
+	protected override List<BotWave> GetBotWaves() => MapBotWaves.Scav;
 	protected override int GetAliveBotsCount() => ConfigService.CalculateAliveBotsCount(IsScav);
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsScav(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledSCAV.Value;

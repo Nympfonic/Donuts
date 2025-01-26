@@ -192,7 +192,7 @@ public abstract class BotDataService : IBotDataService
 				botInfo.Bots = null;
 #if DEBUG
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Cleared cached bot info for bot type: {0}", SpawnType.ToString());
+				sb.AppendFormat("Scheduled clearing cached bot info for bot type: {0}", SpawnType.ToString());
 				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ScheduleForClearBotData));
 #endif
 				return;
