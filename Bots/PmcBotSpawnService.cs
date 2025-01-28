@@ -36,7 +36,6 @@ public class PmcBotSpawnService : BotSpawnService
 		return BotHelper.GetBotGroupSize(DefaultPluginVars.pmcGroupChance.Value, minGroupSize, maxGroupSize);
 	}
 	
-	protected override List<BotWave> GetBotWaves() => MapBotWaves.Pmc;
 	protected override int GetAliveBotsCount() => ConfigService.CalculateAliveBotsCount(IsPmc);
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsPmc(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledPMC.Value;

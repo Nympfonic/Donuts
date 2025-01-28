@@ -140,14 +140,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
 		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
-		foreach (Player player in BotConfigService.GetHumanPlayerList())
-		{
-			if (player.OrNull()?.HealthController?.IsAlive == true)
-			{
-				player.BeingHitAction += TakingDamageCombatCooldown;
-				player.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
-			}
-		}
+		_gameWorld.OnPersonAdd += SubscribeHumanPlayerEventHandlers;
 		
 		await Initialize();
 	}
@@ -159,9 +152,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 		if (!_hasSpawnedStartingBots) return;
 		
-		foreach (IBotSpawnService spawnService in BotSpawnServices.Values)
+		foreach (IBotDataService dataService in BotDataServices.Values)
 		{
-			spawnService.FrameUpdate(deltaTime);
+			dataService.UpdateBotWaveTimers(deltaTime);
 		}
 	}
 	
@@ -173,6 +166,11 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	public override void OnDestroy()
 	{
 		_donutsGizmos?.Dispose();
+		
+		if (_gameWorld != null)
+		{
+			_gameWorld.OnPersonAdd -= SubscribeHumanPlayerEventHandlers;
+		}
 		
 		if (_eftBotSpawner != null)
 		{
@@ -337,26 +335,25 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		{
 			_isSpawnProcessOngoing = true;
 			
-			List<IBotSpawnService> spawnServices = BotSpawnServices.Values.ShuffleElements();
-			foreach (IBotSpawnService service in spawnServices)
+			// Despawn excess bots
+			foreach (IBotSpawnService service in BotSpawnServices.Values.ShuffleElements())
 			{
 				service.DespawnExcessBots();
+			}
+			
+			// Preparation for bot wave spawning
+			foreach (IBotDataService dataService in BotDataServices.Values.ShuffleElements())
+			{
+				IBotSpawnService spawnService = BotSpawnServices[dataService.SpawnType];
 				
-				// Preparation for bot wave spawning
-				if (!_botWavesToSpawn.ContainsKey(service))
+				if (!_botWavesToSpawn.ContainsKey(spawnService))
 				{
-					_botWavesToSpawn.Add(service, service.GetBotWavesToSpawn());
+					_botWavesToSpawn.Add(spawnService, dataService.GetBotWavesToSpawn());
 				}
 			}
 			
 			// Spawn all queued bot waves
 			bool anySpawned = await SpawnBotWaves();
-			
-			// Clear all used bot data
-			foreach (IBotDataService service in BotDataServices.Values)
-			{
-				service.ClearBotData();
-			}
 			
 			if (!anySpawned)
 			{
@@ -478,6 +475,17 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 					service.RestartPlayerHitTimer();
 				}
 				break;
+		}
+	}
+	
+	private static void SubscribeHumanPlayerEventHandlers(IPlayer player)
+	{
+		var humanPlayer = (Player)player;
+		
+		if (humanPlayer && !humanPlayer.IsAI && humanPlayer.HealthController?.IsAlive == true)
+		{
+			humanPlayer.BeingHitAction += TakingDamageCombatCooldown;
+			humanPlayer.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
 		}
 	}
 	

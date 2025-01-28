@@ -36,7 +36,6 @@ public class ScavBotSpawnService : BotSpawnService
 		return BotHelper.GetBotGroupSize(DefaultPluginVars.scavGroupChance.Value, minGroupSize, maxGroupSize);
 	}
 	
-	protected override List<BotWave> GetBotWaves() => MapBotWaves.Scav;
 	protected override int GetAliveBotsCount() => ConfigService.CalculateAliveBotsCount(IsScav);
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsScav(role);
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledSCAV.Value;

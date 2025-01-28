@@ -22,7 +22,7 @@ namespace Donuts;
 [BepInPlugin("com.dvize.Donuts", "Donuts", "2.0.0")]
 [BepInDependency("com.SPT.core", "3.10.0")]
 [BepInDependency("xyz.drakia.waypoints")]
-[BepInDependency("com.Arys.UnityToolkit", "1.1.0")]
+[BepInDependency("com.Arys.UnityToolkit", "1.2.0")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
 {

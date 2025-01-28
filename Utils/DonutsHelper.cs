@@ -135,32 +135,6 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
-	/// Adds a range of data from an input list to target dictionary at the specified key.
-	/// <p>If key is already initialized, the new data is appended to the end of the key's list.</p>
-	/// </summary>
-	/// <param name="source">The target dictionary.</param>
-	/// <param name="key">The key to append data to.</param>
-	/// <param name="values">The range of data to append.</param>
-	/// <typeparam name="TKey">The type of the key in the dictionary.</typeparam>
-	/// <typeparam name="TValue">The type of list.</typeparam>
-	internal static void AddRangeToKey<TKey, TValue>(
-		this IDictionary<TKey, List<TValue>> source,
-		TKey key,
-		List<TValue> values)
-	where TKey : notnull
-	where TValue : notnull
-	{
-		if (source.ContainsKey(key))
-		{
-			source[key].AddRange(values);
-		}
-		else
-		{
-			source.Add(key, values);
-		}
-	}
-	
-	/// <summary>
 	/// Creates a list from the specified collection and performs the shuffle on the new list.
 	/// </summary>
 	/// <param name="source">The collection to shuffle.</param>

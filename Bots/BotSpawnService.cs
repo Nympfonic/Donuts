@@ -12,7 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Linq;
 using System.Threading;
 using Systems.Effects;
 using UnityEngine;
@@ -23,9 +22,7 @@ namespace Donuts.Bots;
 
 public interface IBotSpawnService
 {
-	void FrameUpdate(float deltaTime);
 	UniTask SpawnStartingBots();
-	Queue<BotWave> GetBotWavesToSpawn();
 	UniTask<bool> TrySpawnBotWave(BotWave wave);
 	void DespawnExcessBots();
 	void RestartPlayerHitTimer();
@@ -42,9 +39,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	private string _mapLocation;
 	private CancellationToken _onDestroyToken;
 	
-	private List<BotWave> _botWaves;
-	private ILookup<int, BotWave> _botWavesByGroupNum;
-	
 	private SpawnCheckProcessorBase _spawnCheckProcessor;
 	
 	// Spawn caps
@@ -56,17 +50,48 @@ public abstract class BotSpawnService : IBotSpawnService
 	// Combat state
 	private float _timeSinceLastHit;
 
-	private readonly TimeSpan _retryInterval = TimeSpan.FromMilliseconds(100);
+	private readonly TimeSpan _retryInterval = TimeSpan.FromMilliseconds(500);
 	
 	protected BotConfigService ConfigService { get; private set; }
 	protected IBotDataService DataService { get; private set; }
 	protected ManualLogSource Logger { get; private set; }
-	protected MapBotWaves MapBotWaves { get; private set; }
 	
-	public void FrameUpdate(float deltaTime)
+	public static TBotSpawnService Create<TBotSpawnService>(
+		[NotNull] BotConfigService configService,
+		[NotNull] IBotDataService dataService,
+		[NotNull] BotSpawner eftBotSpawner,
+		[NotNull] ManualLogSource logger,
+		CancellationToken cancellationToken = default)
+		where TBotSpawnService : BotSpawnService, new()
 	{
-		_timeSinceLastHit += deltaTime;
-		UpdateBotWaveTimers(deltaTime);
+		var service = new TBotSpawnService();
+		service.Initialize(configService, dataService, eftBotSpawner, logger, cancellationToken);
+		MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotSpawnServices.Add(dataService.SpawnType, service);
+		return service;
+	}
+	
+	private void Initialize(
+		[NotNull] BotConfigService configService,
+		[NotNull] IBotDataService dataService,
+		[NotNull] BotSpawner eftBotSpawner,
+		[NotNull] ManualLogSource logger,
+		CancellationToken cancellationToken)
+	{
+		ConfigService = configService;
+		DataService = dataService;
+		_eftBotSpawner = eftBotSpawner;
+		Logger = logger;
+		_onDestroyToken = cancellationToken;
+		
+		_gameWorld = Singleton<GameWorld>.Instance;
+		_allAlivePlayersReadOnly = _gameWorld.AllAlivePlayersList.AsReadOnly();
+		_mapLocation = ConfigService.GetMapLocation();
+		_botsController = Singleton<IBotGame>.Instance.BotsController;
+		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
+		
+		_spawnCheckProcessor = new EntitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
+		_spawnCheckProcessor.SetNext(new WallSpawnCheckProcessor())
+			.SetNext(new GroundSpawnCheckProcessor());
 	}
 	
 	public void RestartPlayerHitTimer()
@@ -76,42 +101,24 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	public async UniTask SpawnStartingBots()
 	{
-		List<PrepBotInfo> startingBotsCache = DataService.StartingBotsCache;
+		Queue<PrepBotInfo> startingBotsCache = DataService.StartingBotsCache;
 		ZoneSpawnPoints zoneSpawnPoints = DataService.ZoneSpawnPoints;
 		List<string> zoneNames = DataService.StartingBotConfig.Zones;
-		
-		for (int i = startingBotsCache.Count - 1; i >= 0; i--)
+
+		int count = startingBotsCache.Count;
+		while (count > 0 && !_onDestroyToken.IsCancellationRequested)
 		{
-			if (_onDestroyToken.IsCancellationRequested) return;
-			PrepBotInfo botSpawnInfo = startingBotsCache[i];
+			PrepBotInfo botSpawnInfo = startingBotsCache.Dequeue();
+			count--;
 			
 			await StartingBotsSpawnPointsCheck(zoneSpawnPoints, botSpawnInfo, zoneNames);
 			
 			// Wait until next frame between spawns to reduce the chances of stalling the game
-			if (i > 0)
+			if (count > 0)
 			{
 				await UniTask.Yield(cancellationToken: _onDestroyToken);
 			}
 		}
-	}
-	
-	/// <summary>
-	/// Gets a queue of bot waves which meet the time requirement to spawn.
-	/// </summary>
-	[NotNull]
-	public Queue<BotWave> GetBotWavesToSpawn()
-	{
-		Queue<BotWave> wavesToSpawn = new(_botWaves.Count);
-		
-		foreach (BotWave wave in _botWaves.ShuffleElements(createNewList: true))
-		{
-			if (wave.ShouldSpawn())
-			{
-				wavesToSpawn.Enqueue(wave);
-			}
-		}
-		
-		return wavesToSpawn;
 	}
 	
 	public async UniTask<bool> TrySpawnBotWave(BotWave wave)
@@ -124,7 +131,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		if (IsHumanPlayerInCombat())
 		{
-			ResetGroupTimers(wave.GroupNum);
+			DataService.ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 			sb.Clear();
 			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: {1}", wave.GroupNum.ToString(),
@@ -136,7 +143,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		bool anySpawned = IsSpawnChanceSuccessful(wave.SpawnChance) && await TryProcessBotWave(wave);
 		
-		ResetGroupTimers(wave.GroupNum);
+		DataService.ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 		sb.Clear();
 		sb.AppendFormat("Resetting timer for GroupNum {0}, reason: {1}", wave.GroupNum.ToString(), "Bot wave spawn triggered");
@@ -195,59 +202,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 	}
 	
-	public static TBotSpawnService Create<TBotSpawnService>(
-		[NotNull] BotConfigService configService,
-		[NotNull] IBotDataService dataService,
-		[NotNull] BotSpawner eftBotSpawner,
-		[NotNull] ManualLogSource logger,
-		CancellationToken cancellationToken = default)
-	where TBotSpawnService : BotSpawnService, new()
-	{
-		var service = new TBotSpawnService();
-		service.Initialize(configService, dataService, eftBotSpawner, logger, cancellationToken);
-		MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotSpawnServices.Add(dataService.SpawnType, service);
-		return service;
-	}
-	
-	private void Initialize(
-		[NotNull] BotConfigService configService,
-		[NotNull] IBotDataService dataService,
-		[NotNull] BotSpawner eftBotSpawner,
-		[NotNull] ManualLogSource logger,
-		CancellationToken cancellationToken)
-	{
-		ConfigService = configService;
-		DataService = dataService;
-		_eftBotSpawner = eftBotSpawner;
-		Logger = logger;
-		_onDestroyToken = cancellationToken;
-		
-		_gameWorld = Singleton<GameWorld>.Instance;
-		_allAlivePlayersReadOnly = _gameWorld.AllAlivePlayersList.AsReadOnly();
-		_mapLocation = ConfigService.GetMapLocation();
-		_botsController = Singleton<IBotGame>.Instance.BotsController;
-		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
-		
-		if (!ConfigService.CheckForAnyScenarioPatterns())
-		{
-			return;
-		}
-		
-		MapBotWaves = ConfigService.GetAllMapsBotWavesConfigs()?.Maps[_mapLocation];
-		if (MapBotWaves == null)
-		{
-			Logger.NotifyLogError("Donuts: Failed to load bot waves. Donuts will not function properly.");
-			return;
-		}
-		
-		_botWaves = GetBotWaves();
-		_botWavesByGroupNum = _botWaves.ToLookup(wave => wave.GroupNum);
-		
-		_spawnCheckProcessor = new EntitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
-		_spawnCheckProcessor.SetNext(new WallSpawnCheckProcessor())
-			.SetNext(new GroundSpawnCheckProcessor());
-	}
-	
 	protected abstract bool IsHardStopEnabled();
 	protected abstract int GetHardStopTime();
 	
@@ -289,34 +243,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		return raidTimeLeftPercent <= hardStopPercent;
 	}
 	
-	/// <summary>
-	/// Should only be used in <see cref="Initialize"/> to initialize <see cref="_botWaves"/>.
-	/// </summary>
-	protected abstract List<BotWave> GetBotWaves();
-	
-	/// <summary>
-	/// Updates all bot wave timers, incrementing by the delta time.
-	/// </summary>
-	private void UpdateBotWaveTimers(float deltaTime)
-	{
-		float cooldownDuration = DefaultPluginVars.coolDownTimer.Value;
-		foreach (BotWave wave in _botWaves)
-		{
-			wave.UpdateTimer(deltaTime, cooldownDuration);
-		}
-	}
-	
-	/// <summary>
-	/// Resets timers for every wave sharing the same group number.
-	/// </summary>
-	private void ResetGroupTimers(int groupNum)
-	{
-		foreach (BotWave wave in _botWavesByGroupNum[groupNum])
-		{
-			wave.ResetTimer();
-		}
-	}
-	
 	[CanBeNull]
 	private AICorePoint GetClosestCorePoint(Vector3 position) =>
 		_botsController.CoversData.GetClosest(position)?.CorePointInGame;
@@ -351,14 +277,13 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		// shallBeGroup doesn't matter at this stage, it only matters in the callback action
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
-		DataService.ScheduleForClearBotData(botData);
 		MonoBehaviourSingleton<DonutsRaidManager>.Instance.UpdateReplenishBotDataTime();
 	}
 	
 	private async UniTask StartingBotsSpawnPointsCheck(
 		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
 		[NotNull] PrepBotInfo botSpawnInfo,
-		[CanBeNull] IList<string> zoneNames)
+		[NotNull] IList<string> zoneNames)
 	{
 		// Iterate through unused zone spawn points
 		var failsafeCounter = 0;
@@ -377,7 +302,7 @@ public abstract class BotSpawnService : IBotSpawnService
 				continue;
 			}
 			
-			ActivateBotAtPosition(botSpawnInfo.Bots, positionOnNavMesh.Value);
+			ActivateBotAtPosition(botSpawnInfo.botCreationData, positionOnNavMesh.Value);
 			zoneSpawnPoints.SetStartingSpawnPointAsUsed(zoneName, spawnPoint.Value);
 			return;
 		}
@@ -528,7 +453,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		ZoneSpawnPoints zoneSpawnPoints = DataService.ZoneSpawnPoints;
 		if (zoneSpawnPoints.Count == 0)
 		{
-			ResetGroupTimers(wave.GroupNum);
+			DataService.ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 			sb.Clear();
 			sb.AppendFormat("Resetting timer for GroupNum {0}\nReason: {1}", wave.GroupNum.ToString(),
@@ -542,7 +467,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		if (waveZones.Count == 0)
 		{
-			ResetGroupTimers(wave.GroupNum);
+			DataService.ResetGroupTimers(wave.GroupNum);
 #if DEBUG
 			sb.Clear();
 			sb.AppendFormat("Resetting timer for GroupNum {0}\nReason: {1}", wave.GroupNum.ToString(),
@@ -706,7 +631,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 		
-		if (await SpawnBot(groupSize, spawnPoint))
+		if (await SpawnBot(groupSize, spawnPoint, spawnCheckProcessor: _spawnCheckProcessor))
 		{
 			wave.SpawnTriggered();
 		}
@@ -725,10 +650,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		string typeName = GetType().Name;
 		const string methodName = nameof(SpawnBot);
 #endif
-		bool isGroup = groupSize > 1;
-		BotDifficulty botDifficulty = DataService.GetBotDifficulty();
-		BotCreationDataClass cachedBotData = DataService.FindCachedBotData(botDifficulty, groupSize);
-		if (generateNew && cachedBotData == null)
+		BotDifficulty difficulty = DataService.GetBotDifficulty();
+		PrepBotInfo cachedPrepBotInfo = DataService.FindCachedBotData(difficulty, groupSize);
+		if (generateNew && cachedPrepBotInfo?.botCreationData == null)
 		{
 #if DEBUG
 			sb.Clear();
@@ -736,18 +660,11 @@ public abstract class BotSpawnService : IBotSpawnService
 				groupSize.ToString());
 			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
 #endif
-			var botInfo = new PrepBotInfo(botDifficulty, isGroup, groupSize);
-			(bool success, cachedBotData) = await DataService.TryCreateBotData(botInfo);
-			if (_onDestroyToken.IsCancellationRequested || !success)
-			{
-				return false;
-			}
+			(bool success, cachedPrepBotInfo) = await DataService.TryCreateBotData(difficulty, groupSize);
+			if (_onDestroyToken.IsCancellationRequested || !success) return false;
 		}
 		
-		if (cachedBotData == null)
-		{
-			return false;
-		}
+		if (cachedPrepBotInfo?.botCreationData == null) return false;
 		
 #if DEBUG
 		Logger.LogDebugDetailed("Found grouped cached bots, spawning them.", typeName, methodName);
@@ -757,7 +674,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		if (spawnPosition.HasValue)
 		{
-			ActivateBotAtPosition(cachedBotData, spawnPosition.Value);
+			ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value);
+			DataService.RemoveFromBotCache(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize));
 			return true;
 		}
 		

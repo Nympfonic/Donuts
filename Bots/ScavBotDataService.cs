@@ -1,6 +1,7 @@
 ﻿using Donuts.Models;
 using Donuts.Utils;
 using EFT;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace Donuts.Bots;
@@ -17,6 +18,7 @@ public class ScavBotDataService : BotDataService
 
 	protected override string GroupChance => DefaultPluginVars.scavGroupChance.Value;
 	
+	protected override List<BotWave> GetBotWaves() => MapBotWaves.Scav;
 	protected override WildSpawnType GetWildSpawnType() => WildSpawnType.assault;
 	protected override EPlayerSide GetPlayerSide(WildSpawnType spawnType) => EPlayerSide.Savage;
 

@@ -1,19 +1,20 @@
-﻿using Newtonsoft.Json;
+﻿using Cysharp.Text;
+using Donuts.Utils;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using UnityEngine;
 
 namespace Donuts.Models;
 
-[JsonObject]
 public class AllMapsZoneConfigs
 {
-	[JsonProperty("Maps")]
-	public Dictionary<string, MapZoneConfig> Maps { get; set; } = [];
+	public Dictionary<string, MapZoneConfig> Maps { get; } = [];
 	
 	public static AllMapsZoneConfigs LoadFromDirectory(string directoryPath)
 	{
-		var allMapsConfig = new AllMapsZoneConfigs();
+		var allMapsConfigs = new AllMapsZoneConfigs();
 		string[] files = Directory.GetFiles(directoryPath, "*.json");
 		
 		foreach (string file in files)
@@ -21,37 +22,28 @@ public class AllMapsZoneConfigs
 			string json = File.ReadAllText(file);
 			var mapConfig = JsonConvert.DeserializeObject<MapZoneConfig>(json);
 			if (mapConfig == null) continue;
-			
-			InitializeMapConfig(allMapsConfig, mapConfig);
-		}
-		
-		return allMapsConfig;
-	}
-	
-	/// <summary>
-	/// Adds a MapZoneConfig's list of zones and spawn points into the AllMapsZoneConfigs.Maps dictionary.
-	/// </summary>
-	/// <param name="allMapsConfigs">The target config to insert new data into.</param>
-	/// <param name="mapConfig">The input config to insert its data into the target config.</param>
-	/// <remarks>If a map/zone already exists, the new data is appended instead of overwriting the existing data.</remarks>
-	private static void InitializeMapConfig(AllMapsZoneConfigs allMapsConfigs, MapZoneConfig mapConfig)
-	{
-		string mapName = mapConfig.MapName;
-		if (!allMapsConfigs.Maps.TryGetValue(mapName, out MapZoneConfig map))
-		{
-			allMapsConfigs.Maps.Add(mapName, mapConfig);
-			return;
-		}
-		
-		foreach (KeyValuePair<string, List<Vector3>> zone in mapConfig.Zones)
-		{
-			ZoneSpawnPoints targetZonesDict = map.Zones;
-			if (!targetZonesDict.ContainsKey(zone.Key))
+
+			string mapName = mapConfig.MapName.ToLower();
+			if (!allMapsConfigs.Maps.ContainsKey(mapName))
 			{
-				targetZonesDict[zone.Key] = [];
+				allMapsConfigs.Maps[mapName] = mapConfig;
+				continue;
 			}
-			targetZonesDict[zone.Key].AddRange(zone.Value);
+			
+			allMapsConfigs.Maps[mapName].AppendZones(mapConfig);
 		}
+
+		var sb = new StringBuilder();
+		sb.AppendLine("allMapsConfigs.Maps[\"bigmap\"].Zones");
+		foreach (string zoneName in allMapsConfigs.Maps["bigmap"].Zones.Keys)
+		{
+			sb.Append(zoneName);
+			sb.Append(", ");
+		}
+		sb.AppendLine();
+		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(AllMapsZoneConfigs), nameof(LoadFromDirectory));
+		
+		return allMapsConfigs;
 	}
 }
 
@@ -62,6 +54,16 @@ public class MapZoneConfig
 	public string MapName { get; set; }
 	
 	[JsonProperty("Zones")]
-	[JsonConverter(typeof(ZoneSpawnPointsConverter))]
+	[JsonConverter(typeof(ZoneSpawnPoints.JsonConverter))]
 	public ZoneSpawnPoints Zones { get; set; }
+	
+	public void AppendZones(MapZoneConfig other)
+	{
+		if (Zones == null || other?.Zones == null) return;
+		
+		foreach ((string zoneName, List<Vector3> spawnPoints) in other.Zones)
+		{
+			Zones.AppendSpawnPoints(zoneName, spawnPoints);
+		}
+	}
 }

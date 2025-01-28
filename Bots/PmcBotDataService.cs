@@ -2,6 +2,7 @@
 using Donuts.Utils;
 using EFT;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Random = UnityEngine.Random;
 
@@ -18,7 +19,9 @@ public class PmcBotDataService : BotDataService
 		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value);
 
 	protected override string GroupChance => DefaultPluginVars.pmcGroupChance.Value;
-
+	
+	protected override List<BotWave> GetBotWaves() => MapBotWaves.Pmc;
+	
 	protected override WildSpawnType GetWildSpawnType() =>
 		DefaultPluginVars.pmcFaction.Value switch
 		{
