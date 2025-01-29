@@ -143,12 +143,6 @@ public abstract class BotDataService : IBotDataService
 		}
 		
 		_botWaves = GetBotWaves();
-		if (_botWaves.Count == 0)
-		{
-			Logger.NotifyLogError("Donuts: No bot waves found in the config. Donuts will not function properly.");
-			return;
-		}
-		
 		_botWavesByGroupNum = _botWaves.ToLookup(wave => wave.GroupNum);
 		_waveGroupSize = GetWaveMinMaxGroupSize();
 	}
@@ -368,6 +362,11 @@ public abstract class BotDataService : IBotDataService
 	public Queue<BotWave> GetBotWavesToSpawn()
 	{
 		Queue<BotWave> wavesToSpawn = new(_botWaves.Count);
+		
+		if (_botWaves.Count == 0)
+		{
+			return wavesToSpawn;
+		}
 		
 		foreach (BotWave wave in _botWaves.ShuffleElements(createNewList: true))
 		{
