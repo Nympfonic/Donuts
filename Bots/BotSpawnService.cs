@@ -16,6 +16,7 @@ using System.Threading;
 using Systems.Effects;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityToolkit.Structures.EventBus;
 using Random = UnityEngine.Random;
 
 namespace Donuts.Bots;
@@ -24,12 +25,13 @@ public interface IBotSpawnService
 {
 	UniTask SpawnStartingBots();
 	UniTask<bool> TrySpawnBotWave(BotWave wave);
-	void DespawnExcessBots();
-	void RestartPlayerHitTimer();
+	UniTask DespawnExcessBots();
 }
 
 public abstract class BotSpawnService : IBotSpawnService
 {
+	public readonly struct ResetPlayerCombatTimerEvent : IEvent;
+	
 	private ReadOnlyCollection<Player> _allAlivePlayersReadOnly;
 	private IBotCreator _botCreator;
 	private BotsController _botsController;
@@ -48,9 +50,11 @@ public abstract class BotSpawnService : IBotSpawnService
 	private float _despawnCooldownTime;
 	
 	// Combat state
-	private float _timeSinceLastHit;
-
+	private EventBinding<ResetPlayerCombatTimerEvent> _resetPlayerCombatTimerBinding;
+	private float _playerInCombatPrevTime;
+	
 	private readonly TimeSpan _retryInterval = TimeSpan.FromMilliseconds(500);
+	private const int FRAME_DELAY_BETWEEN_SPAWNS = 5;
 	
 	protected BotConfigService ConfigService { get; private set; }
 	protected IBotDataService DataService { get; private set; }
@@ -89,14 +93,17 @@ public abstract class BotSpawnService : IBotSpawnService
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
 		
+		_resetPlayerCombatTimerBinding = new EventBinding<ResetPlayerCombatTimerEvent>(ResetPlayerCombatTimer);
+		EventBus<ResetPlayerCombatTimerEvent>.Register(_resetPlayerCombatTimerBinding);
+		
 		_spawnCheckProcessor = new EntitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
 		_spawnCheckProcessor.SetNext(new WallSpawnCheckProcessor())
 			.SetNext(new GroundSpawnCheckProcessor());
 	}
 	
-	public void RestartPlayerHitTimer()
+	private void ResetPlayerCombatTimer()
 	{
-		_timeSinceLastHit = 0;
+		_playerInCombatPrevTime = Time.time;
 	}
 	
 	public async UniTask SpawnStartingBots()
@@ -116,7 +123,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			// Wait until next frame between spawns to reduce the chances of stalling the game
 			if (count > 0)
 			{
-				await UniTask.Yield(cancellationToken: _onDestroyToken);
+				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_SPAWNS, cancellationToken: _onDestroyToken);
 			}
 		}
 	}
@@ -152,7 +159,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		return anySpawned;
 	}
 	
-	public void DespawnExcessBots()
+	public async UniTask DespawnExcessBots()
 	{
 #if DEBUG
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
@@ -198,6 +205,11 @@ public abstract class BotSpawnService : IBotSpawnService
 			if (!TryDespawnBot(furthestBot))
 			{
 				return;
+			}
+
+			if (i < excessBots - 1)
+			{
+				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_SPAWNS, cancellationToken: _onDestroyToken);
 			}
 		}
 	}
@@ -277,7 +289,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		// shallBeGroup doesn't matter at this stage, it only matters in the callback action
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
-		MonoBehaviourSingleton<DonutsRaidManager>.Instance.UpdateReplenishBotDataTime();
+		EventBus<BotDataService.ResetReplenishTimerEvent>.Raise(new BotDataService.ResetReplenishTimerEvent());
 	}
 	
 	private async UniTask StartingBotsSpawnPointsCheck(
@@ -429,7 +441,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	private bool IsHumanPlayerInCombat()
 	{
-		return _timeSinceLastHit < DefaultPluginVars.battleStateCoolDown.Value;
+		return Time.time - _playerInCombatPrevTime < DefaultPluginVars.battleStateCoolDown.Value;
 	}
 	
 	private bool IsSpawnChanceSuccessful(int spawnChance)

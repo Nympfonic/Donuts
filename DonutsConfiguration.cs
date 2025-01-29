@@ -34,7 +34,7 @@ internal static class DonutsConfiguration
 
 	internal static void ExportConfig()
 	{
-		string configDirectory = Path.Combine(DonutsPlugin.directoryPath, "Config");
+		string configDirectory = Path.Combine(DonutsPlugin.DirectoryPath, "Config");
 		if (!Directory.Exists(configDirectory))
 		{
 			Directory.CreateDirectory(configDirectory);

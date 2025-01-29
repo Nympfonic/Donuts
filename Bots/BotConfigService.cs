@@ -57,7 +57,7 @@ public class BotConfigService
 			return _allMapsBotWavesConfigs;
 		}
 		
-		string jsonFilePath = Path.Combine(DonutsPlugin.directoryPath, "patterns", _scenarioSelected, $"{_mapName}_waves.json");
+		string jsonFilePath = Path.Combine(DonutsPlugin.DirectoryPath, "patterns", _scenarioSelected, $"{_mapName}_waves.json");
 
 		if (!File.Exists(jsonFilePath))
 		{
@@ -127,7 +127,7 @@ public class BotConfigService
 	{
 		if (_allMapsZoneConfigs == null)
 		{
-			string zoneSpawnPointsPath = Path.Combine(DonutsPlugin.directoryPath, "zoneSpawnPoints");
+			string zoneSpawnPointsPath = Path.Combine(DonutsPlugin.DirectoryPath, "zoneSpawnPoints");
 			AllMapsZoneConfigs allMapsZoneConfigs = AllMapsZoneConfigs.LoadFromDirectory(zoneSpawnPointsPath);
 			if (allMapsZoneConfigs == null)
 			{
@@ -160,7 +160,7 @@ public class BotConfigService
 		}
 		
 		string jsonFilePath = Path.Combine(
-			DonutsPlugin.directoryPath,
+			DonutsPlugin.DirectoryPath,
 			"patterns",
 			GetSelectedScenario()!,
 			$"{GetMapName()}_start.json"
@@ -182,7 +182,7 @@ public class BotConfigService
 	{
 		if (_patternsLoaded) return true;
 
-		string patternFolderPath = Path.Combine(DonutsPlugin.directoryPath, "patterns", _scenarioSelected);
+		string patternFolderPath = Path.Combine(DonutsPlugin.DirectoryPath, "patterns", _scenarioSelected);
 		if (!Directory.Exists(patternFolderPath))
 		{
 			Directory.CreateDirectory(patternFolderPath);

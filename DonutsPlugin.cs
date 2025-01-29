@@ -30,7 +30,6 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	internal static PluginGUIComponent pluginGUIComponent;
 	internal static ConfigEntry<KeyboardShortcut> toggleGUIKey;
-	internal static string directoryPath;
 
 	private static readonly List<Folder> _emptyScenarioList = [];
 	
@@ -38,15 +37,16 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	public new static ManualLogSource Logger { get; private set; }
 	internal static ModulePatchManager ModulePatchManager { get; private set; }
+	internal static string DirectoryPath { get; private set; }
+	internal static Assembly CurrentAssembly { get; private set; }
 	internal static bool FikaEnabled { get; private set; }
 
 	private void Awake()
 	{
 		Logger = base.Logger;
-
-		Assembly currentAssembly = Assembly.GetExecutingAssembly();
-		string assemblyPath = currentAssembly.Location;
-		directoryPath = Path.GetDirectoryName(assemblyPath);
+		CurrentAssembly = Assembly.GetExecutingAssembly();
+		string assemblyPath = CurrentAssembly.Location;
+		DirectoryPath = Path.GetDirectoryName(assemblyPath);
 		
 		// Run dependency checker
 		if (!DependencyChecker.ValidateDependencies(Logger, Info, GetType(), Config))
@@ -54,12 +54,12 @@ public class DonutsPlugin : BaseUnityPlugin
 			throw new Exception("Missing Dependencies");
 		}
 		
-		DonutsConfiguration.ImportConfig(directoryPath);
+		DonutsConfiguration.ImportConfig(DirectoryPath);
 
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
 
-		ModulePatchManager = new ModulePatchManager(currentAssembly);
+		ModulePatchManager = new ModulePatchManager(CurrentAssembly);
 		ModulePatchManager.EnableAllPatches();
 		
 		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
@@ -92,7 +92,7 @@ public class DonutsPlugin : BaseUnityPlugin
 		if (IsKeyPressed(DefaultPluginVars.WriteToFileKey.Value) && !_isWritingToFile)
 		{
 			_isWritingToFile = true;
-			EditorFunctions.WriteToJsonFile(directoryPath)
+			EditorFunctions.WriteToJsonFile(DirectoryPath)
 				.ContinueWith(() => _isWritingToFile = false)
 				.Forget();
 		}
@@ -140,10 +140,10 @@ public class DonutsPlugin : BaseUnityPlugin
 	{
 		// TODO: Write a null check in case the files are missing and generate new defaults
 
-		string scenarioConfigPath = Path.Combine(directoryPath, "ScenarioConfig.json");
+		string scenarioConfigPath = Path.Combine(DirectoryPath, "ScenarioConfig.json");
 		DefaultPluginVars.PmcScenarios = await LoadFoldersAsync(scenarioConfigPath);
 		
-		string randomScenarioConfigPath = Path.Combine(directoryPath, "RandomScenarioConfig.json");
+		string randomScenarioConfigPath = Path.Combine(DirectoryPath, "RandomScenarioConfig.json");
 		DefaultPluginVars.PmcRandomScenarios = await LoadFoldersAsync(randomScenarioConfigPath);
 
 		DefaultPluginVars.ScavScenarios = DefaultPluginVars.PmcScenarios;

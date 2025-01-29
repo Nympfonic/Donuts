@@ -97,33 +97,38 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 	[CanBeNull]
 	public Vector3? GetUnusedStartingSpawnPoint([NotNull] IList<string> startingZoneNames, [CanBeNull] out string zoneName)
 	{
+#if DEBUG
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		const string typeName = nameof(ZoneSpawnPoints);
+		const string methodName = nameof(GetUnusedStartingSpawnPoint);
+#endif
 		if (Count == 0)
 		{
 			zoneName = null;
 			return null;
 		}
 
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.Clear();
-		sb.AppendLine("_keywordZoneMappings:");
-		foreach (KeyValuePair<KeywordZoneType, HashSet<string>> kvp in _keywordZoneMappings)
-		{
-			sb.AppendFormat("Keyword: {0}, Zone Names: ", kvp.Key);
-			if (kvp.Value == null || kvp.Value.Count == 0)
-			{
-				sb.Append("N/A\n");
-				continue;
-			}
-			foreach (string z in kvp.Value)
-			{
-				sb.Append(z);
-				sb.Append(", ");
-			}
-			sb.AppendLine();
-		}
-		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(ZoneSpawnPoints), nameof(GetUnusedStartingSpawnPoint));
-#endif
+// #if DEBUG
+// 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+// 		sb.Clear();
+// 		sb.AppendLine("_keywordZoneMappings:");
+// 		foreach (KeyValuePair<KeywordZoneType, HashSet<string>> kvp in _keywordZoneMappings)
+// 		{
+// 			sb.AppendFormat("Keyword: {0}, Zone Names: ", kvp.Key);
+// 			if (kvp.Value == null || kvp.Value.Count == 0)
+// 			{
+// 				sb.Append("N/A\n");
+// 				continue;
+// 			}
+// 			foreach (string z in kvp.Value)
+// 			{
+// 				sb.Append(z);
+// 				sb.Append(", ");
+// 			}
+// 			sb.AppendLine();
+// 		}
+// 		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
+// #endif
 		
 		// If it's a keyword zone (all/hotspot/start), get the correct list of zone names instead
 		if (startingZoneNames.Count == 1 &&
@@ -138,7 +143,7 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 #if DEBUG
 			sb.Clear();
 			sb.AppendFormat("Donuts: Keyword {0} not found in the {1} dictionary", keyword.ToString(), nameof(_keywordZoneMappings));
-			DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(ZoneSpawnPoints), nameof(GetUnusedStartingSpawnPoint));
+			DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
 #endif
 			zoneName = null;
 			return null;
