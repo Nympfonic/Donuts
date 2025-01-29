@@ -764,14 +764,17 @@ public abstract class BotSpawnService : IBotSpawnService
 	{
 		int activeBots = GetAliveBotsCount();
 		int botLimit = DataService.MaxBotLimit;
-		if (activeBots < botLimit && activeBots + groupSize > botLimit)
+		
+		if (activeBots >= botLimit)
+		{
+			return -1;
+		}
+		
+		if (activeBots + groupSize > botLimit)
 		{
 			groupSize = botLimit - activeBots;
 		}
-		else
-		{
-			groupSize = -1;
-		}
+		
 		return groupSize;
 	}
 	
