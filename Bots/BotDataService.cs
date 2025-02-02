@@ -162,11 +162,13 @@ public abstract class BotDataService : IBotDataService
 			int maxBots = BotHelper.GetRandomBotCap(startingBotCfg.MinCount, startingBotCfg.MaxCount, MaxBotLimit);
 #if DEBUG
 			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
+			int maxBots = Random.Range(startingBotCfg.MinCount, startingBotCfg.MaxCount);
+			
+			if (DefaultPluginVars.debugLogging.Value)
 			{
-				sb.AppendFormat("Max starting bots set to {0}", maxBots.ToString());
-				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SetupInitialBotCache));
+				Logger.LogDebugDetailed("Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			}
-#endif
+			
 			while (_totalBots < maxBots && !_onDestroyToken.IsCancellationRequested)
 			{
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, startingBotCfg.MinGroupSize, startingBotCfg.MaxGroupSize,
