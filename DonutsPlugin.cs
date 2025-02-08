@@ -30,7 +30,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	internal static PluginGUIComponent pluginGUIComponent;
 	internal static ConfigEntry<KeyboardShortcut> toggleGUIKey;
-
+	
 	private static readonly List<Folder> _emptyScenarioList = [];
 	
 	private bool _isWritingToFile;
@@ -40,7 +40,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	internal static string DirectoryPath { get; private set; }
 	internal static Assembly CurrentAssembly { get; private set; }
 	internal static bool FikaEnabled { get; private set; }
-
+	
 	private void Awake()
 	{
 		Logger = base.Logger;
@@ -55,20 +55,16 @@ public class DonutsPlugin : BaseUnityPlugin
 		}
 		
 		DonutsConfiguration.ImportConfig(DirectoryPath);
-
+		
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
-
+		
 		ModulePatchManager = new ModulePatchManager(CurrentAssembly);
 		ModulePatchManager.EnableAllPatches();
 		
 		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
-		// if (FikaEnabled)
-		// {
-		// 	ModulePatchManager.DisablePatch<GetFikaGameTypePatch>();
-		// }
 	}
-
+	
 	// ReSharper disable once Unity.IncorrectMethodSignature
 	[UsedImplicitly]
 	private async UniTaskVoid Start()
@@ -77,14 +73,14 @@ public class DonutsPlugin : BaseUnityPlugin
 		pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
 		DonutsConfiguration.ExportConfig();
 	}
-
+	
 	private void Update()
 	{
 		// If setting a keybind, do not trigger functionality
 		if (ImGUIToolkit.IsSettingKeybind()) return;
-
+		
 		ShowGuiInputCheck();
-
+		
 		if (IsKeyPressed(DefaultPluginVars.CreateSpawnMarkerKey.Value))
 		{
 			EditorFunctions.CreateSpawnMarker();
@@ -101,7 +97,7 @@ public class DonutsPlugin : BaseUnityPlugin
 			EditorFunctions.DeleteSpawnMarker();
 		}
 	}
-
+	
 	private static void ShowGuiInputCheck()
 	{
 		if (IsKeyPressed(toggleGUIKey.Value) || IsKeyPressed(ESCAPE_KEY))
@@ -117,11 +113,11 @@ public class DonutsPlugin : BaseUnityPlugin
 			}
 		}
 	}
-
+	
 	private static async UniTask SetupScenariosUI()
 	{
 		await LoadDonutsScenarios();
-
+		
 		// Dynamically initialize the scenario settings
 		DefaultPluginVars.pmcScenarioSelection = new Setting<string>("PMC Raid Spawn Preset Selection",
 			"Select a preset to use when spawning as PMC",
@@ -135,28 +131,29 @@ public class DonutsPlugin : BaseUnityPlugin
 			"live-like",
 			options: DefaultPluginVars.scavScenarioCombinedArray);
 	}
-
+	
 	private static async UniTask LoadDonutsScenarios()
 	{
 		// TODO: Write a null check in case the files are missing and generate new defaults
-
+		
 		string scenarioConfigPath = Path.Combine(DirectoryPath, "ScenarioConfig.json");
 		DefaultPluginVars.PmcScenarios = await LoadFoldersAsync(scenarioConfigPath);
 		
 		string randomScenarioConfigPath = Path.Combine(DirectoryPath, "RandomScenarioConfig.json");
 		DefaultPluginVars.PmcRandomScenarios = await LoadFoldersAsync(randomScenarioConfigPath);
-
+		
 		DefaultPluginVars.ScavScenarios = DefaultPluginVars.PmcScenarios;
 		DefaultPluginVars.ScavRandomScenarios = DefaultPluginVars.PmcRandomScenarios;
-
+		
 		PopulateScenarioValues();
 		
-#if DEBUG
-		Logger.LogWarning($"Loaded PMC Scenarios: {string.Join(", ", DefaultPluginVars.pmcScenarioCombinedArray)}");
-		Logger.LogWarning($"Loaded Scav Scenarios: {string.Join(", ", DefaultPluginVars.scavScenarioCombinedArray)}");
-#endif
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			Logger.LogWarning($"Loaded PMC Scenarios: {string.Join(", ", DefaultPluginVars.pmcScenarioCombinedArray)}");
+			Logger.LogWarning($"Loaded Scav Scenarios: {string.Join(", ", DefaultPluginVars.scavScenarioCombinedArray)}");
+		}
 	}
-
+	
 	private static async UniTask<List<Folder>> LoadFoldersAsync([NotNull] string filePath)
 	{
 		if (!File.Exists(filePath))
@@ -164,29 +161,29 @@ public class DonutsPlugin : BaseUnityPlugin
 			Logger.LogError($"File not found: {filePath}");
 			return _emptyScenarioList;
 		}
-
+		
 		string fileContent = await DonutsHelper.ReadAllTextAsync(filePath);
 		var folders = JsonConvert.DeserializeObject<List<Folder>>(fileContent);
-
+		
 		if (folders == null || folders.Count == 0)
 		{
 			Logger.LogError($"No Donuts Folders found in Scenario Config file at: {filePath}");
 			return _emptyScenarioList;
 		}
-
+		
 		Logger.LogWarning($"Loaded {folders.Count.ToString()} Donuts Scenario Folders");
 		return folders;
 	}
-
+	
 	private static void PopulateScenarioValues()
 	{
 		DefaultPluginVars.pmcScenarioCombinedArray = GenerateScenarioValues(DefaultPluginVars.PmcScenarios, DefaultPluginVars.PmcRandomScenarios);
 		Logger.LogWarning($"Loaded {DefaultPluginVars.pmcScenarioCombinedArray.Length.ToString()} PMC Scenarios and Finished Generating");
-
+		
 		DefaultPluginVars.scavScenarioCombinedArray = GenerateScenarioValues(DefaultPluginVars.ScavScenarios, DefaultPluginVars.ScavRandomScenarios);
 		Logger.LogWarning($"Loaded {DefaultPluginVars.scavScenarioCombinedArray.Length.ToString()} SCAV Scenarios and Finished Generating");
 	}
-
+	
 	private static string[] GenerateScenarioValues([NotNull] List<Folder> scenarios, [NotNull] List<Folder> randomScenarios)
 	{
 		var scenarioValues = new string[scenarios.Count + randomScenarios.Count];
@@ -197,16 +194,16 @@ public class DonutsPlugin : BaseUnityPlugin
 			scenarioValues[pointer] = scenario.Name;
 			pointer++;
 		}
-
+		
 		foreach (Folder scenario in randomScenarios)
 		{
 			scenarioValues[pointer] = scenario.RandomScenarioConfig;
 			pointer++;
 		}
-
+		
 		return scenarioValues;
 	}
-
+	
 	private static bool IsKeyPressed(KeyboardShortcut key)
 	{
 		bool isMainKeyDown = UnityInput.Current.GetKeyDown(key.MainKey);
@@ -223,6 +220,6 @@ public class DonutsPlugin : BaseUnityPlugin
 		
 		return isMainKeyDown && allModifierKeysDown;
 	}
-
+	
 	private static bool IsKeyPressed(KeyCode key) => UnityInput.Current.GetKeyDown(key);
 }

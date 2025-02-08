@@ -3,6 +3,7 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace Donuts.Models;
 
@@ -10,40 +11,55 @@ namespace Donuts.Models;
 public class AllMapsBotWavesConfigs
 {
 	[JsonProperty("Maps")]
-	public Dictionary<string, MapBotWaves> Maps { get; set; }
+	public Dictionary<string, MapBotWaves> Maps { get; private set; }
 
-	public void EnsureUniqueGroupNumForBotWaves()
+	internal void EnsureUniqueGroupNumForBotWaves()
 	{
 		foreach (MapBotWaves map in Maps.Values)
 		{
-			map.Scav = EnsureUniqueGroupNums(map.Scav);
-			map.Pmc = EnsureUniqueGroupNums(map.Pmc);
+			map.EnsureUniqueGroupNums();
 		}
-	}
-	
-	[NotNull]
-	private static List<BotWave> EnsureUniqueGroupNums([NotNull] List<BotWave> botWaves)
-	{
-		var uniqueWaves = new List<BotWave>();
-		foreach (IGrouping<int, BotWave> group in botWaves.GroupBy(wave => wave.GroupNum))
-		{
-			List<BotWave> groupList = group.ToList();
-			int count = groupList.Count;
-			if (count > 1)
-				uniqueWaves.Add(groupList.PickRandomElement());
-			else if (count == 1)
-				uniqueWaves.Add(groupList[0]);
-		}
-		return uniqueWaves;
 	}
 }
 
 [JsonObject]
 public class MapBotWaves
 {
+	private static readonly PropertyInfo[] _properties = typeof(MapBotWaves).GetProperties();
+	
 	[JsonProperty("PMC")]
-	public List<BotWave> Pmc { get; set; }
+	public BotWave[] Pmc { get; private set; }
 	
 	[JsonProperty("SCAV")]
-	public List<BotWave> Scav { get; set; }
+	public BotWave[] Scav { get; private set; }
+	
+	internal void EnsureUniqueGroupNums()
+	{
+		// Dynamically retrieve all the BotWave[] properties at runtime so we don't have to write out logic for each of them
+		foreach (PropertyInfo property in _properties)
+		{
+			var currentWaves = (BotWave[])property.GetValue(this);
+			
+			// Perform grouping based on a wave's GroupNum value
+			IGrouping<int, BotWave>[] groupings = currentWaves.GroupBy(wave => wave.GroupNum).ToArray();
+			int groupingsCount = groupings.Length;
+			
+			if (groupingsCount == 0)
+			{
+				continue;
+			}
+			
+			var index = 0;
+			var uniqueWaves = new BotWave[groupingsCount];
+			// We pick a random wave from each group so we avoid duplicates sharing the same groupNum
+			// TODO: Wouldn't this go against the rule where multiple waves can share the same timer by using same groupNum?
+			foreach (IGrouping<int, BotWave> group in groupings)
+			{
+				BotWave[] groupArray = group.ToArray();
+				uniqueWaves[index++] = groupArray.PickRandomElement();
+			}
+			
+			property.SetValue(this, uniqueWaves);
+		}
+	}
 }

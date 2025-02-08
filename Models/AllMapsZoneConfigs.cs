@@ -1,6 +1,7 @@
 ﻿using Cysharp.Text;
 using Donuts.Utils;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -51,17 +52,21 @@ public class AllMapsZoneConfigs
 public class MapZoneConfig
 {
 	[JsonProperty("MapName")]
-	public string MapName { get; set; }
+	public string MapName { get; private set; }
 	
 	[JsonProperty("Zones")]
 	[JsonConverter(typeof(ZoneSpawnPoints.JsonConverter))]
-	public ZoneSpawnPoints Zones { get; set; }
+	public ZoneSpawnPoints Zones { get; private set; }
 	
 	public void AppendZones(MapZoneConfig other)
 	{
-		if (Zones == null || other?.Zones == null) return;
+		if (Zones == null || other?.Zones == null)
+		{
+			throw new InvalidOperationException(
+				"Either this MapZoneConfig's Zones instance or the other MapZoneConfig's Zones instance is null.");
+		}
 		
-		foreach ((string zoneName, List<Vector3> spawnPoints) in other.Zones)
+		foreach ((string zoneName, HashSet<Vector3> spawnPoints) in other.Zones)
 		{
 			Zones.AppendSpawnPoints(zoneName, spawnPoints);
 		}

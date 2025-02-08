@@ -22,6 +22,7 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 	private static readonly Stopwatch _stopwatch = new();
 	
 	private BotsGroup _group;
+	private int _membersCount;
 	private DeadBodiesController _deadBodiesController;
 	private bool? _freeForAll;
 	
@@ -65,15 +66,17 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 		{
 			botSpawner.method_5(bot);
 		}
-#if DEBUG
-		using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
+		
+		_membersCount++;
+		
+		if (DefaultPluginVars.debugLogging.Value)
 		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("Group {0} (ID: {1}) - Group size: {2}/{3} - Bot being added: {4} (ID: {5})", _group.Name,
-				_group.Id, _group.MembersCount, _group.TargetMembersCount, bot.Profile.Nickname, bot.Id);
+				_group.Id, _membersCount, _group.TargetMembersCount, bot.Profile.Nickname, bot.Id);
 			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(ActivateBotCallbackWrapper),
 				nameof(GetGroupAndSetEnemies));
 		}
-#endif
 		
 		return _group;
 	}

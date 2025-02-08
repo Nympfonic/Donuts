@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 
 namespace Donuts.Models;
@@ -8,55 +9,54 @@ public class BotWave
 {
 	private float _timer;
 	private float _cooldownTimer;
+	private bool _onCooldown;
+	private int _timesSpawned;
 	
 	[JsonProperty("GroupNum")]
-	public int GroupNum { get; set; }
+	public int GroupNum { get; private set; }
 	
 	[JsonProperty("TriggerTimer")]
-	public int TriggerTimer { get; set; }
+	public int TriggerTimer { get; private set; }
 	
 	[JsonProperty("TriggerDistance")]
-	public int TriggerDistance { get; set; }
+	public int TriggerDistance { get; private set; }
 	
 	[JsonProperty("SpawnChance")]
-	public int SpawnChance { get; set; }
+	public int SpawnChance { get; private set; }
 	
 	[JsonProperty("MaxTriggersBeforeCooldown")]
-	public int MaxTriggersBeforeCooldown { get; set; }
+	public int MaxTriggersBeforeCooldown { get; private set; }
 	
 	[JsonProperty("IgnoreTimerFirstSpawn")]
-	public bool IgnoreTimerFirstSpawn { get; set; }
+	public bool IgnoreTimerFirstSpawn { get; private set; }
 	
 	[JsonProperty("MinGroupSize")]
-	public int MinGroupSize { get; set; }
+	public int MinGroupSize { get; private set; }
 	
 	[JsonProperty("MaxGroupSize")]
-	public int MaxGroupSize { get; set; }
+	public int MaxGroupSize { get; private set; }
 	
 	[JsonProperty("Zones")]
-	public List<string> Zones { get; set; }
+	public string[] Zones { get; private set; }
 	
-	[JsonIgnore] public bool OnCooldown { get; private set; }
-	[JsonIgnore] public int TimesSpawned { get; private set; }
-
 	public void UpdateTimer(float deltaTime, float coolDownDuration)
 	{
 		_timer += deltaTime;
-		if (!OnCooldown) return;
+		if (!_onCooldown) return;
 		
 		_cooldownTimer += deltaTime;
 		
 		if (_cooldownTimer >= coolDownDuration)
 		{
-			OnCooldown = false;
+			_onCooldown = false;
 			_cooldownTimer = 0f;
-			TimesSpawned = 0;
+			_timesSpawned = 0;
 		}
 	}
 	
 	public bool ShouldSpawn()
 	{
-		if (OnCooldown)
+		if (_onCooldown)
 		{
 			return false;
 		}
@@ -72,8 +72,8 @@ public class BotWave
 	
 	public void SpawnTriggered()
 	{
-		TimesSpawned++;
-		if (TimesSpawned >= MaxTriggersBeforeCooldown)
+		_timesSpawned++;
+		if (_timesSpawned >= MaxTriggersBeforeCooldown)
 		{
 			TriggerCooldown();
 		}
@@ -83,10 +83,20 @@ public class BotWave
 	{
 		_timer = 0f;
 	}
+
+	public void SetSpawnChance(int newChance)
+	{
+		if (newChance is < 0 or > 100)
+		{
+			throw new ArgumentOutOfRangeException(nameof(newChance), newChance, "Must be between 0 and 100.");
+		}
+		
+		SpawnChance = newChance;
+	}
 	
 	private void TriggerCooldown()
 	{
-		OnCooldown = true;
+		_onCooldown = true;
 		_cooldownTimer = 0f;
 	}
 }

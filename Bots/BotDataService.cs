@@ -20,18 +20,21 @@ namespace Donuts.Bots;
 
 public interface IBotDataService
 {
-	public StartingBotConfig StartingBotConfig { get; }
 	public Queue<PrepBotInfo> StartingBotsCache { get; }
 	public ZoneSpawnPoints ZoneSpawnPoints { get; }
-	public DonutsSpawnType SpawnType { get; }
 	public int MaxBotLimit { get; }
+	public ReadOnlyCollection<Player> AllAlivePlayers { get; }
 
-	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryCreateBotData(BotDifficulty difficulty, int groupSize);
-	UniTask ReplenishBotCache();
+	UniTask SetupStartingBotCache(CancellationToken cancellationToken);
+	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryCreateBotData(BotDifficulty difficulty, int groupSize,
+		bool saveToCache = true, CancellationToken cancellationToken = default);
+	UniTask ReplenishBotCache(CancellationToken cancellationToken);
 	[CanBeNull] PrepBotInfo FindCachedBotData(BotDifficulty difficulty, int targetCount);
 	void RemoveFromBotCache(PrepBotInfo.GroupDifficultyKey key);
 	[NotNull] Queue<BotWave> GetBotWavesToSpawn();
+	[CanBeNull] Vector3? GetUnusedStartingSpawnPoint();
 	void ResetGroupTimers(int groupNum);
+	int GetAliveBotsCount();
 	BotDifficulty GetBotDifficulty();
 }
 
@@ -44,138 +47,166 @@ public abstract class BotDataService : IBotDataService
 		public readonly float deltaTime = deltaTime;
 	}
 	
+	protected StartingBotConfig startingBotConfig;
+	protected readonly MapBotWaves mapBotWaves;
+
+	protected readonly BotConfigService configService;
+	protected readonly ManualLogSource logger;
+	
 	private const int INITIAL_BOT_CACHE_SIZE = 30;
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
 	private const int FRAME_DELAY_BETWEEN_REPLENISH = 5;
 	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
-	private IBotCreator _botCreator;
-	private BotSpawner _eftBotSpawner;
-	private CancellationToken _onDestroyToken;
+	private readonly IBotCreator _botCreator;
+	private readonly BotSpawner _eftBotSpawner;
 	
-	private EventBinding<ResetReplenishTimerEvent> _resetReplenishTimerBinding;
 	private float _replenishBotCachePrevTime;
-	
-	private EventBinding<UpdateWaveTimerEvent> _updateWaveTimerBinding;
 	
 	private int _totalBots;
 	
-	private List<BotWave> _botWaves;
-	private ILookup<int, BotWave> _botWavesByGroupNum;
-	private (int min, int max) _waveGroupSize;
+	private Vector3[] _cachedStartingSpawnPoints;
+	private Queue<Vector3> _startingSpawnPoints;
 	
-	protected StartingBotConfig startingBotConfig;
+	private readonly Queue<BotWave> _cachedBotWavesToSpawn = new(10);
 	
-	protected BotConfigService ConfigService { get; private set; }
-	protected ManualLogSource Logger { get; private set; }
-	protected MapBotWaves MapBotWaves { get; private set; }
+	protected DonutsSpawnType spawnType;
+	
+	protected BotWave[] botWaves;
+	protected ILookup<int, BotWave> botWavesByGroupNum;
+	protected (int min, int max) waveGroupSize;
+	
+	public Queue<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
+	public ZoneSpawnPoints ZoneSpawnPoints { get; }
+	public int MaxBotLimit { get; protected set; }
+	public ReadOnlyCollection<Player> AllAlivePlayers { get; }
 	
 	protected abstract string GroupChance { get; }
 	protected abstract ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
-	public Queue<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
-	public ZoneSpawnPoints ZoneSpawnPoints { get; private set; } = [];
-	public int MaxBotLimit { get; private set; }
-	
-	public abstract DonutsSpawnType SpawnType { get; }
-	public abstract StartingBotConfig StartingBotConfig { get; }
-	
-	public static async UniTask<TBotDataService> Create<TBotDataService>(
-		[NotNull] BotConfigService configService,
-		[NotNull] ManualLogSource logger,
-		CancellationToken cancellationToken)
-		where TBotDataService : BotDataService, new()
+	protected BotDataService([NotNull] BotConfigService configService)
 	{
-		var service = new TBotDataService();
-		service.Initialize(configService, logger, cancellationToken);
-		Dictionary<DonutsSpawnType, IBotDataService> botDataServices =
-			MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotDataServices;
+		this.configService = configService;
+		logger = DonutsRaidManager.Logger;
 		
-		if (!botDataServices.ContainsKey(service.SpawnType))
-		{
-			botDataServices.Add(service.SpawnType, service);
-		}
-#if DEBUG
-		else
-		{
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("Critical error initializing {0}: SpawnType {1} is already in the BotDataServices dictionary.",
-				service.GetType().Name, service.SpawnType.ToString());
-			logger.LogDebugDetailed(sb.ToString(), nameof(BotDataService), nameof(Create));
-		}
-#endif
-		
-		await service.SetupInitialBotCache();
-		return service;
-	}
-	
-	private void Initialize(
-		[NotNull] BotConfigService configService,
-		[NotNull] ManualLogSource logger,
-		CancellationToken cancellationToken)
-	{
-		ConfigService = configService;
-		Logger = logger;
-		_onDestroyToken = cancellationToken;
 		_eftBotSpawner = Singleton<IBotGame>.Instance.BotsController.BotSpawner;
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
 		
-		_resetReplenishTimerBinding = new EventBinding<ResetReplenishTimerEvent>(ResetReplenishTimer);
-		EventBus<ResetReplenishTimerEvent>.Register(_resetReplenishTimerBinding);
+		var resetReplenishTimerBinding = new EventBinding<ResetReplenishTimerEvent>(ResetReplenishTimer);
+		EventBus.Register(resetReplenishTimerBinding);
 
-		_updateWaveTimerBinding = new EventBinding<UpdateWaveTimerEvent>(UpdateBotWaveTimers);
-		EventBus<UpdateWaveTimerEvent>.Register(_updateWaveTimerBinding);
+		var updateWaveTimerBinding = new EventBinding<UpdateWaveTimerEvent>(UpdateBotWaveTimers);
+		EventBus.Register(updateWaveTimerBinding);
 		
-		string location = ConfigService.GetMapLocation();
-		ZoneSpawnPoints = ConfigService.GetAllMapsZoneConfigs()!.Maps[location].Zones;
-		MaxBotLimit = ConfigService.GetMaxBotLimit(SpawnType);
+		string location = configService.GetMapLocation();
+		ZoneSpawnPoints = configService.GetAllMapsZoneConfigs()!.Maps[location].Zones;
+		if (ZoneSpawnPoints.Count == 0)
+		{
+			logger.NotifyLogError("Donuts: Failed to load zone spawn points. Check your 'zoneSpawnPoints' folder!");
+			return;
+		}
 		
-		if (!ConfigService.CheckForAnyScenarioPatterns())
+		AllAlivePlayers = new ReadOnlyCollection<Player>(Singleton<GameWorld>.Instance.AllAlivePlayersList);
+		
+		if (!configService.CheckForAnyScenarioPatterns())
 		{
 			return;
 		}
 		
-		MapBotWaves = ConfigService.GetAllMapsBotWavesConfigs()?.Maps[location];
-		if (MapBotWaves == null)
+		mapBotWaves = configService.GetAllMapsBotWavesConfigs()?.Maps[location];
+		if (mapBotWaves == null)
 		{
-			Logger.NotifyLogError("Donuts: Failed to load bot waves. Donuts will not function properly.");
+			logger.NotifyLogError("Donuts: Failed to load bot waves. Donuts will not function properly.");
 			return;
 		}
-		
-		_botWaves = GetBotWaves();
-		_botWavesByGroupNum = _botWaves.ToLookup(wave => wave.GroupNum);
-		_waveGroupSize = GetWaveMinMaxGroupSize();
 	}
 
+	protected void ResetStartingSpawnPoints()
+	{
+		// Already cached so we just create a new queue, passing the cached array into it
+		if (_cachedStartingSpawnPoints != null)
+		{
+			_startingSpawnPoints = new Queue<Vector3>(_cachedStartingSpawnPoints);
+			return;
+		}
+		
+		ZoneSpawnPoints zoneSpawnPoints = ZoneSpawnPoints;
+		// Merge zones into a hashset to ensure no duplicates
+		var mergedZones = new HashSet<string>();
+		foreach (string zoneName in startingBotConfig.Zones)
+		{
+			// Check for exact keyword matches
+			if (zoneSpawnPoints.TryGetKeywordZoneMappings(zoneName, out HashSet<string> keywordZoneNames))
+			{
+				mergedZones.UnionWith(keywordZoneNames!);
+			}
+			// Otherwise just add the zone name as is
+			else
+			{
+				mergedZones.Add(zoneName);
+			}
+		}
+		
+		// Populate the hashset with a randomized order of spawn points
+		var mergedSpawnPoints = new HashSet<Vector3>();
+		foreach (string zoneName in mergedZones.ShuffleElements())
+		{
+			List<Vector3> spawnPoints = zoneSpawnPoints[zoneName]!.ShuffleElements();
+			mergedSpawnPoints.UnionWith(spawnPoints);
+		}
+		
+		// Cache the spawn points and create new queue to be used
+		_cachedStartingSpawnPoints = new Vector3[mergedSpawnPoints.Count];
+		mergedSpawnPoints.CopyTo(_cachedStartingSpawnPoints);
+		_startingSpawnPoints = new Queue<Vector3>(_cachedStartingSpawnPoints);
+	}
+	
+	/// <summary>
+	/// Gets an unused starting spawn point.
+	/// </summary>
+	/// <returns>An unused starting spawn point or otherwise null.</returns>
+	public Vector3? GetUnusedStartingSpawnPoint()
+	{
+		if (ZoneSpawnPoints.Count == 0)
+		{
+			return null;
+		}
+		
+		if (_startingSpawnPoints.Count == 0)
+		{
+			ResetStartingSpawnPoints();
+		}
+		
+		return _startingSpawnPoints.Dequeue();
+	}
+	
 	private void ResetReplenishTimer()
 	{
 		_replenishBotCachePrevTime = Time.time;
 	}
 	
-	protected abstract List<BotWave> GetBotWaves();
-	
-	private async UniTask SetupInitialBotCache()
+	/// <summary>
+	/// Initializes the starting bot cache.
+	/// </summary>
+	public async UniTask SetupStartingBotCache(CancellationToken cancellationToken)
 	{
 		try
 		{
-			StartingBotConfig startingBotCfg = StartingBotConfig;
-			int maxBots = BotHelper.GetRandomBotCap(startingBotCfg.MinCount, startingBotCfg.MaxCount, MaxBotLimit);
-#if DEBUG
-			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
-			int maxBots = Random.Range(startingBotCfg.MinCount, startingBotCfg.MaxCount);
+			int maxBots = Random.Range(startingBotConfig.MinCount, startingBotConfig.MaxCount);
 			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				Logger.LogDebugDetailed("Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
+				logger.LogDebugDetailed("Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			}
 			
-			while (_totalBots < maxBots && !_onDestroyToken.IsCancellationRequested)
+			while (_totalBots < maxBots && !cancellationToken.IsCancellationRequested)
 			{
-				int groupSize = BotHelper.GetBotGroupSize(GroupChance, startingBotCfg.MinGroupSize, startingBotCfg.MaxGroupSize,
-					maxBots - _totalBots);
+				int groupSize = BotHelper.GetBotGroupSize(GroupChance, startingBotConfig.MinGroupSize,
+					startingBotConfig.MaxGroupSize, maxBots - _totalBots);
 				
-				(bool success, PrepBotInfo prepBotInfo) = await TryCreateBotData(BotDifficulties.PickRandomElement(), groupSize);
-				if (_onDestroyToken.IsCancellationRequested) return;
+				(bool success, PrepBotInfo prepBotInfo) = await TryCreateBotData(BotDifficulties.PickRandomElement(),
+					groupSize, saveToCache: false, cancellationToken: cancellationToken);
+				if (cancellationToken.IsCancellationRequested) return;
 				
 				if (success)
 				{
@@ -185,16 +216,17 @@ public abstract class BotDataService : IBotDataService
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogException(GetType().Name, nameof(SetupInitialBotCache), ex);
+			logger.LogException(GetType().Name, nameof(SetupStartingBotCache), ex);
 		}
 		catch (OperationCanceledException) {}
 	}
 	
-	private (int min, int max) GetWaveMinMaxGroupSize()
+	protected static (int min, int max) GetWaveMinMaxGroupSize(IReadOnlyList<BotWave> waves)
 	{
 		var minGroupSize = 0;
 		var maxGroupSize = int.MaxValue;
-		foreach (BotWave wave in _botWaves)
+		
+		foreach (BotWave wave in waves)
 		{
 			if (wave.MinGroupSize > minGroupSize)
 			{
@@ -206,6 +238,7 @@ public abstract class BotDataService : IBotDataService
 				maxGroupSize = wave.MaxGroupSize;
 			}
 		}
+		
 		return (minGroupSize, maxGroupSize);
 	}
 	
@@ -213,29 +246,29 @@ public abstract class BotDataService : IBotDataService
 	
 	public async UniTask<(bool success, PrepBotInfo prepBotInfo)> TryCreateBotData(
 		BotDifficulty difficulty,
-		int groupSize)
+		int groupSize,
+		bool saveToCache = true,
+		CancellationToken cancellationToken = default)
 	{
 		try
 		{
-#if DEBUG
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			string typeName = GetType().Name;
-			const string methodName = nameof(TryCreateBotData);
-#endif
-			if (_onDestroyToken.IsCancellationRequested)
+			if (cancellationToken.IsCancellationRequested)
 			{
 				return (false, null);
 			}
 			
-			WildSpawnType spawnType = GetWildSpawnType();
-			EPlayerSide side = GetPlayerSide(spawnType);
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Creating bot: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
-				spawnType.ToString(), difficulty.ToString(), side.ToString(), groupSize.ToString());
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
-			var botProfileData = new BotProfileData(side, spawnType, difficulty, 0f);
+			WildSpawnType wildSpawnType = GetWildSpawnType();
+			EPlayerSide side = GetPlayerSide(wildSpawnType);
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Creating bot: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
+					wildSpawnType.ToString(), difficulty.ToString(), side.ToString(), groupSize.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryCreateBotData));
+			}
+			
+			var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
 			var botCreationData = await BotCreationDataClass
 				.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner);
 			
@@ -245,19 +278,26 @@ public abstract class BotDataService : IBotDataService
 			}
 
 			var prepBotInfo = new PrepBotInfo(botCreationData, difficulty);
-			_botCache.Enqueue(prepBotInfo.groupDifficultyKey, prepBotInfo);
+			if (saveToCache)
+			{
+				_botCache.Enqueue(prepBotInfo.groupDifficultyKey, prepBotInfo);
+			}
+			
 			_totalBots += groupSize;
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Bot created and assigned successfully; {0} profiles loaded. IDs: {1}",
-				botCreationData.Profiles.Count.ToString(), string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Bot created and assigned successfully; {0} profiles loaded. IDs: {1}",
+					botCreationData.Profiles.Count.ToString(), string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryCreateBotData));
+			}
+			
 			return (true, prepBotInfo);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogException(GetType().Name, nameof(TryCreateBotData), ex);
+			logger.LogException(GetType().Name, nameof(TryCreateBotData), ex);
 		}
 		catch (OperationCanceledException) {}
 		
@@ -265,17 +305,12 @@ public abstract class BotDataService : IBotDataService
 	}
 	
 	protected abstract WildSpawnType GetWildSpawnType();
-	protected abstract EPlayerSide GetPlayerSide(WildSpawnType spawnType);
+	protected abstract EPlayerSide GetPlayerSide(WildSpawnType wildSpawnType);
 	
-	public async UniTask ReplenishBotCache()
+	public async UniTask ReplenishBotCache(CancellationToken cancellationToken)
 	{
 		try
 		{
-#if DEBUG
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			string typeName = GetType().Name;
-			const string methodname = nameof(ReplenishBotCache);
-#endif
 			if (Time.time < _replenishBotCachePrevTime + DefaultPluginVars.replenishInterval.Value)
 			{
 				return;
@@ -284,101 +319,104 @@ public abstract class BotDataService : IBotDataService
 			var generatedCount = 0;
 			while (generatedCount < NUMBER_OF_GROUPS_TO_REPLENISH &&
 				_totalBots <= MaxBotLimit &&
-				!_onDestroyToken.IsCancellationRequested)
+				!cancellationToken.IsCancellationRequested)
 			{
 				BotDifficulty difficulty = BotDifficulties.PickRandomElement();
-				int groupSize = BotHelper.GetBotGroupSize(GroupChance, _waveGroupSize.min, _waveGroupSize.max);
+				int groupSize = BotHelper.GetBotGroupSize(GroupChance, waveGroupSize.min, waveGroupSize.max);
 				
-				(bool success, PrepBotInfo _) = await TryCreateBotData(difficulty, groupSize);
-				if (_onDestroyToken.IsCancellationRequested) return;
+				(bool success, PrepBotInfo prepBotInfo) =
+					await TryCreateBotData(difficulty, groupSize, cancellationToken: cancellationToken);
+				if (cancellationToken.IsCancellationRequested) return;
 				if (!success) continue;
 				
 				generatedCount++;
-				await UniTask.Delay(FRAME_DELAY_BETWEEN_REPLENISH, cancellationToken: _onDestroyToken);
-#if DEBUG
-				prepBotInfo.botCreationData._profileData.TryGetRole(out WildSpawnType role, out _);
-				sb.Clear();
-				sb.AppendFormat("Replenishing group bot: {0} {1} {2} Count: {3}.", role.ToString(),
-					prepBotInfo.difficulty.ToString(), prepBotInfo.botCreationData.Side.ToString(),
-					prepBotInfo.groupSize.ToString());
-				Logger.LogDebugDetailed(sb.ToString(), typeName, methodname);
-#endif
+				
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+					prepBotInfo.botCreationData._profileData.TryGetRole(out WildSpawnType role, out _);
+					sb.AppendFormat("Replenishing group bot: {0} {1} {2} Count: {3}.", role.ToString(),
+						prepBotInfo.difficulty.ToString(), prepBotInfo.botCreationData.Side.ToString(),
+						prepBotInfo.groupSize.ToString());
+					logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ReplenishBotCache));
+				}
+				
+				await UniTask.Delay(FRAME_DELAY_BETWEEN_REPLENISH, cancellationToken: cancellationToken);
 			}
 			
 			ResetReplenishTimer();
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			Logger.LogException(GetType().Name, nameof(ReplenishBotCache), ex);
+			logger.LogException(GetType().Name, nameof(ReplenishBotCache), ex);
 		}
 		catch (OperationCanceledException) {}
 	}
 	
 	public PrepBotInfo FindCachedBotData(BotDifficulty difficulty, int groupSize)
 	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(FindCachedBotData);
-#endif
 		// Find PrepBotInfo that matches the difficulty and group size
 		if (_botCache.TryPeek(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize), out PrepBotInfo prepBotInfo) &&
 			prepBotInfo.botCreationData?.Profiles?.Count == groupSize)
 		{
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Found cached bots for difficulty {0}, and target count {1}.", difficulty.ToString(),
-				groupSize.ToString());
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Found cached bots for difficulty {0}, and target count {1}.", difficulty.ToString(),
+					groupSize.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(FindCachedBotData));
+			}
+			
 			return prepBotInfo;
 		}
 		
-#if DEBUG
-		sb.Clear();
-		sb.AppendFormat("No cached bots found for difficulty {0}, and target count {1}.", difficulty.ToString(),
-			groupSize.ToString());
-		Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("No cached bots found for difficulty {0}, and target count {1}.", difficulty.ToString(),
+				groupSize.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(FindCachedBotData));
+		}
+		
 		return null;
 	}
 	
 	public void RemoveFromBotCache(PrepBotInfo.GroupDifficultyKey key)
 	{
-		if (!_botCache.TryDequeue(key, out PrepBotInfo prepBotInfo))
+		if (_botCache.TryDequeue(key, out PrepBotInfo prepBotInfo))
 		{
-#if DEBUG
-			Logger.LogDebugDetailed(
-				"Failure trying to dequeue PrepBotInfo from bot cache.\nAre you sure you're calling this method in the right place?",
-				GetType().Name, nameof(RemoveFromBotCache));
-#endif
+			_totalBots -= prepBotInfo!.groupSize;
 			return;
 		}
 		
-		_totalBots -= prepBotInfo!.groupSize;
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed(
+				"Failure trying to dequeue PrepBotInfo from bot cache.",
+				GetType().Name, nameof(RemoveFromBotCache));
+		}
 	}
 	
 	/// <summary>
 	/// Gets a queue of bot waves which meet the time requirement to spawn.
 	/// </summary>
+	/// <remarks>Caches bot waves to spawn until the queue count reaches zero.</remarks>
 	public Queue<BotWave> GetBotWavesToSpawn()
 	{
-		Queue<BotWave> wavesToSpawn = new(_botWaves.Count);
-		
-		if (_botWaves.Count == 0)
+		if (botWaves.Length == 0 || _cachedBotWavesToSpawn.Count > 0)
 		{
-			return wavesToSpawn;
+			return _cachedBotWavesToSpawn;
 		}
 		
-		foreach (BotWave wave in _botWaves.ShuffleElements(createNewList: true))
+		foreach (BotWave wave in botWaves.ShuffleElements())
 		{
 			if (wave.ShouldSpawn())
 			{
-				wavesToSpawn.Enqueue(wave);
+				_cachedBotWavesToSpawn.Enqueue(wave);
 			}
 		}
 		
-		return wavesToSpawn;
+		return _cachedBotWavesToSpawn;
 	}
 	
 	/// <summary>
@@ -387,7 +425,7 @@ public abstract class BotDataService : IBotDataService
 	private void UpdateBotWaveTimers(UpdateWaveTimerEvent eventData)
 	{
 		float cooldownDuration = DefaultPluginVars.coolDownTimer.Value;
-		foreach (BotWave wave in _botWaves)
+		foreach (BotWave wave in botWaves)
 		{
 			wave.UpdateTimer(eventData.deltaTime, cooldownDuration);
 		}
@@ -398,11 +436,13 @@ public abstract class BotDataService : IBotDataService
 	/// </summary>
 	public void ResetGroupTimers(int groupNum)
 	{
-		foreach (BotWave wave in _botWavesByGroupNum[groupNum])
+		foreach (BotWave wave in botWavesByGroupNum[groupNum])
 		{
 			wave.ResetTimer();
 		}
 	}
+	
+	public abstract int GetAliveBotsCount();
 	
 	protected static BotDifficulty GetBotDifficulty(string settingValue)
 	{

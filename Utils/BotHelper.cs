@@ -86,22 +86,4 @@ internal static class BotHelper
 		
 		return MathHelper.GetOutcomeWithProbability(probabilities, minGroupSize, maxGroupSize) + minGroupSize;
 	}
-
-	/// <summary>
-	/// Generates a number between the <see cref="min"/> and <see cref="max"/> values,
-	/// then clamps the number by <see cref="clampMax"/>.
-	/// </summary>
-	/// <param name="min">The inclusive lower bound.</param>
-	/// <param name="max">The inclusive upper bound.</param>
-	/// <param name="clampMax">The result, if higher than <see cref="max"/>, will be clamped to this value.</param>
-	internal static int GetRandomBotCap(int min, int max, int clampMax = int.MaxValue)
-	{
-		if (max < min)
-		{
-			throw new ArgumentException("The max must be greater than min");
-		}
-		
-		int botCap = Random.Range(min, max);
-		return Math.Min(botCap, clampMax);
-	}
 }

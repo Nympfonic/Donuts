@@ -2,7 +2,7 @@
 using Comfort.Common;
 using Cysharp.Text;
 using Cysharp.Threading.Tasks;
-using Donuts.Bots.SpawnCheckProcessor;
+using Donuts.Bots.Processors;
 using Donuts.Models;
 using Donuts.Utils;
 using EFT;
@@ -13,205 +13,119 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Threading;
-using Systems.Effects;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityToolkit.Structures.EventBus;
-using Random = UnityEngine.Random;
 
 namespace Donuts.Bots;
 
 public interface IBotSpawnService
 {
-	UniTask SpawnStartingBots();
-	UniTask<bool> TrySpawnBotWave(BotWave wave);
-	UniTask DespawnExcessBots();
+	UniTask<bool> SpawnStartingBots(CancellationToken cancellationToken);
+	UniTask<bool> TrySpawnBotWave(CancellationToken cancellationToken);
 }
 
 public abstract class BotSpawnService : IBotSpawnService
 {
-	public readonly struct ResetPlayerCombatTimerEvent : IEvent;
+	private readonly IBotCreator _botCreator;
+	private readonly BotsController _botsController;
+	private readonly BotSpawner _eftBotSpawner;
 	
-	private ReadOnlyCollection<Player> _allAlivePlayersReadOnly;
-	private IBotCreator _botCreator;
-	private BotsController _botsController;
-	
-	private BotSpawner _eftBotSpawner;
-	private GameWorld _gameWorld;
-	private string _mapLocation;
-	private CancellationToken _onDestroyToken;
-	
-	private SpawnCheckProcessorBase _spawnCheckProcessor;
+	private readonly WaveSpawnProcessorBase _waveSpawnProcessor;
+	private readonly WaveSpawnData _waveSpawnData;
+	private readonly SpawnCheckProcessorBase _spawnCheckProcessor;
 	
 	// Spawn caps
 	private int _currentRespawnCount;
 	
-	// Despawning
-	private float _despawnCooldownTime;
+	private const int MS_RETRY_INTERVAL = 500;
 	
-	// Combat state
-	private EventBinding<ResetPlayerCombatTimerEvent> _resetPlayerCombatTimerBinding;
-	private float _playerInCombatPrevTime;
+	protected readonly BotConfigService configService;
+	protected readonly IBotDataService dataService;
+	protected readonly ManualLogSource logger;
 	
-	private readonly TimeSpan _retryInterval = TimeSpan.FromMilliseconds(500);
-	private const int FRAME_DELAY_BETWEEN_SPAWNS = 5;
+	protected DonutsSpawnType spawnType;
 	
-	protected BotConfigService ConfigService { get; private set; }
-	protected IBotDataService DataService { get; private set; }
-	protected ManualLogSource Logger { get; private set; }
-	
-	public static TBotSpawnService Create<TBotSpawnService>(
-		[NotNull] BotConfigService configService,
-		[NotNull] IBotDataService dataService,
-		[NotNull] BotSpawner eftBotSpawner,
-		[NotNull] ManualLogSource logger,
-		CancellationToken cancellationToken = default)
-		where TBotSpawnService : BotSpawnService, new()
+	protected BotSpawnService(BotConfigService configService, IBotDataService dataService)
 	{
-		var service = new TBotSpawnService();
-		service.Initialize(configService, dataService, eftBotSpawner, logger, cancellationToken);
-		MonoBehaviourSingleton<DonutsRaidManager>.Instance.BotSpawnServices.Add(dataService.SpawnType, service);
-		return service;
-	}
-	
-	private void Initialize(
-		[NotNull] BotConfigService configService,
-		[NotNull] IBotDataService dataService,
-		[NotNull] BotSpawner eftBotSpawner,
-		[NotNull] ManualLogSource logger,
-		CancellationToken cancellationToken)
-	{
-		ConfigService = configService;
-		DataService = dataService;
-		_eftBotSpawner = eftBotSpawner;
-		Logger = logger;
-		_onDestroyToken = cancellationToken;
+		this.configService = configService;
+		this.dataService = dataService;
+		logger = DonutsRaidManager.Logger;
 		
-		_gameWorld = Singleton<GameWorld>.Instance;
-		_allAlivePlayersReadOnly = _gameWorld.AllAlivePlayersList.AsReadOnly();
-		_mapLocation = ConfigService.GetMapLocation();
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
+		_eftBotSpawner = _botsController.BotSpawner;
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
 		
-		_resetPlayerCombatTimerBinding = new EventBinding<ResetPlayerCombatTimerEvent>(ResetPlayerCombatTimer);
-		EventBus<ResetPlayerCombatTimerEvent>.Register(_resetPlayerCombatTimerBinding);
+		_waveSpawnData = new WaveSpawnData(dataService.ResetGroupTimers);
+		_waveSpawnProcessor = new PlayerCombatStateCheck();
+		_waveSpawnProcessor.SetNext(new WaveSpawnChanceCheck());
 		
-		_spawnCheckProcessor = new EntitySpawnCheckProcessor(_mapLocation, _allAlivePlayersReadOnly);
-		_spawnCheckProcessor.SetNext(new WallSpawnCheckProcessor())
-			.SetNext(new GroundSpawnCheckProcessor());
+		string mapLocation = this.configService.GetMapLocation();
+		_spawnCheckProcessor = new EntityVicinityCheck(mapLocation, dataService.AllAlivePlayers);
+		_spawnCheckProcessor.SetNext(new WallCollisionCheck())
+			.SetNext(new GroundCheck());
 	}
 	
-	private void ResetPlayerCombatTimer()
+	public async UniTask<bool> SpawnStartingBots(CancellationToken cancellationToken)
 	{
-		_playerInCombatPrevTime = Time.time;
-	}
-	
-	public async UniTask SpawnStartingBots()
-	{
-		Queue<PrepBotInfo> startingBotsCache = DataService.StartingBotsCache;
-		ZoneSpawnPoints zoneSpawnPoints = DataService.ZoneSpawnPoints;
-		List<string> zoneNames = DataService.StartingBotConfig.Zones;
-
+		Queue<PrepBotInfo> startingBotsCache = dataService.StartingBotsCache;
+		
 		int count = startingBotsCache.Count;
-		while (count > 0 && !_onDestroyToken.IsCancellationRequested)
+		if (count == 0)
+		{
+			return true;
+		}
+		
+		while (count > 0 && !cancellationToken.IsCancellationRequested)
 		{
 			PrepBotInfo botSpawnInfo = startingBotsCache.Dequeue();
 			count--;
 			
-			await StartingBotsSpawnPointsCheck(zoneSpawnPoints, botSpawnInfo, zoneNames);
+			IncrementBotSpawnerInProcessCounter(botSpawnInfo.groupSize);
 			
-			// Wait until next frame between spawns to reduce the chances of stalling the game
+			bool success = await StartingBotsSpawnPointsCheck(botSpawnInfo, cancellationToken);
+			if (!success)
+			{
+				startingBotsCache.Enqueue(botSpawnInfo);
+				IncrementBotSpawnerInProcessCounter(-botSpawnInfo.groupSize);
+			}
+			
+			// Delay between spawns to improve performance
 			if (count > 0)
 			{
-				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_SPAWNS, cancellationToken: _onDestroyToken);
+				await UniTask.Delay(MS_RETRY_INTERVAL, cancellationToken: cancellationToken);
 			}
 		}
+		
+		return startingBotsCache.Count == 0;
 	}
 	
-	public async UniTask<bool> TrySpawnBotWave(BotWave wave)
+	public async UniTask<bool> TrySpawnBotWave(CancellationToken cancellationToken)
 	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(TrySpawnBotWave);
-#endif
-		
-		if (IsHumanPlayerInCombat())
+		Queue<BotWave> waveQueue = dataService.GetBotWavesToSpawn();
+		if (waveQueue.Count == 0)
 		{
-			DataService.ResetGroupTimers(wave.GroupNum);
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: {1}", wave.GroupNum.ToString(),
-				"A Human player is in combat state");
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
 			return false;
 		}
 		
-		bool anySpawned = IsSpawnChanceSuccessful(wave.SpawnChance) && await TryProcessBotWave(wave);
+		BotWave wave = waveQueue.Dequeue();
+		_waveSpawnData.Wave = wave;
+		if (!_waveSpawnProcessor.Process(_waveSpawnData))
+		{
+			return false;
+		}
 		
-		DataService.ResetGroupTimers(wave.GroupNum);
-#if DEBUG
-		sb.Clear();
-		sb.AppendFormat("Resetting timer for GroupNum {0}, reason: {1}", wave.GroupNum.ToString(), "Bot wave spawn triggered");
-		Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+		bool anySpawned = await TryProcessBotWave(wave, cancellationToken);
+		
+		dataService.ResetGroupTimers(wave.GroupNum);
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed(
+				$"Resetting timer for GroupNum {wave.GroupNum.ToString()}, reason: Bot wave spawn triggered",
+				GetType().Name, nameof(TrySpawnBotWave));
+		}
+		
 		return anySpawned;
-	}
-	
-	public async UniTask DespawnExcessBots()
-	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(DespawnExcessBots);
-		var spawnTypeName = DataService.SpawnType.ToString();
-#endif
-		
-		if (!IsDespawnBotEnabled())
-		{
-			return;
-		}
-		
-		float timeSinceLastDespawn = Time.time - _despawnCooldownTime;
-		bool hasReachedTimeToDespawn = timeSinceLastDespawn >= DefaultPluginVars.despawnInterval.Value;
-		if (!IsOverBotLimit(out int excessBots) || !hasReachedTimeToDespawn)
-		{
-			return;
-		}
-		
-		if (excessBots <= 0)
-		{
-#if DEBUG
-			Logger.LogDebugDetailed($"{nameof(excessBots)} should be greater than zero! Verify if statements are correct!",
-				nameof(BotSpawnService), methodName);
-#endif
-			return;
-		}
-		
-		for (var i = 0; i < excessBots; i++)
-		{
-			Player furthestBot = FindFurthestBot();
-			if (furthestBot == null)
-			{
-#if DEBUG
-				sb.Clear();
-				sb.AppendFormat("No {0} bot found to despawn. Aborting despawn logic!", spawnTypeName);
-				Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
-				return;
-			}
-
-			if (!TryDespawnBot(furthestBot))
-			{
-				return;
-			}
-
-			if (i < excessBots - 1)
-			{
-				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_SPAWNS, cancellationToken: _onDestroyToken);
-			}
-		}
 	}
 	
 	protected abstract bool IsHardStopEnabled();
@@ -221,11 +135,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	// This is an old comment, method has been changed so it needs testing
 	private bool HasReachedHardStopTime()
 	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(HasReachedHardStopTime);
-#endif
 		if (!IsHardStopEnabled())
 		{
 			return false;
@@ -235,37 +144,55 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			float raidTimeLeftTime = RaidTimeUtil.GetRemainingRaidSeconds(); // Time left
 			int hardStopTime = GetHardStopTime();
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("RaidTimeLeftTime: {0}, HardStopTime: {1}",
-				raidTimeLeftTime.ToString(CultureInfo.InvariantCulture), hardStopTime.ToString());
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("RaidTimeLeftTime: {0}, HardStopTime: {1}",
+					raidTimeLeftTime.ToString(CultureInfo.InvariantCulture), hardStopTime.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(HasReachedHardStopTime));
+			}
+			
 			return raidTimeLeftTime <= hardStopTime;
 		}
 		
 		float raidTimeLeftPercent = RaidTimeUtil.GetRaidTimeRemainingFraction() * 100f; // Percent left
 		int hardStopPercent = GetHardStopTime();
-#if DEBUG
-		sb.Clear();
-		sb.AppendFormat("RaidTimeLeftPercent: {0}, HardStopPercent: {1}",
-			raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture), hardStopPercent.ToString());
-		Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("RaidTimeLeftPercent: {0}, HardStopPercent: {1}",
+				raidTimeLeftPercent.ToString(CultureInfo.InvariantCulture), hardStopPercent.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(HasReachedHardStopTime));
+		}
+		
 		return raidTimeLeftPercent <= hardStopPercent;
+	}
+	
+	/// <summary>
+	/// Increment BotSpawner's _inSpawnProcess int field so the bot count is correct.
+	/// </summary>
+	/// <remarks>
+	/// Normally <c>BotSpawner::method_7()</c> handles this but we skip it to directly call <c>GClass888::ActivateBot()</c>.
+	/// </remarks>
+	private void IncrementBotSpawnerInProcessCounter(int value)
+	{
+		var currentInSpawnProcess = (int)ReflectionHelper.BotSpawner_inSpawnProcess_Field.GetValue(_eftBotSpawner);
+		int newInSpawnProcess = currentInSpawnProcess + value;
+		ReflectionHelper.BotSpawner_inSpawnProcess_Field.SetValue(_eftBotSpawner, newInSpawnProcess);
 	}
 	
 	[CanBeNull]
 	private AICorePoint GetClosestCorePoint(Vector3 position) =>
 		_botsController.CoversData.GetClosest(position)?.CorePointInGame;
 	
-	private void ActivateBotAtPosition([NotNull] BotCreationDataClass botData, Vector3 spawnPosition)
+	private void ActivateBotAtPosition(
+		[NotNull] BotCreationDataClass botData,
+		Vector3 spawnPosition,
+		CancellationToken cancellationToken = default)
 	{
-		// Must add to _inSpawnProcess so the bot count managed by BotSpawner is correct
-		// Normally BotSpawner::method_7() handles this but we skip it to directly call GClass888::ActivateBot()
-		var currentInSpawnProcess = (int)ReflectionHelper.BotSpawner_inSpawnProcess_Field.GetValue(_eftBotSpawner);
-		int newInSpawnProcess = currentInSpawnProcess + botData.Count;
-		ReflectionHelper.BotSpawner_inSpawnProcess_Field.SetValue(_eftBotSpawner, newInSpawnProcess);
+		int groupCount = botData.Count;
 		
 		// Add spawn point to the BotCreationDataClass
 		BotZone closestBotZone = _eftBotSpawner.GetClosestZone(spawnPosition, out _);
@@ -273,9 +200,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		botData.AddPosition(spawnPosition, closestCorePoint!.Id);
 		
 		// Set SpawnParams so the bots are grouped correctly
-		bool isGroup = botData.Count > 1;
+		bool isGroup = groupCount > 1;
 		bool isBossGroup = botData._profileData.TryGetRole(out WildSpawnType role, out _) && role.IsBoss();
-		int groupCount = botData.Count;
 		var newSpawnParams = new BotSpawnParams
 		{
 			ShallBeGroup = new ShallBeGroupParams(isGroup, isBossGroup, groupCount),
@@ -288,236 +214,80 @@ public abstract class BotSpawnService : IBotSpawnService
 		var callback = new Action<BotOwner>(activateBotCallbackWrapper.CreateBotCallback);
 		
 		// shallBeGroup doesn't matter at this stage, it only matters in the callback action
-		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, _onDestroyToken);
-		EventBus<BotDataService.ResetReplenishTimerEvent>.Raise(new BotDataService.ResetReplenishTimerEvent());
+		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, cancellationToken);
+		EventBus.Raise(new BotDataService.ResetReplenishTimerEvent());
 	}
 	
-	private async UniTask StartingBotsSpawnPointsCheck(
-		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
+	private async UniTask<bool> StartingBotsSpawnPointsCheck(
 		[NotNull] PrepBotInfo botSpawnInfo,
-		[NotNull] IList<string> zoneNames)
+		CancellationToken cancellationToken = default)
 	{
 		// Iterate through unused zone spawn points
 		var failsafeCounter = 0;
-		while (failsafeCounter < 3)
+		const int maxFailsafeAttempts = 3;
+		while (failsafeCounter < maxFailsafeAttempts)
 		{
-			if (_onDestroyToken.IsCancellationRequested) return;
-			Vector3? spawnPoint = zoneSpawnPoints.GetUnusedStartingSpawnPoint(zoneNames, out string zoneName);
-			if (!spawnPoint.HasValue) return;
+			if (cancellationToken.IsCancellationRequested) return false;
+			Vector3? spawnPoint = dataService.GetUnusedStartingSpawnPoint();
+			if (!spawnPoint.HasValue) return false;
 			
-			Vector3? positionOnNavMesh = await GetValidSpawnPosition(spawnPoint.Value, _spawnCheckProcessor);
-			if (_onDestroyToken.IsCancellationRequested) return;
+			Vector3? positionOnNavMesh = await GetValidSpawnPosition(spawnPoint.Value, _spawnCheckProcessor, cancellationToken);
+			if (cancellationToken.IsCancellationRequested) return false;
 			if (!positionOnNavMesh.HasValue)
 			{
 				failsafeCounter++;
-				await UniTask.Delay(_retryInterval, cancellationToken: _onDestroyToken);
+				await UniTask.Delay(MS_RETRY_INTERVAL, cancellationToken: cancellationToken);
 				continue;
 			}
 			
-			ActivateBotAtPosition(botSpawnInfo.botCreationData, positionOnNavMesh.Value);
-			zoneSpawnPoints.SetStartingSpawnPointAsUsed(zoneName, spawnPoint.Value);
-			return;
-		}
-#if DEBUG
-		Logger.LogDebugDetailed("Failed to spawn some starting bots!", GetType().Name, nameof(StartingBotsSpawnPointsCheck));
-#endif
-	}
-	
-	protected abstract bool IsCorrectSpawnType(WildSpawnType role);
-	
-	/// <summary>
-	/// Finds the furthest bot away from all human players
-	/// </summary>
-	[CanBeNull]
-	private Player FindFurthestBot()
-	{
-		var furthestSqrMagnitude = float.MinValue;
-		Player furthestBot = null;
-		ReadOnlyCollection<Player> allAlivePlayers = _allAlivePlayersReadOnly;
-		ReadOnlyCollection<Player> humanPlayers = ConfigService.GetHumanPlayerList();
-		// Iterate through alive players
-		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
-		{
-			Player player = allAlivePlayers[i];
-			// Ignore players that aren't bots or aren't the correct spawn type
-			if (!player.IsAI ||
-				player.AIData?.BotOwner == null ||
-				!IsCorrectSpawnType(player.Profile.Info.Settings.Role))
-			{
-				continue;
-			}
-			
-			// Iterate through all human players
-			for (int j = humanPlayers.Count - 1; j >= 0; j--)
-			{
-				Player humanPlayer = humanPlayers[j];
-				// Ignore dead human players
-				if (humanPlayer == null || humanPlayer.HealthController == null || !humanPlayer.HealthController.IsAlive)
-				{
-					continue;
-				}
-				
-				// Get distance of bot to human player using squared distance
-				float sqrMagnitude = (humanPlayer.Transform.position - player.Transform.position).sqrMagnitude;
-				
-				// Check if this is the furthest distance
-				if (sqrMagnitude > furthestSqrMagnitude)
-				{
-					furthestSqrMagnitude = sqrMagnitude;
-					furthestBot = player;
-				}
-			}
+			ActivateBotAtPosition(botSpawnInfo.botCreationData, positionOnNavMesh.Value, cancellationToken);
+			return true;
 		}
 		
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		if (furthestBot == null)
+		if (DefaultPluginVars.debugLogging.Value)
 		{
-			sb.Append("Furthest bot is null. No bots found in the list.");
-		}
-		else
-		{
-			sb.AppendFormat("Furthest bot found: {0} at distance {1}", furthestBot.Profile.Info.Nickname,
-				Mathf.Sqrt(furthestSqrMagnitude).ToString(CultureInfo.InvariantCulture));
-		}
-		Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(FindFurthestBot));
-#endif
-		
-		return furthestBot;
-	}
-	
-	private bool IsOverBotLimit(out int excess)
-	{
-		var isOverBotLimit = false;
-		int aliveBots = GetAliveBotsCount();
-		int botLimit = DataService.MaxBotLimit;
-		if (aliveBots > botLimit)
-		{
-			excess = aliveBots - botLimit;
-			isOverBotLimit = true;
-		}
-		else
-		{
-			excess = 0;
-		}
-		return isOverBotLimit;
-	}
-	
-	protected abstract bool IsDespawnBotEnabled();
-	
-	private bool TryDespawnBot([NotNull] Player furthestBot)
-	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(TryDespawnBot);
-#endif
-		BotOwner botOwner = furthestBot.AIData?.BotOwner;
-		if (botOwner == null)
-		{
-#if DEBUG
-			Logger.LogDebugDetailed("Attempted to despawn a null bot.", typeName, methodName);
-#endif
-			return false;
-		}
-		
-#if DEBUG
-		sb.Clear();
-		sb.AppendFormat("Despawning bot: {0} ({1})", furthestBot.Profile.Info.Nickname, furthestBot.name);
-		Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
-		
-		Player botPlayer = botOwner.GetPlayer;
-        _gameWorld.RegisteredPlayers.Remove(botOwner);
-        _gameWorld.AllAlivePlayersList.Remove(botPlayer);
-		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botPlayer);
-		// BSG calls this to despawn; this calls the BotOwner::Deactivate(), BotOwner::Dispose() and IBotGame::BotDespawn() methods
-        botOwner.LeaveData.RemoveFromMap();
-        
-		// Update the cooldown
-		_despawnCooldownTime = Time.time;
-		return true;
-	}
-	
-	private bool IsHumanPlayerInCombat()
-	{
-		return Time.time - _playerInCombatPrevTime < DefaultPluginVars.battleStateCoolDown.Value;
-	}
-	
-	private bool IsSpawnChanceSuccessful(int spawnChance)
-    {
-    	int randomValue = Random.Range(0, 100);
-    	bool canSpawn = randomValue < spawnChance;
-#if DEBUG
-	    using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-	    sb.AppendFormat("SpawnChance: {0}, RandomValue: {1}, CanSpawn: {2}", spawnChance.ToString(),
-			randomValue.ToString(), canSpawn.ToString());
-	    Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(IsSpawnChanceSuccessful));
-#endif
-    	return canSpawn;
-    }
-	
-	private async UniTask<bool> TryProcessBotWave(BotWave wave)
-	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-#endif
-		ZoneSpawnPoints zoneSpawnPoints = DataService.ZoneSpawnPoints;
-		if (zoneSpawnPoints.Count == 0)
-		{
-			DataService.ResetGroupTimers(wave.GroupNum);
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Resetting timer for GroupNum {0}\nReason: {1}", wave.GroupNum.ToString(),
-				"Fatal Error: No zone spawn points were loaded. Check your zoneSpawnPoints folder!");
-			Logger.NotifyLogError(sb.ToString());
-#endif
-			return false;
-		}
-		
-		List<string> waveZones = wave.Zones;
-		
-		if (waveZones.Count == 0)
-		{
-			DataService.ResetGroupTimers(wave.GroupNum);
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Resetting timer for GroupNum {0}\nReason: {1}", wave.GroupNum.ToString(),
-				"Fatal Error: No zones specified in bot wave. Check your scenario wave patterns are set up correctly!");
-			Logger.NotifyLogError(sb.ToString());
-#endif
-			return false;
-		}
-		
-		// Iterate through shuffled wave zones, adjust for keyword zones and attempt spawning
-		foreach (string zoneName in waveZones.ShuffleElements(createNewList: true))
-		{
-			// Instead of loosely matching, we do an exact match so we know if the wave is specifying all hotspots or just a few hotspots
-			if (!ZoneSpawnPoints.IsKeywordZone(zoneName, out ZoneSpawnPoints.KeywordZoneType keyword, exactMatch: true))
-			{
-				bool isHotspot = ZoneSpawnPoints.IsHotspotZone(zoneName, out _);
-				if (isHotspot)
-				{
-					AdjustHotspotSpawnChance(wave, zoneName);
-				}
-				
-				if (await TrySpawnBotIfValidZone(zoneName, wave, zoneSpawnPoints, isHotspot)) return true;
-				
-				continue;
-			}
-			
-			if (keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot)
-			{
-				AdjustHotspotSpawnChance(wave, zoneName);
-			}
-
-			// If we matched a keyword zone and it still failed to spawn, return false
-			// A wave should not contain multiple zones if a keyword is used
-			return await TrySpawnBotIfValidZone(keyword, wave, zoneSpawnPoints,
-				isHotspot: keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot);
+			logger.LogDebugDetailed("Failed to spawn some starting bots!", GetType().Name, nameof(StartingBotsSpawnPointsCheck));
 		}
 		
 		return false;
+	}
+	
+	private async UniTask<bool> TryProcessBotWave(BotWave wave, CancellationToken cancellationToken = default)
+	{
+		ZoneSpawnPoints zoneSpawnPoints = dataService.ZoneSpawnPoints;
+		string[] waveZones = wave.Zones;
+		
+		if (waveZones.Length == 0)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Donuts: No zones specified in {0} bot wave for GroupNum {1}. Check your scenario wave patterns are set up correctly!",
+				spawnType.ToString(), wave.GroupNum.ToString());
+			logger.NotifyLogError(sb.ToString());
+			return false;
+		}
+
+		string randomZone = waveZones.PickRandomElement()!;
+		
+		// Instead of loosely matching, we do an exact match so we know if the wave is using the 'hotspot' keyword
+		if (ZoneSpawnPoints.IsKeywordZone(randomZone, out ZoneSpawnPoints.KeywordZoneType keyword, exactMatch: true))
+		{
+			if (keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot)
+			{
+				AdjustHotspotSpawnChance(wave, randomZone);
+			}
+			
+			return await TrySpawnBotIfValidZone(keyword, wave, zoneSpawnPoints,
+				isHotspot: keyword == ZoneSpawnPoints.KeywordZoneType.Hotspot, cancellationToken);
+		}
+		
+		// This time, do a loose match for 'hotspot' so we can adjust the spawn chance of zones with 'hotspot' in the name
+		bool isHotspot = ZoneSpawnPoints.IsHotspotZone(randomZone, out _);
+		if (isHotspot)
+		{
+			AdjustHotspotSpawnChance(wave, randomZone);
+		}
+		
+		return await TrySpawnBotIfValidZone(randomZone, wave, zoneSpawnPoints, isHotspot);
 	}
 
 	private async UniTask<bool> TrySpawnBotIfValidZone(
@@ -526,22 +296,24 @@ public abstract class BotSpawnService : IBotSpawnService
 		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
 		bool isHotspot)
 	{
-		if (!zoneSpawnPoints.TryGetValue(zoneName, out List<Vector3> spawnPoints))
+		if (!zoneSpawnPoints.TryGetValue(zoneName, out HashSet<Vector3> spawnPoints))
 		{
 			return false;
 		}
 		
-		foreach (Vector3 spawnPoint in spawnPoints.ShuffleElements(createNewList: true))
+		foreach (Vector3 spawnPoint in spawnPoints.ShuffleElements())
 		{
 			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
 				await TrySpawnBot(wave, spawnPoint, isHotspot))
 			{
-#if DEBUG
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1}, {2}", wave.GroupNum, zoneName,
-					spawnPoint.ToString());
-				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
-#endif
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+					sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1}, {2}", wave.GroupNum, zoneName,
+						spawnPoint.ToString());
+					logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
+				}
+				
 				return true;
 			}
 		}
@@ -553,31 +325,35 @@ public abstract class BotSpawnService : IBotSpawnService
 		ZoneSpawnPoints.KeywordZoneType keyword,
 		[NotNull] BotWave wave,
 		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
-		bool isHotspot)
+		bool isHotspot,
+		CancellationToken cancellationToken = default)
 	{
-		List<KeyValuePair<string, List<Vector3>>> keywordZones = zoneSpawnPoints.GetSpawnPointsFromKeyword(keyword);
-		if (keywordZones.Count == 0)
+		KeyValuePair<string, HashSet<Vector3>>[] keywordZones = zoneSpawnPoints.GetSpawnPointsFromKeyword(keyword);
+		if (keywordZones == null || keywordZones.Length == 0)
 		{
 			return false;
 		}
 		
-		KeyValuePair<string, List<Vector3>> pair = keywordZones.PickRandomElement();
-		
-		foreach (Vector3 spawnPoint in pair.Value.ShuffleElements(createNewList: true))
+		KeyValuePair<string, HashSet<Vector3>> spawnPoints = keywordZones.PickRandomElement();
+		foreach (Vector3 spawnPoint in spawnPoints!.Value.ShuffleElements())
 		{
-			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
-				await TrySpawnBot(wave, spawnPoint, isHotspot))
+			if (!IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) ||
+				!await TrySpawnBot(wave, spawnPoint, isHotspot, cancellationToken))
 			{
-#if DEBUG
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1} (Keyword: {2}), {3}", wave.GroupNum, pair.Key,
-					keyword.ToString(), spawnPoint.ToString());
-				Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
-#endif
-				return true;
+				continue;
 			}
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1} (Keyword: {2}), {3}", wave.GroupNum,
+					spawnPoints.Key, keyword.ToString(), spawnPoint.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
+			}
+				
+			return true;
 		}
-
+		
 		return false;
 	}
 	
@@ -593,21 +369,21 @@ public abstract class BotSpawnService : IBotSpawnService
 			return;
 		}
 		
-#if DEBUG
-		using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
+		if (DefaultPluginVars.debugLogging.Value)
 		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("{0} is a hotspot; hotspot boost is enabled, setting spawn chance to 100", zoneName);
-			Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustHotspotSpawnChance));
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustHotspotSpawnChance));
 		}
-#endif
-		wave.SpawnChance = 100;
+		
+		wave.SetSpawnChance(100);
 	}
 	
 	private bool IsHumanPlayerWithinTriggerDistance(int triggerDistance, Vector3 position)
 	{
 		int triggerSqrMagnitude = triggerDistance * triggerDistance;
 		
-		ReadOnlyCollection<Player> humanPlayerList = ConfigService.GetHumanPlayerList();
+		ReadOnlyCollection<Player> humanPlayerList = configService.GetHumanPlayerList();
 		for (int i = humanPlayerList.Count - 1; i >= 0; i--)
 		{
 			Player player = humanPlayerList[i];
@@ -630,7 +406,11 @@ public abstract class BotSpawnService : IBotSpawnService
 	/// <summary>
 	/// Checks certain spawn options, reset groups timers.
 	/// </summary>
-	private async UniTask<bool> TrySpawnBot([NotNull] BotWave wave, Vector3 spawnPoint, bool isHotspot)
+	private async UniTask<bool> TrySpawnBot(
+		[NotNull] BotWave wave,
+		Vector3 spawnPoint,
+		bool isHotspot,
+		CancellationToken cancellationToken = default)
 	{
 		if ((DefaultPluginVars.HardCapEnabled.Value && HasReachedHardCap(isHotspot)) || HasReachedHardStopTime())
 		{
@@ -643,68 +423,81 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 		
-		if (await SpawnBot(groupSize, spawnPoint, spawnCheckProcessor: _spawnCheckProcessor))
+		IncrementBotSpawnerInProcessCounter(groupSize);
+		bool success = await SpawnBot(groupSize, spawnPoint, spawnCheckProcessor: _spawnCheckProcessor,
+			cancellationToken: cancellationToken);
+		
+		if (success)
 		{
 			wave.SpawnTriggered();
 		}
+		else
+		{
+			IncrementBotSpawnerInProcessCounter(-groupSize);
+		}
 		
-		return !_onDestroyToken.IsCancellationRequested;
+		return !cancellationToken.IsCancellationRequested;
 	}
 	
 	private async UniTask<bool> SpawnBot(
 		int groupSize,
 		Vector3 spawnPoint,
 		bool generateNew = true,
-		SpawnCheckProcessorBase spawnCheckProcessor = null)
+		SpawnCheckProcessorBase spawnCheckProcessor = null,
+		CancellationToken cancellationToken = default)
 	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(SpawnBot);
-#endif
-		BotDifficulty difficulty = DataService.GetBotDifficulty();
-		PrepBotInfo cachedPrepBotInfo = DataService.FindCachedBotData(difficulty, groupSize);
+		BotDifficulty difficulty = dataService.GetBotDifficulty();
+		PrepBotInfo cachedPrepBotInfo = dataService.FindCachedBotData(difficulty, groupSize);
 		if (generateNew && cachedPrepBotInfo?.botCreationData == null)
 		{
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("No cached bots found for this spawn, generating on the fly for {0} bots - this may take some time.",
-				groupSize.ToString());
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
-			(bool success, cachedPrepBotInfo) = await DataService.TryCreateBotData(difficulty, groupSize);
-			if (_onDestroyToken.IsCancellationRequested || !success) return false;
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("No cached bots found for this spawn, generating on the fly for {0} bots - this may take some time.",
+					groupSize.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SpawnBot));
+			}
+			
+			(bool success, cachedPrepBotInfo) =
+				await dataService.TryCreateBotData(difficulty, groupSize, cancellationToken: cancellationToken);
+			if (cancellationToken.IsCancellationRequested || !success) return false;
 		}
 		
 		if (cachedPrepBotInfo?.botCreationData == null) return false;
 		
-#if DEBUG
-		Logger.LogDebugDetailed("Found grouped cached bots, spawning them.", typeName, methodName);
-#endif
-		Vector3? spawnPosition = await GetValidSpawnPosition(spawnPoint, spawnCheckProcessor);
-		if (_onDestroyToken.IsCancellationRequested) return false;
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed("Found grouped cached bots, spawning them.", GetType().Name, nameof(SpawnBot));
+		}
+		
+		Vector3? spawnPosition = await GetValidSpawnPosition(spawnPoint, spawnCheckProcessor, cancellationToken);
+		if (cancellationToken.IsCancellationRequested) return false;
 		
 		if (spawnPosition.HasValue)
 		{
-			ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value);
-			DataService.RemoveFromBotCache(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize));
+			ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value, cancellationToken);
+			dataService.RemoveFromBotCache(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize));
 			return true;
 		}
 		
-#if DEBUG
-		Logger.LogDebugDetailed("No valid spawn position found after retries - skipping this spawn", typeName, methodName);
-#endif
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed("No valid spawn position found after retries - skipping this spawn", GetType().Name,
+				nameof(SpawnBot));
+		}
+		
 		return false;
 	}
 	
 	private async UniTask<Vector3?> GetValidSpawnPosition(
 		Vector3 position,
-		[CanBeNull] SpawnCheckProcessorBase spawnCheckProcessor)
+		[CanBeNull] SpawnCheckProcessorBase spawnCheckProcessor,
+		CancellationToken cancellationToken = default)
 	{
 		int maxSpawnAttempts = DefaultPluginVars.maxSpawnTriesPerBot.Value;
 		for (var i = 0; i < maxSpawnAttempts; i++)
 		{
-			if (_onDestroyToken.IsCancellationRequested)
+			if (cancellationToken.IsCancellationRequested)
 			{
 				return null;
 			}
@@ -712,16 +505,19 @@ public abstract class BotSpawnService : IBotSpawnService
 			if (!NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas) ||
 				(spawnCheckProcessor != null && !spawnCheckProcessor.Process(navHit.position)))
 			{
-				await UniTask.Delay(_retryInterval, cancellationToken: _onDestroyToken);
+				await UniTask.Delay(MS_RETRY_INTERVAL, cancellationToken: cancellationToken);
 				continue;
 			}
 			
 			Vector3 spawnPosition = navHit.position;
-#if DEBUG
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("Found spawn position at: {0}", spawnPosition.ToString());
-			Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(GetValidSpawnPosition));
-#endif
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Found spawn position at: {0}", spawnPosition.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(GetValidSpawnPosition));
+			}
+			
 			return spawnPosition;
 		}
 		
@@ -758,12 +554,10 @@ public abstract class BotSpawnService : IBotSpawnService
 		return groupSize;
 	}
 	
-	protected abstract int GetAliveBotsCount();
-	
 	private int AdjustGroupSizeForHardCap(int groupSize)
 	{
-		int activeBots = GetAliveBotsCount();
-		int botLimit = DataService.MaxBotLimit;
+		int activeBots = dataService.GetAliveBotsCount();
+		int botLimit = dataService.MaxBotLimit;
 		
 		if (activeBots >= botLimit)
 		{
@@ -782,12 +576,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	private int AdjustMaxCountForRespawnLimits(int groupSize)
 	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		string typeName = GetType().Name;
-		const string methodName = nameof(AdjustMaxCountForRespawnLimits);
-		var spawnTypeName = DataService.SpawnType.ToString();
-#endif
 		int maxBotRespawns = GetMaxBotRespawns();
 		// Don't cap if maxRespawns is set to zero or less
 		if (maxBotRespawns <= 0)
@@ -798,23 +586,27 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		if (_currentRespawnCount >= maxBotRespawns)
 		{
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Max {0} respawns reached, skipping this spawn", spawnTypeName);
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Max {0} respawns reached, skipping this spawn", spawnType.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
+			}
+			
 			return -1;
 		}
 		
 		if (_currentRespawnCount + groupSize >= maxBotRespawns)
 		{
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Max {0} respawn limit reached: {1}. Current {2} respawns this raid: {3}",
-				spawnTypeName, DefaultPluginVars.maxRespawnsPMC.Value.ToString(),
-				(_currentRespawnCount + groupSize).ToString());
-			Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Max {0} respawn limit reached: {1}. Current {2} respawns this raid: {3}",
+					spawnType.ToString(), DefaultPluginVars.maxRespawnsPMC.Value.ToString(),
+					(_currentRespawnCount + groupSize).ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
+			}
+			
 			groupSize = maxBotRespawns - _currentRespawnCount;
 		}
 		

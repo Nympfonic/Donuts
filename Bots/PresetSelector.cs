@@ -16,9 +16,11 @@ public static class PresetSelector
 		string scenarioSelection = DefaultPluginVars.pmcScenarioSelection.Value;
 		if (RaidChangesUtil.IsScavRaid)
 		{
-#if DEBUG
-			ConsoleScreen.LogWarning("This is a Scav raid; using Scav raid preset selector");
-#endif
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				ConsoleScreen.LogWarning("This is a Scav raid; using Scav raid preset selector");
+			}
+			
 			scenarioSelection = DefaultPluginVars.scavScenarioSelection.Value;
 		}
 

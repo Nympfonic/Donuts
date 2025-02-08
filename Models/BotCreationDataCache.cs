@@ -20,7 +20,7 @@ public class BotCreationDataCache(int capacity = 0) : Dictionary<PrepBotInfo.Gro
 			this[key] = new Queue<PrepBotInfo>();
 		}
 		
-		botDataQueue!.Enqueue(prepBotInfo);
+		this[key].Enqueue(prepBotInfo);
 	}
 	
 	public bool TryDequeue(PrepBotInfo.GroupDifficultyKey key, [CanBeNull] out PrepBotInfo prepBotInfo)

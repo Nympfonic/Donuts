@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 
-namespace Donuts.Bots.SpawnCheckProcessor;
+namespace Donuts.Bots.Processors;
 
-public class GroundSpawnCheckProcessor : SpawnCheckProcessorBase
+public class GroundCheck : SpawnCheckProcessorBase
 {
 	public override bool Process(Vector3 spawnPoint)
 	{

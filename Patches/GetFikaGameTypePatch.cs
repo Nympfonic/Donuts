@@ -1,5 +1,6 @@
 using Comfort.Common;
 using Donuts.Bots;
+using Donuts.Utils;
 using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -23,11 +24,14 @@ internal class GetFikaGameTypePatch : ModulePatch
 	private static void PatchPostfix(AbstractGame instance)
 	{
 		Type type = instance.GetType();
+		DonutsPlugin.Logger.LogDebugDetailed($"Game type: {type.Name}", nameof(GetFikaGameTypePatch), nameof(PatchPostfix));
+		
 		if (type == typeof(LocalGame))
 		{
 			DonutsRaidManager.Logger.LogError("Something went wrong! Fika is detected but LocalGame is being created instead of CoopGame?");
 			return;
 		}
+		
 		FikaGameType = type;
 	}
 }

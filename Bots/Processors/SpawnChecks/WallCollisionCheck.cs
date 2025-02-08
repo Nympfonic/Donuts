@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 
-namespace Donuts.Bots.SpawnCheckProcessor;
+namespace Donuts.Bots.Processors;
 
-public class WallSpawnCheckProcessor : SpawnCheckProcessorBase
+public class WallCollisionCheck : SpawnCheckProcessorBase
 {
 	private const string WALL_OBJECT_NAME_UPPER = "WALLS";
 	private readonly Collider[] _spawnCheckColliderBuffer = new Collider[50];

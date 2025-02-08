@@ -1,5 +1,6 @@
 ﻿using BepInEx.Logging;
 using Comfort.Common;
+using Cysharp.Text;
 using Donuts.Models;
 using Donuts.Utils;
 using EFT;
@@ -13,6 +14,7 @@ using System.Linq;
 
 namespace Donuts.Bots;
 
+[UsedImplicitly]
 public class BotConfigService
 {
 	private readonly ManualLogSource _logger;
@@ -23,7 +25,7 @@ public class BotConfigService
 	private readonly List<Player> _humanPlayerList;
 	private readonly ReadOnlyCollection<Player> _humanPlayerListReadOnly;
 	
-	private GameWorld _gameWorld;
+	private readonly GameWorld _gameWorld;
 	private string _scenarioSelected;
 	private string _mapLocation;
 	private string _mapName;
@@ -32,21 +34,21 @@ public class BotConfigService
 	private AllMapsBotWavesConfigs _allMapsBotWavesConfigs;
 	
 	private bool _patternsLoaded;
-
-	private BotConfigService(ManualLogSource logger)
+	
+	public BotConfigService()
 	{
-		_logger = logger;
+		_logger = DonutsRaidManager.Logger;
 		
 		_humanPlayerList = new List<Player>(5);
 		_humanPlayerListReadOnly = _humanPlayerList.AsReadOnly();
-	}
-
-	[NotNull]
-	public static BotConfigService Create([NotNull] ManualLogSource logger)
-	{
-		var service = new BotConfigService(logger);
-		service.Initialize();
-		return service;
+		_gameWorld = Singleton<GameWorld>.Instance;
+		
+		GetMapLocation();
+		GetMapName();
+		GetSelectedScenario();
+		GetAllMapsStartingBotConfigs();
+		
+		InitializeBotLimits(_scenarioSelected, _mapLocation);
 	}
 	
 	[CanBeNull]
@@ -58,13 +60,13 @@ public class BotConfigService
 		}
 		
 		string jsonFilePath = Path.Combine(DonutsPlugin.DirectoryPath, "patterns", _scenarioSelected, $"{_mapName}_waves.json");
-
+		
 		if (!File.Exists(jsonFilePath))
 		{
 			_logger.LogError($"{_mapName}_waves.json file not found at path: {jsonFilePath}");
 			return null;
 		}
-
+		
 		string jsonString = File.ReadAllText(jsonFilePath);
 		var botWavesConfig = JsonConvert.DeserializeObject<AllMapsBotWavesConfigs>(jsonString);
 		if (botWavesConfig == null)
@@ -72,14 +74,16 @@ public class BotConfigService
 			_logger.LogError($"Failed to deserialize {_mapName}_waves.json for preset: {_scenarioSelected}");
 			return null;
 		}
-#if DEBUG
-		_logger.LogDebug($"Successfully loaded {_mapName}_waves.json for preset: {_scenarioSelected}");
-#endif
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			_logger.LogInfo($"Successfully loaded {_mapName}_waves.json for preset: {_scenarioSelected}");
+		}
 		botWavesConfig.EnsureUniqueGroupNumForBotWaves();
 		_allMapsBotWavesConfigs = botWavesConfig;
 		return _allMapsBotWavesConfigs;
 	}
-
+	
 	[NotNull]
 	public string GetMapLocation()
 	{
@@ -93,6 +97,7 @@ public class BotConfigService
 			}
 			_mapLocation = mapLocation;
 		}
+		
 		return _mapLocation;
 	}
 	
@@ -121,7 +126,7 @@ public class BotConfigService
 		}
 		return _mapName;
 	}
-
+	
 	[CanBeNull]
 	public AllMapsZoneConfigs GetAllMapsZoneConfigs()
 	{
@@ -134,13 +139,15 @@ public class BotConfigService
 				_logger.NotifyLogError("Donuts: Failed to load AllMapZoneConfig. Donuts will not function properly.");
 				return null;
 			}
+			
 			_allMapsZoneConfigs = allMapsZoneConfigs;
 		}
+		
 		return _allMapsZoneConfigs;
 	}
 	
 	[CanBeNull]
-	public string GetSelectedScenario()
+	private string GetSelectedScenario()
 	{
 		_scenarioSelected ??= PresetSelector.GetWeightedScenarioSelection();
 		if (_scenarioSelected == null)
@@ -148,9 +155,10 @@ public class BotConfigService
 			_logger.NotifyLogError("Donuts: No valid scenario nor fallback found. Donuts will not function properly.");
 			return null;
 		}
+		
 		return _scenarioSelected;
 	}
-
+	
 	[CanBeNull]
 	public AllMapsStartingBotConfigs GetAllMapsStartingBotConfigs()
 	{
@@ -165,13 +173,13 @@ public class BotConfigService
 			GetSelectedScenario()!,
 			$"{GetMapName()}_start.json"
 		);
-
+		
 		if (!File.Exists(jsonFilePath))
 		{
 			_logger.NotifyLogError($"Donuts: {GetMapName()}_start.json file not found. Donuts will not function properly.");
 			return null;
 		}
-
+		
 		using var reader = new StreamReader(jsonFilePath);
 		string jsonString = reader.ReadToEnd();
 		_allMapsStartingBotConfigs = JsonConvert.DeserializeObject<AllMapsStartingBotConfigs>(jsonString);
@@ -181,7 +189,7 @@ public class BotConfigService
 	public bool CheckForAnyScenarioPatterns()
 	{
 		if (_patternsLoaded) return true;
-
+		
 		string patternFolderPath = Path.Combine(DonutsPlugin.DirectoryPath, "patterns", _scenarioSelected);
 		if (!Directory.Exists(patternFolderPath))
 		{
@@ -189,7 +197,7 @@ public class BotConfigService
 			//DonutsHelper.NotifyLogError($"Donuts Plugin: Folder from ScenarioConfig.json does not actually exist: {patternFolderPath}\nDisabling the donuts plugin for this raid.");
 			//filesLoaded = false;
 		}
-
+		
 		string[] jsonFiles = Directory.GetFiles(patternFolderPath, "*.json");
 		if (jsonFiles.Length == 0)
 		{
@@ -198,7 +206,7 @@ public class BotConfigService
 				$"Donuts: No JSON Pattern files found in folder: {patternFolderPath}\nDonuts will not function properly.");
 			return false;
 		}
-
+		
 		_patternsLoaded = true;
 		// Display selected preset
 		if (DefaultPluginVars.ShowRandomFolderChoice.Value)
@@ -227,16 +235,20 @@ public class BotConfigService
 		
 		return _humanPlayerListReadOnly;
 	}
-
+	
 	public int GetMaxBotLimit(DonutsSpawnType spawnType)
 	{
 		if (_botCountLimits.TryGetValue(spawnType, out int botLimit))
 		{
 			return botLimit;
 		}
+		
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		sb.AppendFormat("Donuts: Failed to retrieve {0} max bot cap value. Report this to the author!", spawnType.ToString());
+		DonutsRaidManager.Logger.NotifyLogError(sb.ToString());
 		return -1;
 	}
-
+	
 	/// <summary>
 	/// Counts the number of alive bots. A predicate can be specified to filter for specific bot types, but is optional.
 	/// </summary>
@@ -248,27 +260,17 @@ public class BotConfigService
 		{
 			Player player = allAlivePlayers[i];
 			if (player == null || !player.IsAI) continue;
-
+			
 			WildSpawnType role = player.Profile.Info.Settings.Role;
 			if (predicate == null || predicate(role))
 			{
 				count++;
 			}
 		}
+		
 		return count;
 	}
-
-	private void Initialize()
-	{
-		_gameWorld = Singleton<GameWorld>.Instance;
-		GetMapLocation();
-		GetMapName();
-		GetSelectedScenario();
-		GetAllMapsStartingBotConfigs();
-
-		InitializeBotLimits(_scenarioSelected, _mapLocation);
-	}
-
+	
 	private void InitializeBotLimits([NotNull] string folderName, [NotNull] string location)
 	{
 		Folder selectedRaidFolder = null;
@@ -282,7 +284,7 @@ public class BotConfigService
 		}
 		
 		if (selectedRaidFolder == null) return;
-
+		
 		// TODO: Needs a refactor
 		// Models would need rearranging, bot limits should be initialized in their respective services
 		switch (location)

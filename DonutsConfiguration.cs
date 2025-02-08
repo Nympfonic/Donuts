@@ -87,18 +87,22 @@ internal static class DonutsConfiguration
 			if (field.Name == nameof(DefaultPluginVars.pmcScenarioSelection))
 			{
 				DefaultPluginVars.PmcScenarioSelectionValue = value.ToString();
-#if DEBUG
-				DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.PmcScenarioSelectionValue)} to {value}");	
-#endif
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.PmcScenarioSelectionValue)} to {value}");
+				}
+				
 				continue;
 			}
 
 			if (field.Name == nameof(DefaultPluginVars.scavScenarioSelection))
 			{
 				DefaultPluginVars.ScavScenarioSelectionValue = value.ToString();
-#if DEBUG
-				DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.ScavScenarioSelectionValue)} to {value}");	
-#endif
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.ScavScenarioSelectionValue)} to {value}");
+				}
+				
 				continue;
 			}
 

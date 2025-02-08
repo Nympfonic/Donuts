@@ -20,9 +20,10 @@ internal class StartSpawningRaidManagerPatch : ModulePatch
 	{
 		if (!DonutsRaidManager.IsBotSpawningEnabled)
 		{
-#if DEBUG
-			Logger.LogInfo("Running as Fika client or something catastrophic happened to the BotsController, skipping DonutsRaidManager::Initialize"); 
-#endif
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				Logger.LogInfo("Running as Fika client or something catastrophic happened to the BotsController, skipping DonutsRaidManager::Initialize");
+			}
 			return;
 		}
 		

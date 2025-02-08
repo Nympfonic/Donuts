@@ -68,7 +68,7 @@ internal static class DonutsHelper
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		sb.AppendFormat("{0} {1}::{2}: {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
-		logSource.LogDebug(sb.ToString());
+		logSource.LogWarning(sb.ToString());
 	}
 	
 	/// <summary>

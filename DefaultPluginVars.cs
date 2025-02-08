@@ -404,6 +404,7 @@ internal static class DefaultPluginVars
 	{
 		debugLogging = new Setting<bool>("Enable Debug Logging",
 			"When enabled, outputs debug logging to the BepInEx console and the LogOutput.log file", false, false);
+		
 		DebugGizmos = new Setting<bool>("Enable Debug Markers",
 			"When enabled, draws debug spheres on set spawn from json", false, false);
 

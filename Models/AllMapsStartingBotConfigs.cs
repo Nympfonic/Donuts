@@ -7,34 +7,34 @@ namespace Donuts.Models;
 public class AllMapsStartingBotConfigs
 {
 	[JsonProperty("Maps")]
-	public Dictionary<string, MapStartingBotConfigs> Maps { get; set; }
+	public Dictionary<string, MapStartingBotConfigs> Maps { get; private set; }
 }
 
 [JsonObject]
 public class MapStartingBotConfigs
 {
 	[JsonProperty("PMC")]
-	public StartingBotConfig Pmc { get; set; }
+	public StartingBotConfig Pmc { get; private set; }
 	
 	[JsonProperty("SCAV")]
-	public StartingBotConfig Scav { get; set; }
+	public StartingBotConfig Scav { get; private set; }
 }
 
 [JsonObject]
 public class StartingBotConfig
 {
 	[JsonProperty("MinCount")]
-	public int MinCount { get; set; }
+	public int MinCount { get; private set; }
 	
 	[JsonProperty("MaxCount")]
-	public int MaxCount { get; set; }
+	public int MaxCount { get; private set; }
 	
 	[JsonProperty("MinGroupSize")]
-	public int MinGroupSize { get; set; }
+	public int MinGroupSize { get; private set; }
 	
 	[JsonProperty("MaxGroupSize")]
-	public int MaxGroupSize { get; set; }
+	public int MaxGroupSize { get; private set; }
 	
 	[JsonProperty("Zones")]
-	public List<string> Zones { get; set; }
+	public string[] Zones { get; private set; }
 }

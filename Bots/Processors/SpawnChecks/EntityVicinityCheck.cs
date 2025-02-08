@@ -3,9 +3,9 @@ using JetBrains.Annotations;
 using System.Collections.ObjectModel;
 using UnityEngine;
 
-namespace Donuts.Bots.SpawnCheckProcessor;
+namespace Donuts.Bots.Processors;
 
-public class EntitySpawnCheckProcessor(
+public class EntityVicinityCheck(
 	[NotNull] string mapLocation,
 	[NotNull] ReadOnlyCollection<Player> alivePlayers) : SpawnCheckProcessorBase
 {

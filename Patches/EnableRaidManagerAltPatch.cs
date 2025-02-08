@@ -77,7 +77,7 @@ public class EnableRaidManagerAltPatch : ModulePatch
 		MethodInfo insertAfterMethod = AccessTools.Method(typeof(GameWorld), nameof(GameWorld.RegisterBorderZones));
 		
 		MethodInfo enableRaidManagerMethod = AccessTools.Method(typeof(DonutsRaidManager), nameof(DonutsRaidManager.Enable));
-		MethodInfo initRaidManagerMethod = AccessTools.Method(typeof(DonutsRaidManager), nameof(DonutsRaidManager.Initialize));
+		MethodInfo initRaidManagerMethod = AccessTools.Method(typeof(DonutsRaidManager), "Initialize");
 		MethodInfo taskAwaiterMethod = AccessTools.Method(typeof(Task), nameof(Task.GetAwaiter));
 		MethodInfo taskIsCompletedMethod = AccessTools.PropertyGetter(typeof(Task), nameof(Task.IsCompleted));
 		
@@ -104,7 +104,7 @@ public class EnableRaidManagerAltPatch : ModulePatch
 		MethodInfo insertAfterMethod = AccessTools.Method(typeof(BotsController), nameof(BotsController.AddActivePLayer));
 		
 		MethodInfo enableRaidManagerMethod = AccessTools.Method(typeof(DonutsRaidManager), nameof(DonutsRaidManager.Enable));
-		MethodInfo initRaidManagerMethod = AccessTools.Method(typeof(DonutsRaidManager), nameof(DonutsRaidManager.Initialize));
+		MethodInfo initRaidManagerMethod = AccessTools.Method(typeof(DonutsRaidManager), "Initialize");
 		MethodInfo taskAwaiterMethod = AccessTools.Method(typeof(Task), nameof(Task.GetAwaiter));
 		MethodInfo taskIsCompletedMethod = AccessTools.PropertyGetter(typeof(Task), nameof(Task.IsCompleted));
 		FieldInfo taskStateMachineIndexField = AccessTools.Field(typeof(LocalGame.Struct480), "int_0");

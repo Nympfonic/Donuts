@@ -13,7 +13,7 @@ namespace Donuts.Models;
 /// ZoneSpawnPoints is a dictionary that stores all the zone spawn points, with an internal keyword-to-zone mapping dictionary.
 /// </summary>
 [Serializable]
-public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
+public class ZoneSpawnPoints : Dictionary<string, HashSet<Vector3>>
 {
 	public enum KeywordZoneType
 	{
@@ -23,12 +23,7 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 		Hotspot
 	}
 	
-	/// <summary>
-	/// This is to keep track of all the starting spawn points so we can reset the <see cref="_unusedStartingSpawnPoints"/> dictionary later.
-	/// <p>Do not modify!</p>
-	/// </summary>
-	private Dictionary<string, HashSet<Vector3>> _allStartingSpawnPoints = [];
-	private Dictionary<string, HashSet<Vector3>> _unusedStartingSpawnPoints = [];
+	
 	private Dictionary<KeywordZoneType, HashSet<string>> _keywordZoneMappings = [];
 	
 	/// <summary>
@@ -36,215 +31,74 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 	/// </summary>
 	public new void Clear()
 	{
-		_allStartingSpawnPoints.Clear();
-		_unusedStartingSpawnPoints.Clear();
 		_keywordZoneMappings.Clear();
 		base.Clear();
 	}
 	
 	/// <summary>
-	/// Gets a list of spawn points for all zones that are mapped to the specified keyword.
+	/// Gets an array of spawn points for all zones that are mapped to the specified keyword.
 	/// </summary>
 	/// <param name="keyword">The keyword to filter for zones.</param>
-	[NotNull]
-	public List<KeyValuePair<string, List<Vector3>>> GetSpawnPointsFromKeyword(KeywordZoneType keyword)
+	[CanBeNull]
+	public KeyValuePair<string, HashSet<Vector3>>[] GetSpawnPointsFromKeyword(KeywordZoneType keyword)
 	{
-		var list = new List<KeyValuePair<string, List<Vector3>>>();
-		
 		if (keyword == KeywordZoneType.None || !_keywordZoneMappings.TryGetValue(keyword, out HashSet<string> zoneNames))
 		{
-			return list;
+			return null;
 		}
 		
+		var index = 0;
+		var array = new KeyValuePair<string, HashSet<Vector3>>[zoneNames.Count];
 		foreach (string zoneName in zoneNames)
 		{
-			var pair = new KeyValuePair<string, List<Vector3>>(zoneName, this[zoneName]);
-			list.Add(pair);
+			array[index++] = new KeyValuePair<string, HashSet<Vector3>>(zoneName, this[zoneName]);
 		}
 		
-		return list;
+		return array;
 	}
 	
-	/// <summary>
-	/// Removes the spawn point from the <see cref="_unusedStartingSpawnPoints"/> dictionary using the zone name as the key.
-	/// </summary>
-	/// <returns>True if the spawn point was removed from the hashset at the specified key, false if the dictionary is not initialized.</returns>
-	public bool SetStartingSpawnPointAsUsed(string zoneName, Vector3 spawnPoint)
+	public bool TryGetKeywordZoneMappings([NotNull] string zoneName, [CanBeNull] out HashSet<string> keywordZoneMappings)
 	{
-		if (_unusedStartingSpawnPoints == null)
+		if (!IsKeywordZone(zoneName, out KeywordZoneType keyword, exactMatch: true))
 		{
+			keywordZoneMappings = null;
 			return false;
 		}
 		
-		if (_unusedStartingSpawnPoints.TryGetValue(zoneName, out HashSet<Vector3> usedSpawnPoints))
+		if (_keywordZoneMappings.TryGetValue(keyword, out keywordZoneMappings))
 		{
-			if (usedSpawnPoints == null)
-			{
-				return false;
-			}
-			
-			_unusedStartingSpawnPoints[zoneName].Remove(spawnPoint);
 			return true;
+		}
+		
+		// Failsafe: Is a keyword zone but could not find it in the keyword mapping dictionary
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Donuts: Keyword {0} not found in the {1} dictionary", keyword.ToString(), nameof(_keywordZoneMappings));
+			DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(ZoneSpawnPoints), nameof(TryGetKeywordZoneMappings));
 		}
 		
 		return false;
 	}
 	
-	/// <summary>
-	/// Gets a random unused starting spawn point, along with its zone name from the list.
-	/// </summary>
-	/// <returns>A random unused starting spawn point or otherwise null.</returns>
 	[CanBeNull]
-	public Vector3? GetUnusedStartingSpawnPoint([NotNull] IList<string> startingZoneNames, [CanBeNull] out string zoneName)
-	{
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		const string typeName = nameof(ZoneSpawnPoints);
-		const string methodName = nameof(GetUnusedStartingSpawnPoint);
-#endif
-		if (Count == 0)
-		{
-			zoneName = null;
-			return null;
-		}
-
-// #if DEBUG
-// 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-// 		sb.Clear();
-// 		sb.AppendLine("_keywordZoneMappings:");
-// 		foreach (KeyValuePair<KeywordZoneType, HashSet<string>> kvp in _keywordZoneMappings)
-// 		{
-// 			sb.AppendFormat("Keyword: {0}, Zone Names: ", kvp.Key);
-// 			if (kvp.Value == null || kvp.Value.Count == 0)
-// 			{
-// 				sb.Append("N/A\n");
-// 				continue;
-// 			}
-// 			foreach (string z in kvp.Value)
-// 			{
-// 				sb.Append(z);
-// 				sb.Append(", ");
-// 			}
-// 			sb.AppendLine();
-// 		}
-// 		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-// #endif
-		
-		// If it's a keyword zone (all/hotspot/start), get the correct list of zone names instead
-		if (startingZoneNames.Count == 1 &&
-			IsKeywordZone(startingZoneNames[0], out KeywordZoneType keyword, exactMatch: true))
-		{
-			if (_keywordZoneMappings.TryGetValue(keyword, out HashSet<string> keywordZoneNames))
-			{
-				return SelectRandomStartingSpawnPoint(keywordZoneNames, out zoneName);
-			}
-			
-			// Failsafe: Is a keyword zone but could not find it in the keyword mapping dictionary
-#if DEBUG
-			sb.Clear();
-			sb.AppendFormat("Donuts: Keyword {0} not found in the {1} dictionary", keyword.ToString(), nameof(_keywordZoneMappings));
-			DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), typeName, methodName);
-#endif
-			zoneName = null;
-			return null;
-		}
-		
-		// List of starting zone names provided: pick a random zone and spawn point from them
-		if (startingZoneNames.Count >= 1)
-		{
-			return SelectRandomStartingSpawnPoint(startingZoneNames, out zoneName);
-		}
-		
-		// Empty list of starting zone names provided: look at the 'all' keyword zones
-		if (!_keywordZoneMappings.TryGetValue(KeywordZoneType.All, out HashSet<string> allZoneNames) ||
-			allZoneNames.Count == 0)
-		{
-			// No 'all' keyword zones
-			zoneName = null;
-			return null;
-		}
-		
-		return SelectRandomStartingSpawnPoint(allZoneNames, out zoneName);
-	}
-	
-	private Vector3? SelectRandomStartingSpawnPoint([NotNull] IEnumerable<string> zoneNames, [CanBeNull] out string zoneName)
-	{
-		string randomZone = zoneNames.PickRandomElement()!;
-#if DEBUG
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.AppendFormat("Randomly selected zone: {0}", randomZone);
-		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(ZoneSpawnPoints), nameof(SelectRandomStartingSpawnPoint));
-#endif
-		if (!_unusedStartingSpawnPoints.TryGetValue(randomZone, out HashSet<Vector3> spawnPoints))
-		{
-			zoneName = null;
-			return null;
-		}
-			
-		// Reset if all starting spawns for this zone are used
-		if (spawnPoints.Count == 0)
-		{
-			_unusedStartingSpawnPoints[randomZone] = [.._allStartingSpawnPoints[randomZone]];
-			spawnPoints = _unusedStartingSpawnPoints[randomZone];
-		}
-
-		zoneName = randomZone;
-		return spawnPoints.PickRandomElement();
-	}
-	
-	/// <summary>
-	/// Used to initialize the starting spawn points dictionaries.
-	/// </summary>
-	/// <param name="zoneName"></param>
-	/// <param name="spawnPoints"></param>
-	private void AddStartingSpawnPoints(string zoneName, [NotNull] IList<Vector3> spawnPoints)
-	{
-		if (_allStartingSpawnPoints.ContainsKey(zoneName))
-		{
-			_allStartingSpawnPoints[zoneName].UnionWith(spawnPoints);
-			_unusedStartingSpawnPoints[zoneName].UnionWith(spawnPoints);
-		}
-		else
-		{
-			HashSet<Vector3> copyOfSpawnPoints = [..spawnPoints];
-			_allStartingSpawnPoints.Add(zoneName, copyOfSpawnPoints);
-			_unusedStartingSpawnPoints.Add(zoneName, copyOfSpawnPoints);
-		}
-		
-// #if DEBUG
-// 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-// 		foreach (KeyValuePair<string, HashSet<Vector3>> kvp in _allStartingSpawnPoints)
-// 		{
-// 			sb.AppendFormat("{0} - Zone: {1}, Number of Spawn Points: {2}\n", nameof(_allStartingSpawnPoints), kvp.Key,
-// 				kvp.Value?.Count);
-// 		}
-// 		foreach (KeyValuePair<string, HashSet<Vector3>> kvp in _unusedStartingSpawnPoints)
-// 		{
-// 			sb.AppendFormat("{0} - Zone: {1}, Number of Spawn Points: {2}\n", nameof(_unusedStartingSpawnPoints),
-// 				kvp.Key, kvp.Value?.Count);
-// 		}
-// 		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(ZoneSpawnPoints), nameof(AddStartingSpawnPoints));
-// #endif
-	}
-	
-	[CanBeNull]
-	public new List<Vector3> this[[NotNull] string zoneName]
+	public new HashSet<Vector3> this[[NotNull] string zoneName]
 	{
 		get => base[zoneName];
 		set
 		{
 			base[zoneName] = value;
-			UpdateInternalMappings(zoneName, value);
+			UpdateInternalMappings(zoneName);
 		}
 	}
 	
-	public new void Add([NotNull] string zoneName, [CanBeNull] List<Vector3> spawnPoints)
+	public new void Add([NotNull] string zoneName, [CanBeNull] HashSet<Vector3> spawnPoints)
 	{
 		base.Add(zoneName, spawnPoints);
-		UpdateInternalMappings(zoneName, spawnPoints);
+		UpdateInternalMappings(zoneName);
 	}
 
-	public void AppendSpawnPoints([NotNull] string zoneName, [NotNull] List<Vector3> spawnPoints)
+	public void AppendSpawnPoints([NotNull] string zoneName, [NotNull] HashSet<Vector3> spawnPoints)
 	{
 		if (!ContainsKey(zoneName))
 		{
@@ -258,26 +112,22 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 			return;
 		}
 		
-		this[zoneName].AddRange(spawnPoints);
-		UpdateInternalMappings(zoneName, spawnPoints);
+		this[zoneName].UnionWith(spawnPoints);
+		UpdateInternalMappings(zoneName);
 	}
 	
 	/// <summary>
 	/// Updates the internal mapping dictionaries.
 	/// </summary>
-	private void UpdateInternalMappings([NotNull] string zoneName, [CanBeNull] IList<Vector3> spawnPoints)
+	private void UpdateInternalMappings([NotNull] string zoneName)
 	{
 		// Always map to 'all' keyword
 		MapZoneToKeyword(zoneName, KeywordZoneType.All);
 		
 		// Map zones with 'hotspot' or 'start' in their name to their respective keywords
-		if (!IsStartOrHotspotZone(zoneName, out KeywordZoneType keyword)) return;
-		MapZoneToKeyword(zoneName, keyword);
-		
-		// Make sure to initialize/append to starting spawn point dictionaries
-		if (keyword == KeywordZoneType.Start && spawnPoints != null && spawnPoints.Count > 0)
+		if (IsStartOrHotspotZone(zoneName, out KeywordZoneType keyword))
 		{
-			AddStartingSpawnPoints(zoneName, spawnPoints);
+			MapZoneToKeyword(zoneName, keyword);
 		}
 	}
 	
@@ -381,11 +231,10 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 	/// </summary>
 	/// <param name="zoneName">The name of the zone to validate.</param>
 	/// <param name="filePath">The path to the JSON.</param>
-	/// <returns>True if the zone is valid, false otherwise.</returns>
+	/// <returns>True if the zone name is valid, false otherwise.</returns>
 	private static bool ValidateZoneName([NotNull] string zoneName, [NotNull] string filePath)
 	{
-		// 
-		// E.g. You cannot have a zone called 'All' or 'start'
+		// E.g. You cannot have a zone called 'all', 'start' or 'hotspot'
 		if (IsKeywordZone(zoneName, out _, exactMatch: true))
 		{
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
@@ -413,7 +262,7 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 			
 			writer.WriteStartObject();
 			
-			foreach (KeyValuePair<string, List<Vector3>> zoneSpawnPoint in value)
+			foreach (KeyValuePair<string, HashSet<Vector3>> zoneSpawnPoint in value)
 			{
 				writer.WritePropertyName(zoneSpawnPoint.Key);
 				serializer.Serialize(writer, zoneSpawnPoint.Value);
@@ -446,7 +295,7 @@ public class ZoneSpawnPoints : Dictionary<string, List<Vector3>>
 			{
 				if (ValidateZoneName(zoneName, reader.Path))
 				{
-					var spawnPoints = value.ToObject<List<Vector3>>();
+					var spawnPoints = value.ToObject<HashSet<Vector3>>();
 					zoneSpawnPoints.Add(zoneName, spawnPoints);
 				}
 			}
