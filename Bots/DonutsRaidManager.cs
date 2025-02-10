@@ -380,6 +380,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			{
 				hasWavesToSpawn = false;
 				
+				// TODO: Separate starting bot spawning into its own list and service so it's not affected by this shuffle
 				List<IBotSpawnService> spawnServices = _botSpawnServices.ShuffleElements();
 				for (int i = spawnServices.Count - 1; i >= 0; i--)
 				{
