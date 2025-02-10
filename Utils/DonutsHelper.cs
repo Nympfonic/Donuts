@@ -84,10 +84,8 @@ internal static class DonutsHelper
 		[NotNull] string methodName,
 		[NotNull] Exception ex)
 	{
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.AppendFormat("{0} {1}::{2}: {3}\n{4}", DateTime.Now.ToLongTimeString(), typeName, methodName, ex.Message,
-			ex.StackTrace);
-		logSource.LogError(sb.ToString());
+		var msg = $"{DateTime.Now.ToLongTimeString()} {typeName}::{methodName}: {ex.Message}\n{ex.StackTrace}";
+		logSource.LogError(msg);
 	}
 	
 	/// <summary>
