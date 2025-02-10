@@ -32,7 +32,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	private readonly BotSpawner _eftBotSpawner;
 	
 	private readonly WaveSpawnProcessorBase _waveSpawnProcessor;
-	private readonly WaveSpawnData _waveSpawnData;
 	
 	// Spawn caps
 	private int _currentRespawnCount;
@@ -57,7 +56,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		_eftBotSpawner = _botsController.BotSpawner;
 		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
 		
-		_waveSpawnData = new WaveSpawnData(dataService.ResetGroupTimers);
 		_waveSpawnProcessor = new PlayerCombatStateCheck();
 		_waveSpawnProcessor.SetNext(new WaveSpawnChanceCheck());
 	}
@@ -105,19 +103,21 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 		
 		BotWave wave = waveQueue.Dequeue();
-		_waveSpawnData.Wave = wave;
-		if (!_waveSpawnProcessor.Process(_waveSpawnData))
+		int waveGroupNum = wave.GroupNum;
+		
+		if (!_waveSpawnProcessor.Process(wave))
 		{
+			dataService.ResetGroupTimers(waveGroupNum);
 			return false;
 		}
 		
 		bool anySpawned = await TryProcessBotWave(wave, cancellationToken);
 		
-		dataService.ResetGroupTimers(wave.GroupNum);
+		dataService.ResetGroupTimers(waveGroupNum);
 		if (DefaultPluginVars.debugLogging.Value)
 		{
 			logger.LogDebugDetailed(
-				$"Resetting timer for GroupNum {wave.GroupNum.ToString()}, reason: Bot wave spawn triggered",
+				$"Resetting timer for GroupNum {waveGroupNum.ToString()}, reason: Bot wave spawn triggered",
 				GetType().Name, nameof(TrySpawnBotWave));
 		}
 		

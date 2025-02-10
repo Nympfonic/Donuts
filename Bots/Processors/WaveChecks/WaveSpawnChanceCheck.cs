@@ -7,11 +7,9 @@ namespace Donuts.Bots.Processors;
 
 public class WaveSpawnChanceCheck : WaveSpawnProcessorBase
 {
-	public override bool Process(WaveSpawnData data)
+	public override bool Process(BotWave data)
 	{
-		BotWave wave = data.Wave;
-
-		if (IsSpawnChanceSuccessful(wave.SpawnChance))
+		if (IsSpawnChanceSuccessful(data.SpawnChance))
 		{
 			return base.Process(data);
 		}
@@ -19,11 +17,10 @@ public class WaveSpawnChanceCheck : WaveSpawnProcessorBase
 		if (DefaultPluginVars.debugLogging.Value)
 		{
 			DonutsRaidManager.Logger.LogDebugDetailed(
-				$"Resetting timer for GroupNum {wave.GroupNum.ToString()}, reason: Spawn chance check failed.",
+				$"Resetting timer for GroupNum {data.GroupNum.ToString()}, reason: Spawn chance check failed.",
 				nameof(WaveSpawnChanceCheck), nameof(Process));
 		}
 		
-		data.resetGroupTimerCallback?.Invoke(wave.GroupNum);
 		return false;
 	}
 	

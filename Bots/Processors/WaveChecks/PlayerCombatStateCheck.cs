@@ -16,7 +16,7 @@ public class PlayerCombatStateCheck : WaveSpawnProcessorBase
 		EventBus<ResetTimerEvent>.Register(binding);
 	}
 	
-	public override bool Process(WaveSpawnData data)
+	public override bool Process(BotWave data)
 	{
 		return !IsPlayerInCombat() && base.Process(data);
 	}
