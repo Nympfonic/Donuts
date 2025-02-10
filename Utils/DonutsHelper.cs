@@ -135,32 +135,6 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
-	/// Non-allocating version of string::Join().
-	/// </summary>
-	/// <param name="separator">The separator between each item.</param>
-	/// <param name="collection">The collection to output into a string.</param>
-	/// <returns>A string where all the items in the collection are separated by the specified separator.</returns>
-	[NotNull]
-	internal static string StringJoinNonAlloc(string separator, [NotNull] params string[] collection)
-	{
-		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		
-		int count = collection.Length;
-		for (var i = 0; i < count; i++)
-		{
-			string str = collection[i];
-			sb.Append(str);
-			
-			if (i < count - 1)
-			{
-				sb.Append(separator);
-			}
-		}
-		
-		return sb.ToString();
-	}
-	
-	/// <summary>
 	/// Shuffles elements in the specified array.
 	/// </summary>
 	/// <param name="source">The array to shuffle.</param>

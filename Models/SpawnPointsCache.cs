@@ -22,9 +22,7 @@ public class SpawnPointsCache
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("SpawnPointsCache Zone Names: {0}", DonutsHelper.StringJoinNonAlloc(", ", zoneNames));
-			DonutsRaidManager.Logger.LogWarning(sb.ToString());
+			DonutsRaidManager.Logger.LogWarning($"SpawnPointsCache Zone Names: {string.Join(", ", zoneNames)}");
 		}
 		
 		InitializeSpawnPoints();
