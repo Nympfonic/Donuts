@@ -1,4 +1,5 @@
-﻿using Donuts.Utils;
+﻿using Donuts.Models;
+using Donuts.Utils;
 using EFT;
 using JetBrains.Annotations;
 using System.Collections.ObjectModel;
@@ -17,8 +18,7 @@ public sealed class ScavDataService : BotDataService
 		botWavesByGroupNum = botWaves.ToLookup(wave => wave.GroupNum);
 		waveGroupSize = GetWaveMinMaxGroupSize(botWaves);
 		MaxBotLimit = configService.GetMaxBotLimit(spawnType);
-		
-		ResetStartingSpawnPoints();
+		startingSpawnPointsCache = new SpawnPointsCache(ZoneSpawnPoints, startingBotConfig.Zones);
 	}
 	
 	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties =>

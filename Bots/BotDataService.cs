@@ -32,7 +32,7 @@ public interface IBotDataService
 	[CanBeNull] PrepBotInfo FindCachedBotData(BotDifficulty difficulty, int targetCount);
 	void RemoveFromBotCache(PrepBotInfo.GroupDifficultyKey key);
 	[NotNull] Queue<BotWave> GetBotWavesToSpawn();
-	[CanBeNull] Vector3? GetUnusedStartingSpawnPoint();
+	[CanBeNull] Vector3? GetUnusedSpawnPoint(SpawnPointType spawnPointType = SpawnPointType.Standard);
 	void ResetGroupTimers(int groupNum);
 	int GetAliveBotsCount();
 	BotDifficulty GetBotDifficulty();
@@ -65,9 +65,6 @@ public abstract class BotDataService : IBotDataService
 	
 	private int _totalBots;
 	
-	private Vector3[] _cachedStartingSpawnPoints;
-	private Queue<Vector3> _startingSpawnPoints;
-	
 	private readonly Queue<BotWave> _cachedBotWavesToSpawn = new(10);
 	
 	protected DonutsSpawnType spawnType;
@@ -75,6 +72,10 @@ public abstract class BotDataService : IBotDataService
 	protected BotWave[] botWaves;
 	protected ILookup<int, BotWave> botWavesByGroupNum;
 	protected (int min, int max) waveGroupSize;
+	
+	protected SpawnPointsCache startingSpawnPointsCache;
+	// TODO: Figure out how to implement remembering used spawn points for individual bot waves without 
+	//protected SpawnPointsCache waveSpawnPointsCache;
 	
 	public Queue<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
 	public ZoneSpawnPoints ZoneSpawnPoints { get; }
@@ -120,64 +121,18 @@ public abstract class BotDataService : IBotDataService
 			return;
 		}
 	}
-
-	protected void ResetStartingSpawnPoints()
-	{
-		// Already cached so we just create a new queue, passing the cached array into it
-		if (_cachedStartingSpawnPoints != null)
-		{
-			_startingSpawnPoints = new Queue<Vector3>(_cachedStartingSpawnPoints);
-			return;
-		}
-		
-		ZoneSpawnPoints zoneSpawnPoints = ZoneSpawnPoints;
-		// Merge zones into a hashset to ensure no duplicates
-		var mergedZones = new HashSet<string>();
-		foreach (string zoneName in startingBotConfig.Zones)
-		{
-			// Check for exact keyword matches
-			if (zoneSpawnPoints.TryGetKeywordZoneMappings(zoneName, out HashSet<string> keywordZoneNames))
-			{
-				mergedZones.UnionWith(keywordZoneNames!);
-			}
-			// Otherwise just add the zone name as is
-			else
-			{
-				mergedZones.Add(zoneName);
-			}
-		}
-		
-		// Populate the hashset with a randomized order of spawn points
-		var mergedSpawnPoints = new HashSet<Vector3>();
-		foreach (string zoneName in mergedZones.ShuffleElements())
-		{
-			List<Vector3> spawnPoints = zoneSpawnPoints[zoneName]!.ShuffleElements();
-			mergedSpawnPoints.UnionWith(spawnPoints);
-		}
-		
-		// Cache the spawn points and create new queue to be used
-		_cachedStartingSpawnPoints = new Vector3[mergedSpawnPoints.Count];
-		mergedSpawnPoints.CopyTo(_cachedStartingSpawnPoints);
-		_startingSpawnPoints = new Queue<Vector3>(_cachedStartingSpawnPoints);
-	}
 	
 	/// <summary>
 	/// Gets an unused starting spawn point.
 	/// </summary>
 	/// <returns>An unused starting spawn point or otherwise null.</returns>
-	public Vector3? GetUnusedStartingSpawnPoint()
+	public Vector3? GetUnusedSpawnPoint(SpawnPointType spawnPointType = SpawnPointType.Standard)
 	{
-		if (ZoneSpawnPoints.Count == 0)
+		return spawnPointType switch
 		{
-			return null;
-		}
-		
-		if (_startingSpawnPoints.Count == 0)
-		{
-			ResetStartingSpawnPoints();
-		}
-		
-		return _startingSpawnPoints.Dequeue();
+			SpawnPointType.Starting => startingSpawnPointsCache.GetUnusedSpawnPoint(),
+			_ => throw new InvalidOperationException("Invalid spawn point type!"),
+		};
 	}
 	
 	private void ResetReplenishTimer()
@@ -199,10 +154,11 @@ public abstract class BotDataService : IBotDataService
 				logger.LogDebugDetailed("Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			}
 			
-			while (_totalBots < maxBots && !cancellationToken.IsCancellationRequested)
+			var currentBotCount = 0;
+			while (currentBotCount < maxBots && !cancellationToken.IsCancellationRequested)
 			{
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, startingBotConfig.MinGroupSize,
-					startingBotConfig.MaxGroupSize, maxBots - _totalBots);
+					startingBotConfig.MaxGroupSize, maxBots - currentBotCount);
 				
 				(bool success, PrepBotInfo prepBotInfo) = await TryCreateBotData(BotDifficulties.PickRandomElement(),
 					groupSize, saveToCache: false, cancellationToken: cancellationToken);
@@ -211,6 +167,7 @@ public abstract class BotDataService : IBotDataService
 				if (success)
 				{
 					StartingBotsCache.Enqueue(prepBotInfo);
+					currentBotCount += groupSize;
 				}
 			}
 		}
@@ -283,8 +240,6 @@ public abstract class BotDataService : IBotDataService
 				_botCache.Enqueue(prepBotInfo.groupDifficultyKey, prepBotInfo);
 			}
 			
-			_totalBots += groupSize;
-			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
@@ -330,6 +285,7 @@ public abstract class BotDataService : IBotDataService
 				if (!success) continue;
 				
 				generatedCount++;
+				_totalBots += groupSize;
 				
 				if (DefaultPluginVars.debugLogging.Value)
 				{

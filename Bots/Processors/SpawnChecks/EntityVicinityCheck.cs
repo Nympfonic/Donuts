@@ -1,5 +1,6 @@
 ﻿using EFT;
 using JetBrains.Annotations;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine;
 
@@ -7,7 +8,8 @@ namespace Donuts.Bots.Processors;
 
 public class EntityVicinityCheck(
 	[NotNull] string mapLocation,
-	[NotNull] ReadOnlyCollection<Player> alivePlayers) : SpawnCheckProcessorBase
+	[NotNull] ReadOnlyCollection<Player> alivePlayers,
+	[CanBeNull] HashSet<WildSpawnType> botTypesToIgnore = null) : SpawnCheckProcessorBase
 {
 	public override bool Process(Vector3 spawnPoint)
 	{
@@ -33,6 +35,11 @@ public class EntityVicinityCheck(
 			// If it's a bot
 			if (player.IsAI)
 			{
+				if (botTypesToIgnore?.Contains(player.Profile.Info.Settings.Role) == true)
+				{
+					continue;
+				}
+				
 				if (checkBotVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudeBot))
 				{
 					return false;

@@ -1,4 +1,4 @@
-﻿namespace Donuts;
+﻿namespace Donuts.Bots;
 
 public enum DonutsSpawnType
 {

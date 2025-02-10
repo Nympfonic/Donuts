@@ -135,6 +135,69 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
+	/// Non-allocating version of <see cref="string.Join"/>.
+	/// </summary>
+	/// <param name="separator">The separator between each item.</param>
+	/// <param name="collection">The collection to output into a string.</param>
+	/// <returns>A string where all the items in the collection are separated by the specified separator.</returns>
+	[NotNull]
+	internal static string StringJoinNonAlloc(string separator, [NotNull] params string[] collection)
+	{
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		
+		int count = collection.Length;
+		for (var i = 0; i < count; i++)
+		{
+			string str = collection[i];
+			sb.Append(str);
+			
+			if (i < count - 1)
+			{
+				sb.Append(separator);
+			}
+		}
+		
+		return sb.ToString();
+	}
+	
+	/// <summary>
+	/// Shuffles elements in the specified array.
+	/// </summary>
+	/// <param name="source">The array to shuffle.</param>
+	/// <param name="createNewArray">Whether a new array should be created to perform the shuffle on.</param>
+	/// <typeparam name="T">The type of array.</typeparam>
+	/// <returns>An array with shuffled elements.</returns>
+	[NotNull]
+	internal static T[] ShuffleElements<T>(this T[] source, bool createNewArray = false)
+	{
+		int arrayLength = source.Length;
+		if (arrayLength <= 1)
+		{
+			return source;
+		}
+		
+		T[] array;
+		if (createNewArray)
+		{
+			array = new T[arrayLength];
+			Array.Copy(source, array, arrayLength);
+		}
+		else
+		{
+			array = source;
+		}
+		
+		while (arrayLength > 1)
+		{
+			arrayLength--;
+			int k = _random.Next(arrayLength + 1);
+			(array[k], array[arrayLength]) = (array[arrayLength], array[k]);
+		}
+		
+		return array;
+	}
+	
+	/// <summary>
 	/// Creates a list from the specified collection and performs the shuffle on the new list.
 	/// </summary>
 	/// <param name="source">The collection to shuffle.</param>
@@ -148,18 +211,18 @@ internal static class DonutsHelper
 	/// </summary>
 	/// <param name="source">The list to shuffle.</param>
 	/// <param name="createNewList">Whether or not a new list should be created to perform the shuffle on.</param>
-	/// <typeparam name="T">The type the list stores.</typeparam>
+	/// <typeparam name="T">The type of list.</typeparam>
 	/// <returns>A list with shuffled elements.</returns>
 	[NotNull]
 	internal static List<T> ShuffleElements<T>([NotNull] this List<T> source, bool createNewList = false)
 	{
-		List<T> list = createNewList ? source.ToList() : source;
-		int count = list.Count;
-		
-		if (count == 1)
+		int count = source.Count;
+		if (count <= 1)
 		{
-			return list;
+			return source;
 		}
+		
+		List<T> list = createNewList ? source.ToList() : source;
 		
 		while (count > 1)
 		{

@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using UnityEngine;
 
 namespace Donuts.Bots;
 
@@ -34,6 +35,8 @@ public class BotConfigService
 	private AllMapsBotWavesConfigs _allMapsBotWavesConfigs;
 	
 	private bool _patternsLoaded;
+	
+	private int _lastFrameUpdatedHumanPlayerList;
 	
 	public BotConfigService()
 	{
@@ -223,7 +226,12 @@ public class BotConfigService
 		{
 			return _emptyPlayerList;
 		}
-
+		
+		if (_lastFrameUpdatedHumanPlayerList == Time.frameCount)
+		{
+			return _humanPlayerListReadOnly;
+		}
+		
 		List<Player> allPlayers = _gameWorld.AllPlayersEverExisted.ToList();
 		foreach (Player player in allPlayers)
 		{
@@ -232,6 +240,8 @@ public class BotConfigService
 				_humanPlayerList.Add(player);
 			}
 		}
+		
+		_lastFrameUpdatedHumanPlayerList = Time.frameCount;
 		
 		return _humanPlayerListReadOnly;
 	}

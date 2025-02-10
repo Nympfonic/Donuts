@@ -33,16 +33,17 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	private readonly WaveSpawnProcessorBase _waveSpawnProcessor;
 	private readonly WaveSpawnData _waveSpawnData;
-	private readonly SpawnCheckProcessorBase _spawnCheckProcessor;
 	
 	// Spawn caps
 	private int _currentRespawnCount;
 	
-	private const int MS_RETRY_INTERVAL = 500;
+	private const int FRAME_DELAY_INTERVAL = 30;
 	
 	protected readonly BotConfigService configService;
 	protected readonly IBotDataService dataService;
 	protected readonly ManualLogSource logger;
+	
+	protected SpawnCheckProcessorBase spawnCheckProcessor;
 	
 	protected DonutsSpawnType spawnType;
 	
@@ -59,11 +60,6 @@ public abstract class BotSpawnService : IBotSpawnService
 		_waveSpawnData = new WaveSpawnData(dataService.ResetGroupTimers);
 		_waveSpawnProcessor = new PlayerCombatStateCheck();
 		_waveSpawnProcessor.SetNext(new WaveSpawnChanceCheck());
-		
-		string mapLocation = this.configService.GetMapLocation();
-		_spawnCheckProcessor = new EntityVicinityCheck(mapLocation, dataService.AllAlivePlayers);
-		_spawnCheckProcessor.SetNext(new WallCollisionCheck())
-			.SetNext(new GroundCheck());
 	}
 	
 	public async UniTask<bool> SpawnStartingBots(CancellationToken cancellationToken)
@@ -93,7 +89,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			// Delay between spawns to improve performance
 			if (count > 0)
 			{
-				await UniTask.Delay(MS_RETRY_INTERVAL, cancellationToken: cancellationToken);
+				await UniTask.DelayFrame(FRAME_DELAY_INTERVAL, cancellationToken: cancellationToken);
 			}
 		}
 		
@@ -228,15 +224,24 @@ public abstract class BotSpawnService : IBotSpawnService
 		while (failsafeCounter < maxFailsafeAttempts)
 		{
 			if (cancellationToken.IsCancellationRequested) return false;
-			Vector3? spawnPoint = dataService.GetUnusedStartingSpawnPoint();
-			if (!spawnPoint.HasValue) return false;
+			Vector3? spawnPoint = dataService.GetUnusedSpawnPoint(SpawnPointType.Starting);
+			if (!spawnPoint.HasValue)
+			{
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					logger.LogDebugDetailed("No zone spawn points found, cancelling!", GetType().Name,
+						nameof(StartingBotsSpawnPointsCheck));
+				}
+				
+				break;
+			}
 			
-			Vector3? positionOnNavMesh = await GetValidSpawnPosition(spawnPoint.Value, _spawnCheckProcessor, cancellationToken);
+			Vector3? positionOnNavMesh = await GetValidSpawnPosition(spawnPoint.Value, spawnCheckProcessor, cancellationToken);
 			if (cancellationToken.IsCancellationRequested) return false;
 			if (!positionOnNavMesh.HasValue)
 			{
 				failsafeCounter++;
-				await UniTask.Delay(MS_RETRY_INTERVAL, cancellationToken: cancellationToken);
+				await UniTask.DelayFrame(FRAME_DELAY_INTERVAL, cancellationToken: cancellationToken);
 				continue;
 			}
 			
@@ -424,7 +429,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 		
 		IncrementBotSpawnerInProcessCounter(groupSize);
-		bool success = await SpawnBot(groupSize, spawnPoint, spawnCheckProcessor: _spawnCheckProcessor,
+		bool success = await SpawnBot(groupSize, spawnPoint, spawnChecker: spawnCheckProcessor,
 			cancellationToken: cancellationToken);
 		
 		if (success)
@@ -443,7 +448,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		int groupSize,
 		Vector3 spawnPoint,
 		bool generateNew = true,
-		SpawnCheckProcessorBase spawnCheckProcessor = null,
+		SpawnCheckProcessorBase spawnChecker = null,
 		CancellationToken cancellationToken = default)
 	{
 		BotDifficulty difficulty = dataService.GetBotDifficulty();
@@ -470,7 +475,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			logger.LogDebugDetailed("Found grouped cached bots, spawning them.", GetType().Name, nameof(SpawnBot));
 		}
 		
-		Vector3? spawnPosition = await GetValidSpawnPosition(spawnPoint, spawnCheckProcessor, cancellationToken);
+		Vector3? spawnPosition = await GetValidSpawnPosition(spawnPoint, spawnChecker, cancellationToken);
 		if (cancellationToken.IsCancellationRequested) return false;
 		
 		if (spawnPosition.HasValue)
@@ -491,7 +496,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	private async UniTask<Vector3?> GetValidSpawnPosition(
 		Vector3 position,
-		[CanBeNull] SpawnCheckProcessorBase spawnCheckProcessor,
+		[CanBeNull] SpawnCheckProcessorBase spawnChecker,
 		CancellationToken cancellationToken = default)
 	{
 		int maxSpawnAttempts = DefaultPluginVars.maxSpawnTriesPerBot.Value;
@@ -503,9 +508,9 @@ public abstract class BotSpawnService : IBotSpawnService
 			}
 			
 			if (!NavMesh.SamplePosition(position, out NavMeshHit navHit, 2f, NavMesh.AllAreas) ||
-				(spawnCheckProcessor != null && !spawnCheckProcessor.Process(navHit.position)))
+				(spawnChecker != null && !spawnChecker.Process(navHit.position)))
 			{
-				await UniTask.Delay(MS_RETRY_INTERVAL, cancellationToken: cancellationToken);
+				await UniTask.DelayFrame(FRAME_DELAY_INTERVAL, cancellationToken: cancellationToken);
 				continue;
 			}
 			

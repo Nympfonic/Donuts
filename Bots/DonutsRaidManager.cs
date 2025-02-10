@@ -3,7 +3,6 @@ using Comfort.Common;
 using Cysharp.Threading.Tasks;
 using Cysharp.Threading.Tasks.Linq;
 using Donuts.Bots.Processors;
-using Donuts.Models;
 using Donuts.Tools;
 using Donuts.Utils;
 using EFT;
@@ -77,6 +76,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	internal const string SCAV_SERVICE_KEY = "Scav";
 	
 	private bool _hasSpawnedStartingBots;
+	private bool _isStartingBotSpawnOngoing;
 	private float _startingSpawnPrevTime;
 	
 	private bool _isReplenishBotDataOngoing;
@@ -87,7 +87,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private readonly List<IBotDataService> _botDataServices = new(INITIAL_SERVICES_COUNT);
 	private readonly List<IBotSpawnService> _botSpawnServices = new(INITIAL_SERVICES_COUNT);
 	private readonly List<IBotDespawnService> _botDespawnServices = new(INITIAL_SERVICES_COUNT);
-	
+
 	public BotConfigService BotConfigService { get; private set; }
 	
 	public static bool CanStartRaid { get; private set; }
@@ -272,9 +272,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		if (raidManager == null) return;
 
 		if (!raidManager._hasSpawnedStartingBots &&
+			!raidManager._isStartingBotSpawnOngoing &&
 			Time.time >= raidManager._startingSpawnPrevTime + SPAWN_INTERVAL_SECONDS)
 		{
-			raidManager.SpawnStartingBots().Forget();
+			await raidManager.SpawnStartingBots();
 		}
 		
 		if (!raidManager._isReplenishBotDataOngoing)
@@ -323,11 +324,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		try
 		{
-			if (_hasSpawnedStartingBots)
-			{
-				return;
-			}
-			
+			_isStartingBotSpawnOngoing = true;
 			_startingSpawnPrevTime = Time.time;
 			
 			_hasSpawnedStartingBots = true;
@@ -339,6 +336,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 					_hasSpawnedStartingBots = false;
 				}
 			}
+			
+			_isStartingBotSpawnOngoing = false;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{

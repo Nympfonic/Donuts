@@ -1,4 +1,5 @@
 ﻿using Cysharp.Text;
+using Donuts.Bots.Processors;
 using Donuts.Utils;
 using JetBrains.Annotations;
 
@@ -10,6 +11,11 @@ public class PmcSpawnService : BotSpawnService
 	public PmcSpawnService(BotConfigService configService, IBotDataService dataService) : base(configService, dataService)
 	{
 		spawnType = DonutsSpawnType.Pmc;
+		
+		string mapLocation = this.configService.GetMapLocation();
+		spawnCheckProcessor = new EntityVicinityCheck(mapLocation, dataService.AllAlivePlayers);
+		spawnCheckProcessor.SetNext(new WallCollisionCheck())
+			.SetNext(new GroundCheck());
 	}
 	
 	protected override bool HasReachedHardCap(bool isHotspot)

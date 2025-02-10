@@ -1,9 +1,8 @@
 ﻿using Cysharp.Text;
-using Donuts.Models;
+using Donuts.Bots.Processors;
 using Donuts.Utils;
 using EFT;
 using JetBrains.Annotations;
-using System.Collections.Generic;
 
 namespace Donuts.Bots;
 
@@ -13,6 +12,12 @@ public class ScavSpawnService : BotSpawnService
 	public ScavSpawnService(BotConfigService configService, IBotDataService dataService) : base(configService, dataService)
 	{
 		spawnType = DonutsSpawnType.Scav;
+		
+		string mapLocation = this.configService.GetMapLocation();
+		spawnCheckProcessor = new EntityVicinityCheck(mapLocation, dataService.AllAlivePlayers,
+			botTypesToIgnore: [WildSpawnType.assault, WildSpawnType.marksman, WildSpawnType.assaultGroup]);
+		spawnCheckProcessor.SetNext(new WallCollisionCheck())
+			.SetNext(new GroundCheck());
 	}
 
 	protected override bool HasReachedHardCap(bool isHotspot)
