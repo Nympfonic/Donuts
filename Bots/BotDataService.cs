@@ -151,7 +151,7 @@ public abstract class BotDataService : IBotDataService
 			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				logger.LogDebugDetailed("Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
+				logger.LogDebugDetailed($"Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			}
 			
 			var currentBotCount = 0;
