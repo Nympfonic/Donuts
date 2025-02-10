@@ -135,7 +135,7 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
-	/// Non-allocating version of <see cref="string.Join"/>.
+	/// Non-allocating version of string::Join().
 	/// </summary>
 	/// <param name="separator">The separator between each item.</param>
 	/// <param name="collection">The collection to output into a string.</param>
