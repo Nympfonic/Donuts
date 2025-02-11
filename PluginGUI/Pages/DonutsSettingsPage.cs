@@ -73,7 +73,7 @@ public class DonutsSettingsPage : TabContainerPage
 		if (GUILayout.Button("Save All Changes", greenButtonStyle, GUILayout.Width(250), GUILayout.Height(50)))
 		{
 			DonutsConfiguration.ExportConfig();
-			DonutsPlugin.Logger.NotifyModSettingsStatus("All Donuts settings have been saved.");
+			DonutsHelper.NotifyModSettingsStatus("All Donuts settings have been saved.");
 		}
 
 		GUILayout.Space(RESIZE_HANDLE_SIZE);

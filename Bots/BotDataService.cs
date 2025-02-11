@@ -103,7 +103,7 @@ public abstract class BotDataService : IBotDataService
 		ZoneSpawnPoints = configService.GetAllMapsZoneConfigs()!.Maps[location].Zones;
 		if (ZoneSpawnPoints.Count == 0)
 		{
-			logger.NotifyLogError("Donuts: Failed to load zone spawn points. Check your 'zoneSpawnPoints' folder!");
+			DonutsHelper.NotifyLogError("Donuts: Failed to load zone spawn points. Check your 'zoneSpawnPoints' folder!");
 			return;
 		}
 		
@@ -117,7 +117,7 @@ public abstract class BotDataService : IBotDataService
 		mapBotWaves = configService.GetAllMapsBotWavesConfigs()?.Maps[location];
 		if (mapBotWaves == null)
 		{
-			logger.NotifyLogError("Donuts: Failed to load bot waves. Donuts will not function properly.");
+			DonutsHelper.NotifyLogError("Donuts: Failed to load bot waves. Donuts will not function properly.");
 			return;
 		}
 	}
@@ -272,8 +272,9 @@ public abstract class BotDataService : IBotDataService
 			}
 			
 			var generatedCount = 0;
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			while (generatedCount < NUMBER_OF_GROUPS_TO_REPLENISH &&
-				_totalBots <= MaxBotLimit &&
+				_totalBots < MaxBotLimit &&
 				!cancellationToken.IsCancellationRequested)
 			{
 				BotDifficulty difficulty = BotDifficulties.PickRandomElement();
@@ -289,15 +290,15 @@ public abstract class BotDataService : IBotDataService
 				
 				if (DefaultPluginVars.debugLogging.Value)
 				{
-					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 					prepBotInfo.botCreationData._profileData.TryGetRole(out WildSpawnType role, out _);
+					sb.Clear();
 					sb.AppendFormat("Replenishing group bot: {0} {1} {2} Count: {3}.", role.ToString(),
 						prepBotInfo.difficulty.ToString(), prepBotInfo.botCreationData.Side.ToString(),
 						prepBotInfo.groupSize.ToString());
 					logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(ReplenishBotCache));
 				}
 				
-				await UniTask.Delay(FRAME_DELAY_BETWEEN_REPLENISH, cancellationToken: cancellationToken);
+				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_REPLENISH, cancellationToken: cancellationToken);
 			}
 			
 			ResetReplenishTimer();

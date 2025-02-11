@@ -267,7 +267,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("Donuts: No zones specified in {0} bot wave for GroupNum {1}. Check your scenario wave patterns are set up correctly!",
 				spawnType.ToString(), wave.GroupNum.ToString());
-			logger.NotifyLogError(sb.ToString());
+			DonutsHelper.NotifyLogError(sb.ToString());
 			return false;
 		}
 
@@ -306,6 +306,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 		
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		foreach (Vector3 spawnPoint in spawnPoints.ShuffleElements())
 		{
 			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
@@ -313,7 +314,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			{
 				if (DefaultPluginVars.debugLogging.Value)
 				{
-					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+					sb.Clear();
 					sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1}, {2}", wave.GroupNum, zoneName,
 						spawnPoint.ToString());
 					logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
@@ -339,6 +340,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 		
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		KeyValuePair<string, HashSet<Vector3>> spawnPoints = keywordZones.PickRandomElement();
 		foreach (Vector3 spawnPoint in spawnPoints!.Value.ShuffleElements())
 		{
@@ -350,7 +352,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.Clear();
 				sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1} (Keyword: {2}), {3}", wave.GroupNum,
 					spawnPoints.Key, keyword.ToString(), spawnPoint.ToString());
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
@@ -376,9 +378,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("{0} is a hotspot; hotspot boost is enabled, setting spawn chance to 100", zoneName);
-			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustHotspotSpawnChance));
+			logger.LogDebugDetailed($"{zoneName} is a hotspot; hotspot boost is enabled, setting spawn chance to 100",
+				GetType().Name, nameof(AdjustHotspotSpawnChance));
 		}
 		
 		wave.SetSpawnChance(100);
@@ -457,10 +458,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("No cached bots found for this spawn, generating on the fly for {0} bots - this may take some time.",
-					groupSize.ToString());
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SpawnBot));
+				logger.LogDebugDetailed(
+					$"No cached bots found for this spawn, generating on the fly for {groupSize.ToString()} bots - this may take some time.",
+					GetType().Name, nameof(SpawnBot));
 			}
 			
 			(bool success, cachedPrepBotInfo) =
@@ -518,9 +518,8 @@ public abstract class BotSpawnService : IBotSpawnService
 			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Found spawn position at: {0}", spawnPosition.ToString());
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(GetValidSpawnPosition));
+				logger.LogDebugDetailed($"Found spawn position at: {spawnPosition.ToString()}", GetType().Name,
+					nameof(GetValidSpawnPosition));
 			}
 			
 			return spawnPosition;
@@ -593,9 +592,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Max {0} respawns reached, skipping this spawn", spawnType.ToString());
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
+				logger.LogDebugDetailed($"Max {spawnType.ToString()} respawns reached, skipping this spawn",
+					GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
 			}
 			
 			return -1;

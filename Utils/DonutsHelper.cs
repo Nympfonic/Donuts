@@ -1,7 +1,7 @@
 ﻿using BepInEx.Logging;
 using Cysharp.Text;
 using Cysharp.Threading.Tasks;
-using Donuts.Utils.LoggerProcessor;
+using Donuts.Utils.Logger;
 using EFT.Communications;
 using JetBrains.Annotations;
 using System;
@@ -10,7 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
-using LogLevel = Donuts.Utils.LoggerProcessor.LogLevel;
+using LogLevel = Donuts.Utils.Logger.LogLevel;
 using Random = System.Random;
 
 namespace Donuts.Utils;
@@ -18,19 +18,22 @@ namespace Donuts.Utils;
 internal static class DonutsHelper
 {
 	private static readonly Random _random;
-	private static readonly LoggerProcessorBase _configGuiNotificationProcessor;
-	private static readonly LoggerProcessorBase _fullLoggerProcessor;
+	private static readonly DonutsLogger _modNotificationLogger;
+	private static readonly DonutsLogger _fullLogger;
 	
 	static DonutsHelper()
 	{
 		_random = new Random(unchecked((int)EFTDateTimeClass.Now.Ticks));
 		
-		_configGuiNotificationProcessor = new BepInExLoggerProcessor();
-		_configGuiNotificationProcessor.SetNext(new NotificationLoggerProcessor());
+		var loggerBuilder = new DonutsLoggerBuilder();
+		_modNotificationLogger = loggerBuilder.SetLoggingLevel(LogLevel.Info)
+			.AddNotificationToast(Color.cyan, ENotificationIconType.Alert)
+			.Build();
 		
-		_fullLoggerProcessor = new BepInExLoggerProcessor();
-		_fullLoggerProcessor.SetNext(new ConsoleLoggerProcessor())
-			.SetNext(new NotificationLoggerProcessor());
+		_fullLogger = loggerBuilder.SetLoggingLevel(LogLevel.Warning)
+			.AddNotificationToast(Color.yellow, ENotificationIconType.Alert)
+			.AddConsoleLogging()
+			.Build();
 	}
 	
 	/// <summary>
@@ -72,6 +75,24 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
+	/// <see cref="ManualLogSource.LogError"/> but also provides current time, executing type name and method name.
+	/// </summary>
+	/// <param name="logSource">The log source.</param>
+	/// <param name="message">The message to output to the log.</param>
+	/// <param name="typeName">Name of the executing type.</param>
+	/// <param name="methodName">Name of the executing method.</param>
+	internal static void LogErrorDetailed(
+		[NotNull] this ManualLogSource logSource,
+		[NotNull] string message,
+		[NotNull] string typeName,
+		[NotNull] string methodName)
+	{
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		sb.AppendFormat("{0} {1}::{2}: {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
+		logSource.LogError(sb.ToString());
+	}
+	
+	/// <summary>
 	/// Logs the given exception while also providing current time, executing type name and method name.
 	/// </summary>
 	/// <param name="logSource"></param>
@@ -91,24 +112,19 @@ internal static class DonutsHelper
 	/// <summary>
 	/// Output error message to BepInEx client log, to the EFT console and notify the player in-game.
 	/// </summary>
-	/// <param name="logger">The BepInEx logger to be used.</param>
 	/// <param name="message">Text to be output.</param>
-	internal static void NotifyLogError([NotNull] this ManualLogSource logger, [NotNull] string message)
+	internal static void NotifyLogError([NotNull] string message)
 	{
-		var loggerData =
-			new NotificationLoggerData(message, logger, LogLevel.Error, Color.yellow, ENotificationIconType.Alert);
-		_fullLoggerProcessor.Process(loggerData);
+		_fullLogger.Log(new LoggerMessage(message));
 	}
 	
 	/// <summary>
 	/// Outputs a warning message to BepInEx client log and notify the player in-game. Used for Donuts' F9 Config GUI.
 	/// </summary>
 	/// <inheritdoc cref="NotifyLogError"/>
-	internal static void NotifyModSettingsStatus([NotNull] this ManualLogSource logger, [NotNull] string message)
+	internal static void NotifyModSettingsStatus([NotNull] string message)
 	{
-		var loggerData =
-			new NotificationLoggerData(message, logger, LogLevel.Warning, Color.cyan, ENotificationIconType.Alert);
-		_configGuiNotificationProcessor.Process(loggerData);
+		_modNotificationLogger.Log(new LoggerMessage(message, LogLevel.Info));
 	}
 	
 	/// <summary>
@@ -177,7 +193,7 @@ internal static class DonutsHelper
 	/// <returns>A new list with shuffled elements.</returns>
 	[NotNull]
 	internal static List<T> ShuffleElements<T>([NotNull] this IEnumerable<T> source) => source.ToList().ShuffleElements();
-
+	
 	/// <summary>
 	/// Shuffles elements in the specified list.
 	/// </summary>
@@ -235,7 +251,7 @@ internal static class DonutsHelper
 			index = -1;
 			return default;
 		}
-
+		
 		if (count == 1)
 		{
 			index = 0;

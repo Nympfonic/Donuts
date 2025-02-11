@@ -40,12 +40,8 @@ internal static class BotHelper
 				difficulties = _impossibleDifficulty;
 				break;
 			default:
-				using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
-				{
-					sb.AppendFormat("{0} {1}::{2}: Unsupported difficulty setting: {3}", DateTime.Now.ToLongTimeString(),
-						nameof(BotHelper), nameof(GetSettingDifficulties), difficultySetting);
-					DonutsPlugin.Logger.LogError(sb.ToString());
-				}
+				DonutsPlugin.Logger.LogErrorDetailed($"Unsupported difficulty setting: {difficultySetting}",
+					nameof(BotHelper), nameof(GetSettingDifficulties));
 				difficulties = _invalidDifficulty;
 				break;
 		}

@@ -1,10 +1,10 @@
 using EFT.UI;
 
-namespace Donuts.Utils.LoggerProcessor;
+namespace Donuts.Utils.Logger;
 
 public class ConsoleLoggerProcessor : LoggerProcessorBase
 {
-	public override bool Process(LoggerData data)
+	public override bool Process(LoggerMessage data)
 	{
 		switch (data.logLevel)
 		{

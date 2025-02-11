@@ -1,4 +1,4 @@
-namespace Donuts.Utils.LoggerProcessor;
+namespace Donuts.Utils.Logger;
 
 public enum LogLevel
 {

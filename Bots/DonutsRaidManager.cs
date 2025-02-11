@@ -238,7 +238,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		if (!await TryCreateDataServices())
 		{
-			Logger.NotifyLogError("Donuts: Failed to initialize Donuts Raid Manager, disabling Donuts for this raid.");
+			DonutsHelper.NotifyLogError("Donuts: Failed to initialize Donuts Raid Manager, disabling Donuts for this raid.");
 			Destroy(this);
 			CanStartRaid = true;
 			return;

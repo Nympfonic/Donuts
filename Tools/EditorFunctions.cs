@@ -144,7 +144,7 @@ internal static class EditorFunctions
 		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
 		if (raidManager == null || raidManager.BotConfigService == null)
 		{
-			_logger.NotifyLogError("Donuts: You must be in a raid to create a spawn marker!");
+			DonutsHelper.NotifyLogError("Donuts: You must be in a raid to create a spawn marker!");
 			return;
 		}
 			
@@ -197,7 +197,7 @@ internal static class EditorFunctions
 		DonutsRaidManager raidManager = MonoBehaviourSingleton<DonutsRaidManager>.Instance;
 		if (raidManager == null || raidManager.BotConfigService == null)
 		{
-			_logger.NotifyLogError("Donuts: You must be in a raid to use this functionality!");
+			DonutsHelper.NotifyLogError("Donuts: You must be in a raid to use this functionality!");
 			return;
 		}
 

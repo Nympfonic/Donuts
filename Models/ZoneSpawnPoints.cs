@@ -241,7 +241,7 @@ public class ZoneSpawnPoints : Dictionary<string, HashSet<Vector3>>
 			sb.AppendFormat(
 				"Donuts: Invalid zone name \'{0}\'!\nYou cannot use Donuts keywords as zone names in a ZoneSpawnPoints .json!\nPath: \'{1}\'\n",
 				zoneName, filePath);
-			DonutsPlugin.Logger.NotifyLogError(sb.ToString());
+			DonutsHelper.NotifyLogError(sb.ToString());
 			return false;
 		}
 		

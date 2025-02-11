@@ -139,7 +139,7 @@ public class BotConfigService
 			AllMapsZoneConfigs allMapsZoneConfigs = AllMapsZoneConfigs.LoadFromDirectory(zoneSpawnPointsPath);
 			if (allMapsZoneConfigs == null)
 			{
-				_logger.NotifyLogError("Donuts: Failed to load AllMapZoneConfig. Donuts will not function properly.");
+				DonutsHelper.NotifyLogError("Donuts: Failed to load AllMapZoneConfig. Donuts will not function properly.");
 				return null;
 			}
 			
@@ -155,7 +155,7 @@ public class BotConfigService
 		_scenarioSelected ??= PresetSelector.GetWeightedScenarioSelection();
 		if (_scenarioSelected == null)
 		{
-			_logger.NotifyLogError("Donuts: No valid scenario nor fallback found. Donuts will not function properly.");
+			DonutsHelper.NotifyLogError("Donuts: No valid scenario nor fallback found. Donuts will not function properly.");
 			return null;
 		}
 		
@@ -179,7 +179,7 @@ public class BotConfigService
 		
 		if (!File.Exists(jsonFilePath))
 		{
-			_logger.NotifyLogError($"Donuts: {GetMapName()}_start.json file not found. Donuts will not function properly.");
+			DonutsHelper.NotifyLogError($"Donuts: {GetMapName()}_start.json file not found. Donuts will not function properly.");
 			return null;
 		}
 		
@@ -205,7 +205,7 @@ public class BotConfigService
 		if (jsonFiles.Length == 0)
 		{
 			// TODO: Implement generating default JSONs for the patterns if not found.
-			_logger.NotifyLogError(
+			DonutsHelper.NotifyLogError(
 				$"Donuts: No JSON Pattern files found in folder: {patternFolderPath}\nDonuts will not function properly.");
 			return false;
 		}
@@ -214,7 +214,7 @@ public class BotConfigService
 		// Display selected preset
 		if (DefaultPluginVars.ShowRandomFolderChoice.Value)
 		{
-			_logger.NotifyModSettingsStatus($"Donuts: Selected Spawn Preset: {_scenarioSelected}");
+			DonutsHelper.NotifyModSettingsStatus($"Donuts: Selected Spawn Preset: {_scenarioSelected}");
 		}
 		return true;
 	}
@@ -255,7 +255,7 @@ public class BotConfigService
 		
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		sb.AppendFormat("Donuts: Failed to retrieve {0} max bot cap value. Report this to the author!", spawnType.ToString());
-		DonutsRaidManager.Logger.NotifyLogError(sb.ToString());
+		DonutsHelper.NotifyLogError(sb.ToString());
 		return -1;
 	}
 	
