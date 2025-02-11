@@ -314,10 +314,14 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private void CreateSpawnServices()
 	{
 		var pmcSpawnService = _dependencyContainer.Resolve<IBotSpawnService>(PMC_SERVICE_KEY);
+		var pmcDespawnService = _dependencyContainer.Resolve<IBotDespawnService>(PMC_SERVICE_KEY);
 		_botSpawnServices.Add(pmcSpawnService);
+		_botDespawnServices.Add(pmcDespawnService);
 		
 		var scavSpawnService = _dependencyContainer.Resolve<IBotSpawnService>(SCAV_SERVICE_KEY);
+		var scavDespawnService = _dependencyContainer.Resolve<IBotDespawnService>(SCAV_SERVICE_KEY);
 		_botSpawnServices.Add(scavSpawnService);
+		_botDespawnServices.Add(scavDespawnService);
 	}
 	
 	private async UniTask SpawnStartingBots()
