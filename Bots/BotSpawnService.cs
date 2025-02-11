@@ -224,8 +224,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		while (failsafeCounter < maxFailsafeAttempts)
 		{
 			if (cancellationToken.IsCancellationRequested) return false;
-			Vector3? spawnPoint = dataService.GetUnusedSpawnPoint(SpawnPointType.Starting);
-			if (!spawnPoint.HasValue)
+			
+			Vector3? simulatedSpawnPoint = dataService.GetUnusedSpawnPoint(SpawnPointType.Starting);
+			if (!simulatedSpawnPoint.HasValue)
 			{
 				if (DefaultPluginVars.debugLogging.Value)
 				{
@@ -236,7 +237,8 @@ public abstract class BotSpawnService : IBotSpawnService
 				break;
 			}
 			
-			Vector3? positionOnNavMesh = await GetValidSpawnPosition(spawnPoint.Value, spawnCheckProcessor, cancellationToken);
+			Vector3? positionOnNavMesh =
+				await GetValidSpawnPosition(simulatedSpawnPoint.Value, spawnCheckProcessor, cancellationToken);
 			if (cancellationToken.IsCancellationRequested) return false;
 			if (!positionOnNavMesh.HasValue)
 			{

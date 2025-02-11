@@ -1,4 +1,3 @@
-using Cysharp.Text;
 using Donuts.Bots;
 using Donuts.Utils;
 using JetBrains.Annotations;
@@ -12,8 +11,11 @@ public class SpawnPointsCache
 	[NotNull] private readonly ZoneSpawnPoints _zoneSpawnPoints;
 	[NotNull] private readonly string[] _zoneNames;
 	
-	private Vector3[] _cachedSpawnPoints;
-	private Queue<Vector3> _spawnPointsToUse;
+	private Queue<Vector3>[] _cachedSpawnPoints;
+	private Queue<Vector3>[] _spawnPointsToUse;
+	
+	private int _zoneCount;
+	private int _currentIndex;
 	
 	public SpawnPointsCache([NotNull] ZoneSpawnPoints zoneSpawnPoints, [NotNull] string[] zoneNames)
 	{
@@ -35,12 +37,14 @@ public class SpawnPointsCache
 			return null;
 		}
 		
-		if (_spawnPointsToUse.Count == 0)
+		Queue<Vector3> spawnPointQueue = _spawnPointsToUse[_currentIndex];
+		if (spawnPointQueue.Count == 0)
 		{
-			ResetSpawnPoints();
+			ResetSpawnPoints(_currentIndex);
 		}
 		
-		Vector3 spawnPoint = _spawnPointsToUse.Dequeue();
+		_currentIndex = (_currentIndex + 1) % _zoneCount;
+		Vector3 spawnPoint = spawnPointQueue.Dequeue();
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -49,7 +53,7 @@ public class SpawnPointsCache
 		
 		return spawnPoint;
 	}
-
+	
 	private void InitializeSpawnPoints()
 	{
 		// Merge zones into a hashset to ensure no duplicates
@@ -68,18 +72,22 @@ public class SpawnPointsCache
 			}
 		}
 		
-		// Populate the hashset with a randomized order of spawn points
-		var mergedSpawnPoints = new HashSet<Vector3>();
-		foreach (string zoneName in mergedZones.ShuffleElements())
+		// Cache the spawn points and create new queues to be used
+		_zoneCount = mergedZones.Count;
+		_cachedSpawnPoints = new Queue<Vector3>[_zoneCount];
+		
+		var index = 0;
+		foreach (string zoneName in mergedZones)
 		{
-			List<Vector3> spawnPoints = _zoneSpawnPoints[zoneName]!.ShuffleElements();
-			mergedSpawnPoints.UnionWith(spawnPoints);
+			var queue = new Queue<Vector3>(_zoneSpawnPoints[zoneName]!.ShuffleElements());
+			_cachedSpawnPoints[index++] = new Queue<Vector3>(queue);
 		}
 		
-		// Cache the spawn points and create new queue to be used
-		_cachedSpawnPoints = new Vector3[mergedSpawnPoints.Count];
-		mergedSpawnPoints.CopyTo(_cachedSpawnPoints);
-		_spawnPointsToUse = new Queue<Vector3>(_cachedSpawnPoints);
+		_spawnPointsToUse = new Queue<Vector3>[_zoneCount];
+		for (var i = 0; i < _zoneCount; i++)
+		{
+			_spawnPointsToUse[i] = new Queue<Vector3>(_cachedSpawnPoints[i]);
+		}
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -87,7 +95,7 @@ public class SpawnPointsCache
 		}
 	}
 	
-	private void ResetSpawnPoints()
+	private void ResetSpawnPoints(int index)
 	{
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -95,17 +103,16 @@ public class SpawnPointsCache
 		}
 		
 		// Already cached so we just create a new queue, passing the cached array into it
-		if (_cachedSpawnPoints != null)
+		if (_cachedSpawnPoints != null && _cachedSpawnPoints.Length > 0)
 		{
-			_cachedSpawnPoints = _cachedSpawnPoints.ShuffleElements();
-			_spawnPointsToUse = new Queue<Vector3>(_cachedSpawnPoints);
+			_spawnPointsToUse[index] = new Queue<Vector3>(_cachedSpawnPoints[index].ShuffleElements());
 			return;
 		}
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
 			DonutsRaidManager.Logger.LogWarning(
-				$"{nameof(_cachedSpawnPoints)} is unexpectedly null. Initializing new cache...");
+				$"{nameof(_cachedSpawnPoints)} is unexpectedly null or empty. Initializing new cache...");
 		}
 		
 		InitializeSpawnPoints();
