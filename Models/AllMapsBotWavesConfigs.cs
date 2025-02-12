@@ -12,8 +12,8 @@ public class AllMapsBotWavesConfigs
 {
 	[JsonProperty("Maps")]
 	public Dictionary<string, MapBotWaves> Maps { get; private set; }
-
-	internal void EnsureUniqueGroupNumForBotWaves()
+	
+	internal void Validate()
 	{
 		foreach (MapBotWaves map in Maps.Values)
 		{

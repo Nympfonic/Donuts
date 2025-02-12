@@ -82,8 +82,10 @@ public class BotConfigService
 		{
 			_logger.LogInfo($"Successfully loaded {_mapName}_waves.json for preset: {_scenarioSelected}");
 		}
-		botWavesConfig.EnsureUniqueGroupNumForBotWaves();
+		
+		botWavesConfig.Validate();
 		_allMapsBotWavesConfigs = botWavesConfig;
+		
 		return _allMapsBotWavesConfigs;
 	}
 	

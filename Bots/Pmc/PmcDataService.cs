@@ -10,12 +10,13 @@ using Random = UnityEngine.Random;
 namespace Donuts.Bots;
 
 [UsedImplicitly]
-public class PmcDataService : BotDataService
+public sealed class PmcDataService : BotDataService
 {
 	public PmcDataService([NotNull] BotConfigService configService) : base(configService)
 	{
 		spawnType = DonutsSpawnType.Pmc;
-		startingBotConfig = configService.GetAllMapsStartingBotConfigs()!.Maps[configService.GetMapLocation()].Pmc;
+		string mapLocation = configService.GetMapLocation();
+		startingBotConfig = configService.GetAllMapsStartingBotConfigs()!.Maps[mapLocation].Pmc;
 		botWaves = mapBotWaves.Pmc;
 		botWavesByGroupNum = botWaves.ToLookup(wave => wave.GroupNum);
 		waveGroupSize = GetWaveMinMaxGroupSize(botWaves);

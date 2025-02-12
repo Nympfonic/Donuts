@@ -13,7 +13,8 @@ public sealed class ScavDataService : BotDataService
 	public ScavDataService([NotNull] BotConfigService configService) : base(configService)
 	{
 		spawnType = DonutsSpawnType.Scav;
-		startingBotConfig = configService.GetAllMapsStartingBotConfigs()!.Maps[configService.GetMapLocation()].Scav;
+		string mapLocation = configService.GetMapLocation();
+		startingBotConfig = configService.GetAllMapsStartingBotConfigs()!.Maps[mapLocation].Scav;
 		botWaves = mapBotWaves.Scav;
 		botWavesByGroupNum = botWaves.ToLookup(wave => wave.GroupNum);
 		waveGroupSize = GetWaveMinMaxGroupSize(botWaves);
