@@ -83,6 +83,8 @@ public class SpawnPointsCache
 			_cachedSpawnPoints[index++] = new Queue<Vector3>(queue);
 		}
 		
+		_cachedSpawnPoints.ShuffleElements();
+		
 		_spawnPointsToUse = new Queue<Vector3>[_zoneCount];
 		for (var i = 0; i < _zoneCount; i++)
 		{
@@ -105,7 +107,10 @@ public class SpawnPointsCache
 		// Already cached so we just create a new queue, passing the cached array into it
 		if (_cachedSpawnPoints != null && _cachedSpawnPoints.Length > 0)
 		{
-			_spawnPointsToUse[index] = new Queue<Vector3>(_cachedSpawnPoints[index].ShuffleElements());
+			foreach (Vector3 spawnPoint in _cachedSpawnPoints[index].ShuffleElements())
+			{
+				_spawnPointsToUse[index].Enqueue(spawnPoint);
+			}
 			return;
 		}
 		
