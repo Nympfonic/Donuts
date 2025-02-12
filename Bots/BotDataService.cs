@@ -148,6 +148,8 @@ public abstract class BotDataService : IBotDataService
 		try
 		{
 			int maxBots = Random.Range(startingBotConfig.MinCount, startingBotConfig.MaxCount);
+			int minGroupSize = Math.Max(startingBotConfig.MinGroupSize, 1);
+			int maxGroupSize = startingBotConfig.MaxGroupSize;
 			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
@@ -157,8 +159,7 @@ public abstract class BotDataService : IBotDataService
 			var currentBotCount = 0;
 			while (currentBotCount < maxBots && !cancellationToken.IsCancellationRequested)
 			{
-				int groupSize = BotHelper.GetBotGroupSize(GroupChance, startingBotConfig.MinGroupSize,
-					startingBotConfig.MaxGroupSize, maxBots - currentBotCount);
+				int groupSize = BotHelper.GetBotGroupSize(GroupChance, minGroupSize, maxGroupSize, maxBots - currentBotCount);
 				
 				(bool success, PrepBotInfo prepBotInfo) = await TryCreateBotData(BotDifficulties.PickRandomElement(),
 					groupSize, saveToCache: false, cancellationToken: cancellationToken);
@@ -180,7 +181,7 @@ public abstract class BotDataService : IBotDataService
 	
 	protected static (int min, int max) GetWaveMinMaxGroupSize(IReadOnlyList<BotWave> waves)
 	{
-		var minGroupSize = 0;
+		var minGroupSize = 1;
 		var maxGroupSize = int.MaxValue;
 		
 		foreach (BotWave wave in waves)
@@ -283,7 +284,11 @@ public abstract class BotDataService : IBotDataService
 				(bool success, PrepBotInfo prepBotInfo) =
 					await TryCreateBotData(difficulty, groupSize, cancellationToken: cancellationToken);
 				if (cancellationToken.IsCancellationRequested) return;
-				if (!success) continue;
+				if (!success)
+				{
+					await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_REPLENISH, cancellationToken: cancellationToken);
+					continue;
+				}
 				
 				generatedCount++;
 				_totalBots += groupSize;
