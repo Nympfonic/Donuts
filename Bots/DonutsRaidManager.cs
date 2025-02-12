@@ -176,7 +176,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		float deltaTime = Time.deltaTime;
 		_donutsGizmos.DisplayMarkerInformation(_mainPlayer.Transform);
-		EventBus<BotDataService.UpdateWaveTimerEvent>.Raise(new BotDataService.UpdateWaveTimerEvent(deltaTime));
+		EventBus.Raise(new BotDataService.UpdateWaveTimerEvent(deltaTime));
 	}
 	
 	private void OnGUI()

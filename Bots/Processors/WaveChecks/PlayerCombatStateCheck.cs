@@ -1,4 +1,5 @@
 using Donuts.Models;
+using Donuts.Utils;
 using UnityEngine;
 using UnityToolkit.Structures.EventBus;
 
@@ -18,7 +19,19 @@ public class PlayerCombatStateCheck : WaveSpawnProcessorBase
 	
 	public override bool Process(BotWave data)
 	{
-		return !IsPlayerInCombat() && base.Process(data);
+		if (!IsPlayerInCombat())
+		{
+			return base.Process(data);
+		}
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			DonutsRaidManager.Logger.LogDebugDetailed(
+				$"Resetting timer for GroupNum {data.GroupNum.ToString()}, reason: A player is in combat.",
+				nameof(WaveSpawnChanceCheck), nameof(Process));
+		}
+		
+		return false;
 	}
 	
 	private bool IsPlayerInCombat()
