@@ -1,10 +1,7 @@
-﻿using Cysharp.Text;
-using Donuts.Utils;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using UnityEngine;
 
 namespace Donuts.Models;
@@ -23,7 +20,7 @@ public class AllMapsZoneConfigs
 			string json = File.ReadAllText(file);
 			var mapConfig = JsonConvert.DeserializeObject<MapZoneConfig>(json);
 			if (mapConfig == null) continue;
-
+			
 			string mapName = mapConfig.MapName.ToLower();
 			if (!allMapsConfigs.Maps.ContainsKey(mapName))
 			{
@@ -33,16 +30,6 @@ public class AllMapsZoneConfigs
 			
 			allMapsConfigs.Maps[mapName].AppendZones(mapConfig);
 		}
-
-		var sb = new StringBuilder();
-		sb.AppendLine("allMapsConfigs.Maps[\"bigmap\"].Zones");
-		foreach (string zoneName in allMapsConfigs.Maps["bigmap"].Zones.Keys)
-		{
-			sb.Append(zoneName);
-			sb.Append(", ");
-		}
-		sb.AppendLine();
-		DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(AllMapsZoneConfigs), nameof(LoadFromDirectory));
 		
 		return allMapsConfigs;
 	}
