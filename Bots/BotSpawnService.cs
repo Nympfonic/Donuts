@@ -127,8 +127,6 @@ public abstract class BotSpawnService : IBotSpawnService
 	protected abstract bool IsHardStopEnabled();
 	protected abstract int GetHardStopTime();
 	
-	// TODO: why is this method failing?
-	// This is an old comment, method has been changed so it needs testing
 	private bool HasReachedHardStopTime()
 	{
 		if (!IsHardStopEnabled())

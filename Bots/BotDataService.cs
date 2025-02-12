@@ -74,7 +74,7 @@ public abstract class BotDataService : IBotDataService
 	protected (int min, int max) waveGroupSize;
 	
 	protected SpawnPointsCache startingSpawnPointsCache;
-	// TODO: Figure out how to implement remembering used spawn points for individual bot waves without 
+	// TODO: Figure out how to implement remembering used spawn points for individual bot waves
 	//protected SpawnPointsCache waveSpawnPointsCache;
 	
 	public Queue<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);

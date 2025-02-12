@@ -158,8 +158,6 @@ public abstract class BotDespawnService(
 		}
 		
 		Player botPlayer = botOwner.GetPlayer;
-		// _gameWorld.RegisteredPlayers.Remove(botOwner);
-		// _gameWorld.AllAlivePlayersList.Remove(botPlayer);
 		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botPlayer);
 		
 		// TODO: Call Fika's despawn method instead
