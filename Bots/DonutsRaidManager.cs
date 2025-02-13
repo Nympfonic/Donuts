@@ -165,9 +165,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	[UsedImplicitly]
 	private async UniTaskVoid Start()
 	{
+		_gameWorld.OnPersonAdd += SubscribeHumanPlayerEventHandlers;
 		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
 		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
-		_gameWorld.OnPersonAdd += SubscribeHumanPlayerEventHandlers;
 		
 		await Initialize();
 	}
@@ -423,9 +423,32 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		catch (OperationCanceledException) {}
 	}
 	
+	private static void SubscribeHumanPlayerEventHandlers(IPlayer player)
+	{
+		var humanPlayer = (Player)player;
+		
+		// We don't check if it's an AI here because it doesn't have the BotOwner MonoBehaviour script at this point
+		// Simply remove the subscription later in the BotSpawner::OnBotCreated event
+		if (humanPlayer && humanPlayer.HealthController?.IsAlive == true)
+		{
+			humanPlayer.BeingHitAction += TakingDamageCombatCooldown;
+			humanPlayer.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
+		}
+	}
+	
+	private static void DisposePlayerSubscriptions(Player player)
+	{
+		player.BeingHitAction -= TakingDamageCombatCooldown;
+		player.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
+	}
+	
 	private static void EftBotSpawner_OnBotCreated(BotOwner bot)
 	{
 		bot.Memory.OnGoalEnemyChanged += Memory_OnGoalEnemyChanged;
+		// Remove these subscriptions since now it's confirmed this player is a bot and not a human player
+		Player botPlayer = bot.GetPlayer;
+		botPlayer.BeingHitAction -= TakingDamageCombatCooldown;
+		botPlayer.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
 	}
 	
 	private static void EftBotSpawner_OnBotRemoved(BotOwner bot)
@@ -476,22 +499,5 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				EventBus.Raise(new PlayerCombatStateCheck.ResetTimerEvent());
 				break;
 		}
-	}
-	
-	private static void SubscribeHumanPlayerEventHandlers(IPlayer player)
-	{
-		var humanPlayer = (Player)player;
-		
-		if (humanPlayer && !humanPlayer.IsAI && humanPlayer.HealthController?.IsAlive == true)
-		{
-			humanPlayer.BeingHitAction += TakingDamageCombatCooldown;
-			humanPlayer.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
-		}
-	}
-	
-	private static void DisposePlayerSubscriptions(Player player)
-	{
-		player.BeingHitAction -= TakingDamageCombatCooldown;
-		player.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
 	}
 }
