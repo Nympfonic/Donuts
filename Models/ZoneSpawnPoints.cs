@@ -23,7 +23,6 @@ public class ZoneSpawnPoints : Dictionary<string, HashSet<Vector3>>
 		Hotspot
 	}
 	
-	
 	private Dictionary<KeywordZoneType, HashSet<string>> _keywordZoneMappings = [];
 	
 	/// <summary>

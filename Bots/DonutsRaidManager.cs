@@ -385,10 +385,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				hasWavesToSpawn = false;
 				
 				// TODO: Separate starting bot spawning into its own list and service so it's not affected by this shuffle
-				List<IBotSpawnService> spawnServices = _botSpawnServices.ShuffleElements();
-				for (int i = spawnServices.Count - 1; i >= 0; i--)
+				for (int i = _botSpawnServices.Count - 1; i >= 0; i--)
 				{
-					IBotSpawnService service = spawnServices[i];
+					IBotSpawnService service = _botSpawnServices[i];
 					if (!await service.TrySpawnBotWave(_onDestroyToken) || _onDestroyToken.IsCancellationRequested)
 					{
 						continue;
@@ -409,10 +408,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 			
 			// Despawn excess bots
-			List<IBotDespawnService> despawnServices = _botDespawnServices.ShuffleElements();
-			for (int i = despawnServices.Count - 1; i >= 0; i--)
+			for (int i = _botDespawnServices.Count - 1; i >= 0; i--)
 			{
-				IBotDespawnService service = despawnServices[i];
+				IBotDespawnService service = _botDespawnServices[i];
 				await service.DespawnExcessBots(_onDestroyToken);
 			}
 			
