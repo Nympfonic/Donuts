@@ -12,7 +12,7 @@ using UnityEngine;
 namespace Donuts.Patches;
 
 [UsedImplicitly]
-internal class DelayedGameStartPatch : ModulePatch
+internal class GenerateStartingBotsPatch : ModulePatch
 {
 	/// <remarks>Target method has a return type of <see cref="IEnumerator"/> and has a single <see cref="Action"/> type parameter.</remarks>
 	protected override MethodBase GetTargetMethod()

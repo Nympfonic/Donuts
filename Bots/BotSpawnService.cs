@@ -464,7 +464,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			}
 			
 			(bool success, cachedPrepBotInfo) =
-				await dataService.TryCreateBotData(difficulty, groupSize, cancellationToken: cancellationToken);
+				await dataService.TryGenerateBotProfiles(difficulty, groupSize, cancellationToken: cancellationToken);
 			if (cancellationToken.IsCancellationRequested || !success) return false;
 		}
 		

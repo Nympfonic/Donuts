@@ -26,7 +26,7 @@ public interface IBotDataService
 	public ReadOnlyCollection<Player> AllAlivePlayers { get; }
 
 	UniTask SetupStartingBotCache(CancellationToken cancellationToken);
-	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryCreateBotData(BotDifficulty difficulty, int groupSize,
+	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryGenerateBotProfiles(BotDifficulty difficulty, int groupSize,
 		bool saveToCache = true, CancellationToken cancellationToken = default);
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
 	[CanBeNull] PrepBotInfo FindCachedBotData(BotDifficulty difficulty, int targetCount);
@@ -57,9 +57,11 @@ public abstract class BotDataService : IBotDataService
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
 	private const int FRAME_DELAY_BETWEEN_REPLENISH = 5;
 	
+	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(3);
+	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
-	private readonly IBotCreator _botCreator;
 	private readonly BotSpawner _eftBotSpawner;
+	private readonly IBotCreator _botCreator;
 	
 	private float _replenishBotCachePrevTime;
 	
@@ -161,7 +163,7 @@ public abstract class BotDataService : IBotDataService
 			{
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, minGroupSize, maxGroupSize, maxBots - currentBotCount);
 				
-				(bool success, PrepBotInfo prepBotInfo) = await TryCreateBotData(BotDifficulties.PickRandomElement(),
+				(bool success, PrepBotInfo prepBotInfo) = await TryGenerateBotProfiles(BotDifficulties.PickRandomElement(),
 					groupSize, saveToCache: false, cancellationToken: cancellationToken);
 				if (cancellationToken.IsCancellationRequested) return;
 				
@@ -190,7 +192,7 @@ public abstract class BotDataService : IBotDataService
 			{
 				minGroupSize = wave.MinGroupSize;
 			}
-
+			
 			if (wave.MaxGroupSize < maxGroupSize)
 			{
 				maxGroupSize = wave.MaxGroupSize;
@@ -202,7 +204,7 @@ public abstract class BotDataService : IBotDataService
 	
 	public abstract BotDifficulty GetBotDifficulty();
 	
-	public async UniTask<(bool success, PrepBotInfo prepBotInfo)> TryCreateBotData(
+	public async UniTask<(bool success, PrepBotInfo prepBotInfo)> TryGenerateBotProfiles(
 		BotDifficulty difficulty,
 		int groupSize,
 		bool saveToCache = true,
@@ -221,20 +223,32 @@ public abstract class BotDataService : IBotDataService
 			if (DefaultPluginVars.debugLogging.Value)
 			{
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Creating bot: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
+				sb.AppendFormat("Generating bot profiles: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
 					wildSpawnType.ToString(), difficulty.ToString(), side.ToString(), groupSize.ToString());
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryCreateBotData));
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
 			}
 			
 			var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
-			var botCreationData = await BotCreationDataClass
-				.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner);
+			BotCreationDataClass botCreationData;
+			using (var cts = new CancellationTokenSource(_timeoutSeconds))
+			{
+				botCreationData = await BotCreationDataClass
+					.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner)
+					.AsUniTask()
+					.AttachExternalCancellation(cts.Token);
+				
+				if (cts.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
+				{
+					const string timedOutMessage = "Generating bot profiles timed out! Check server logs, there may be a bot generation error!";
+					logger.LogDebugDetailed(timedOutMessage, GetType().Name, nameof(TryGenerateBotProfiles));
+				}
+			}
 			
 			if (botCreationData?.Profiles == null || botCreationData.Profiles.Count == 0)
 			{
 				return (false, null);
 			}
-
+			
 			var prepBotInfo = new PrepBotInfo(botCreationData, difficulty);
 			if (saveToCache)
 			{
@@ -244,16 +258,16 @@ public abstract class BotDataService : IBotDataService
 			if (DefaultPluginVars.debugLogging.Value)
 			{
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Bot created and assigned successfully; {0} profiles loaded. IDs: {1}",
+				sb.AppendFormat("Bot profiles generated and assigned successfully; {0} profiles loaded. IDs: {1}",
 					botCreationData.Profiles.Count.ToString(), string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryCreateBotData));
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
 			}
 			
 			return (true, prepBotInfo);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
-			logger.LogException(GetType().Name, nameof(TryCreateBotData), ex);
+			logger.LogException(GetType().Name, nameof(TryGenerateBotProfiles), ex);
 		}
 		catch (OperationCanceledException) {}
 		
@@ -282,7 +296,7 @@ public abstract class BotDataService : IBotDataService
 				int groupSize = BotHelper.GetBotGroupSize(GroupChance, waveGroupSize.min, waveGroupSize.max);
 				
 				(bool success, PrepBotInfo prepBotInfo) =
-					await TryCreateBotData(difficulty, groupSize, cancellationToken: cancellationToken);
+					await TryGenerateBotProfiles(difficulty, groupSize, cancellationToken: cancellationToken);
 				if (cancellationToken.IsCancellationRequested) return;
 				if (!success)
 				{
