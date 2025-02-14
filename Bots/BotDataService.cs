@@ -230,14 +230,14 @@ public abstract class BotDataService : IBotDataService
 			
 			var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
 			BotCreationDataClass botCreationData;
-			using (var cts = new CancellationTokenSource(_timeoutSeconds))
+			using (var timeout = new CancellationTokenSource(_timeoutSeconds))
 			{
 				botCreationData = await BotCreationDataClass
 					.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner)
 					.AsUniTask()
-					.AttachExternalCancellation(cts.Token);
+					.AttachExternalCancellation(timeout.Token);
 				
-				if (cts.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
+				if (timeout.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
 				{
 					const string timedOutMessage = "Generating bot profiles timed out! Check server logs, there may be a bot generation error!";
 					logger.LogDebugDetailed(timedOutMessage, GetType().Name, nameof(TryGenerateBotProfiles));
