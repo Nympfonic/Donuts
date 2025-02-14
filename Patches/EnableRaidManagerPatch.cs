@@ -1,5 +1,4 @@
-﻿using Donuts.Bots;
-using EFT;
+﻿using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;

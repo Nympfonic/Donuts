@@ -1,4 +1,4 @@
-﻿using Donuts.Models;
+﻿using Donuts.Spawning.Models;
 using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;

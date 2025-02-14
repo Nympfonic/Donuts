@@ -1,5 +1,5 @@
 using Comfort.Common;
-using Donuts.Bots;
+using Donuts.Spawning;
 using Donuts.Utils;
 using EFT;
 using HarmonyLib;
