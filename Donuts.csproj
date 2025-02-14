@@ -89,6 +89,9 @@
     <Reference Include="Unity.Mathematics">
       <HintPath>E:\SPT-3.10\EscapeFromTarkov_Data\Managed\Unity.Mathematics.dll</HintPath>
     </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>E:\SPT-3.10\EscapeFromTarkov_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>E:\SPT-3.10\EscapeFromTarkov_Data\Managed\UnityEngine.dll</HintPath>
     </Reference>

@@ -9,7 +9,6 @@ using Donuts.Tools;
 using Donuts.Utils;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,8 +20,7 @@ namespace Donuts;
 
 [BepInPlugin("com.dvize.Donuts", "Donuts", "2.0.0")]
 [BepInDependency("com.SPT.core", "3.10.0")]
-[BepInDependency("xyz.drakia.waypoints")]
-[BepInDependency("com.Arys.UnityToolkit", "1.2.0")]
+[BepInDependency("com.dvize.DonutsDependencyChecker")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
 {
@@ -47,12 +45,6 @@ public class DonutsPlugin : BaseUnityPlugin
 		CurrentAssembly = Assembly.GetExecutingAssembly();
 		string assemblyPath = CurrentAssembly.Location;
 		DirectoryPath = Path.GetDirectoryName(assemblyPath);
-		
-		// Run dependency checker
-		if (!DependencyChecker.ValidateDependencies(Logger, Info, GetType(), Config))
-		{
-			throw new Exception("Missing Dependencies");
-		}
 		
 		DonutsConfiguration.ImportConfig(DirectoryPath);
 		
