@@ -14,7 +14,7 @@ namespace Donuts.Patches;
 internal class EnableRaidManagerPatch : ModulePatch
 {
 	protected override MethodBase GetTargetMethod() =>
-		AccessTools.Method(typeof(BotsController), nameof(BotsController.AddActivePLayer));
+		AccessTools.Method(typeof(BotsController), nameof(BotsController.SetSettings));
 
 	[PatchPostfix]
 	private static void PatchPostfix() => DonutsRaidManager.Enable();
