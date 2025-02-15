@@ -27,7 +27,7 @@ public interface IBotDataService : IServiceSpawnType
 	public string GroupChance { get; }
 	public ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
-	[CanBeNull] IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(CancellationToken cancellationToken);
+	[CanBeNull] IUniTaskAsyncEnumerable<BotGenerationProgress> SetupStartingBotCache(CancellationToken cancellationToken);
 	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryGenerateBotProfiles(BotDifficulty difficulty, int groupSize,
 		bool saveToCache = true, CancellationToken cancellationToken = default);
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
@@ -145,7 +145,7 @@ public abstract class BotDataService : IBotDataService
 	/// <summary>
 	/// Initializes the starting bot cache.
 	/// </summary>
-	public IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(CancellationToken cancellationToken)
+	public IUniTaskAsyncEnumerable<BotGenerationProgress> SetupStartingBotCache(CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -159,31 +159,6 @@ public abstract class BotDataService : IBotDataService
 			}
 			
 			return new GenerateBotProfilesAsyncEnumerable(this, maxBots, minGroupSize, maxGroupSize, cancellationToken);
-			// game.SetMatchmakerStatus(message, 0);
-			//
-			// var botsGenerated = 0;
-			// while (botsGenerated < maxBots && !cancellationToken.IsCancellationRequested)
-			// {
-			// 	int groupSize = BotHelper.GetBotGroupSize(GroupChance, minGroupSize, maxGroupSize, maxBots - botsGenerated);
-			// 	
-			// 	(bool success, PrepBotInfo prepBotInfo) = await TryGenerateBotProfiles(
-			// 		BotDifficulties.PickRandomElement(),
-			// 		groupSize,
-			// 		saveToCache: false,
-			// 		cancellationToken: cancellationToken);
-			//
-			// 	if (cancellationToken.IsCancellationRequested) return;
-			// 	
-			// 	if (success)
-			// 	{
-			// 		StartingBotsCache.Enqueue(prepBotInfo);
-			// 		botsGenerated += groupSize;
-			// 		float progress = botsGenerated / (float)maxBots;
-			// 		game.SetMatchmakerStatus(message, progress);
-			// 	}
-			// }
-			//
-			// game.SetMatchmakerStatus(message, 1);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{

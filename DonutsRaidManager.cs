@@ -3,6 +3,7 @@ using Comfort.Common;
 using Cysharp.Threading.Tasks;
 using Cysharp.Threading.Tasks.Linq;
 using Donuts.Spawning;
+using Donuts.Spawning.Models;
 using Donuts.Spawning.Processors;
 using Donuts.Spawning.Services;
 using Donuts.Tools;
@@ -287,8 +288,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, _onDestroyToken);
 			cts.CancelAfter(_startingBotsTimeoutSeconds);
 			
-			IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> stream =
-				dataService.SetupStartingBotCache(cts.Token);
+			IUniTaskAsyncEnumerable<BotGenerationProgress> stream = dataService.SetupStartingBotCache(cts.Token);
 			if (stream == null)
 			{
 				var errorMessage =
@@ -303,15 +303,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			await UniTask.SwitchToMainThread(cts.Token);
 			
 			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
-			await stream.ForEachAwaitAsync(async streamData =>
+			await stream.ForEachAwaitWithCancellationAsync(async (generationProgress, token) =>
 			{
-				await UniTask.SwitchToMainThread(cts.Token);
-				
-				float? progress = streamData.maxBotsToGenerate > 0
-					? streamData.botsGenerated / (float)streamData.maxBotsToGenerate
-					: null;
-				
-				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(message, progress);
+				await UniTask.SwitchToMainThread(token);
+				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(message, generationProgress.Progress);
 			}, cts.Token);
 			
 			game.SetMatchmakerStatus(message, 1);

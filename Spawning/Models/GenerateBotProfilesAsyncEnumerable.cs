@@ -12,23 +12,35 @@ public class GenerateBotProfilesAsyncEnumerable(
 	int minGroupSize,
 	int maxGroupSize,
 	CancellationToken token)
-	: IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)>
+	: IUniTaskAsyncEnumerable<BotGenerationProgress>
 {
-	public IUniTaskAsyncEnumerator<(int botsGenerated, int maxBotsToGenerate)> GetAsyncEnumerator(
+	public IUniTaskAsyncEnumerator<BotGenerationProgress> GetAsyncEnumerator(
 		CancellationToken cancellationToken = default)
 	{
 		return new AsyncEnumerator(dataService, maxBotsToGenerate, minGroupSize, maxGroupSize, token);
 	}
 	
-	private class AsyncEnumerator(
-		[NotNull] IBotDataService dataService,
-		int maxBotsToGenerate,
-		int minGroupSize,
-		int maxGroupSize,
-		CancellationToken token)
-		: IUniTaskAsyncEnumerator<(int botsGenerated, int maxBotsToGenerate)>
+	private class AsyncEnumerator : IUniTaskAsyncEnumerator<BotGenerationProgress>
 	{
-		public (int botsGenerated, int maxBotsToGenerate) Current { get; private set; } = (0, maxBotsToGenerate);
+		[NotNull] private readonly IBotDataService _dataService;
+		private readonly int _minGroupSize;
+		private readonly int _maxGroupSize;
+		private CancellationToken _token;
+		
+		public AsyncEnumerator([NotNull] IBotDataService dataService,
+			int maxBotsToGenerate,
+			int minGroupSize,
+			int maxGroupSize,
+			CancellationToken token)
+		{
+			_dataService = dataService;
+			_minGroupSize = minGroupSize;
+			_maxGroupSize = maxGroupSize;
+			_token = token;
+			Current = new BotGenerationProgress(maxBotsToGenerate);
+		}
+		
+		public BotGenerationProgress Current { get; }
 		
 		public UniTask DisposeAsync()
 		{
@@ -37,30 +49,30 @@ public class GenerateBotProfilesAsyncEnumerable(
 		
 		public async UniTask<bool> MoveNextAsync()
 		{
-			if (token.IsCancellationRequested || Current.botsGenerated >= maxBotsToGenerate)
+			if (_token.IsCancellationRequested || Current.Progress >= 1)
 			{
 				return false;
 			}
 			
-			int groupSize = BotHelper.GetBotGroupSize(dataService.GroupChance, minGroupSize, maxGroupSize,
-				maxBotsToGenerate - Current.botsGenerated);
+			int groupSize = BotHelper.GetBotGroupSize(_dataService.GroupChance, _minGroupSize, _maxGroupSize,
+				Current.maxBotsToGenerate - Current.BotsGenerated);
 			
-			(bool success, PrepBotInfo prepBotInfo) = await dataService.TryGenerateBotProfiles(
-				dataService.BotDifficulties.PickRandomElement(),
+			(bool success, PrepBotInfo prepBotInfo) = await _dataService.TryGenerateBotProfiles(
+				_dataService.BotDifficulties.PickRandomElement(),
 				groupSize,
 				saveToCache: false,
-				cancellationToken: token);
+				cancellationToken: _token);
 			
-			if (token.IsCancellationRequested)
+			if (_token.IsCancellationRequested)
 			{
 				return false;
 			}
 			
 			if (success)
 			{
-				dataService.StartingBotsCache.Enqueue(prepBotInfo);
-				int newBotsGeneratedValue = Current.botsGenerated + groupSize;
-				Current = (newBotsGeneratedValue, Current.maxBotsToGenerate);
+				_dataService.StartingBotsCache.Enqueue(prepBotInfo);
+				int newBotsGeneratedValue = Current.BotsGenerated + groupSize;
+				Current.Report(newBotsGeneratedValue);
 			}
 			
 			return true;
