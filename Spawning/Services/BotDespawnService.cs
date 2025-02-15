@@ -3,9 +3,13 @@ using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using Donuts.Utils;
 using EFT;
+using EFT.AssetsManager;
+using HarmonyLib;
 using JetBrains.Annotations;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Reflection;
 using System.Threading;
 using Systems.Effects;
 using UnityEngine;
@@ -18,14 +22,14 @@ public interface IBotDespawnService : IServiceSpawnType
 	UniTask DespawnExcessBots(CancellationToken cancellationToken);
 }
 
-public abstract class BotDespawnService(
-	BotConfigService configService,
-	IBotDataService dataService) : IBotDespawnService
+public abstract class BotDespawnService(BotConfigService configService, IBotDataService dataService) : IBotDespawnService
 {
+	private readonly BotsController _botsController = Singleton<IBotGame>.Instance.BotsController;
 	private readonly FurthestBotComparer _furthestBotComparer = new();
 	
-	private const int FRAME_DELAY_BETWEEN_DESPAWNS = 20;
+	private static readonly FieldInfo _botLeaveDataOnLeaveField = AccessTools.Field(typeof(BotLeaveData), "onLeave");
 	
+	private const int FRAME_DELAY_BETWEEN_DESPAWNS = 20;
 	private readonly List<Player> _botsToDespawn = new(20);
 	private float _despawnCooldownTime;
 	
@@ -165,17 +169,36 @@ public abstract class BotDespawnService(
 		// TODO: Call Fika's despawn method instead
 		if (DonutsPlugin.FikaEnabled)
 		{
-			botOwner.LeaveData.RemoveFromMap();
+			Despawn(botOwner);
 		}
 		else
 		{
-			// BSG calls this to despawn; this calls the BotOwner::Deactivate(), BotOwner::Dispose() and IBotGame::BotDespawn() methods
-			botOwner.LeaveData.RemoveFromMap();
+			Despawn(botOwner);
 		}
         
 		// Update the cooldown
 		_despawnCooldownTime = Time.time;
 		return true;
+	}
+	
+	protected virtual void Despawn(BotOwner botOwner)
+	{
+		BotLeaveData leaveData = botOwner.LeaveData;
+		var onLeave = (Action<BotOwner>)_botLeaveDataOnLeaveField.GetValue(leaveData);
+		if (onLeave != null)
+		{
+			onLeave(botOwner);
+			_botLeaveDataOnLeaveField.SetValue(leaveData, null);
+		}
+		
+		botOwner.Deactivate();
+		botOwner.Dispose();
+		leaveData.LeaveComplete = true;
+
+		_botsController.BotDied(botOwner);
+		_botsController.DestroyInfo(botOwner.GetPlayer);
+		
+		AssetPoolObject.ReturnToPool(botOwner.gameObject, false);
 	}
 	
 	private class FurthestBotComparer : Comparer<Player>
