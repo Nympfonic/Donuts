@@ -5,6 +5,8 @@
     <RootNamespace>Donuts</RootNamespace>
     <AssemblyName>Donuts</AssemblyName>
     <Deterministic>true</Deterministic>
+    <Configurations>Debug;Release;SPT Release;Fika Release</Configurations>
+    <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
@@ -17,6 +19,24 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'SPT Release|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Fika Release|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>
     <Optimize>true</Optimize>
@@ -143,6 +163,15 @@
     <None Include="Patterns\CustomsPMC.json" />
     <None Include="Patterns\CustomsScav.json" />
     <None Include="Patterns\ReservePMC.json" />
+    <None Remove="FikaBridge\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="FikaBridge\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="FikaBridge\**" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
