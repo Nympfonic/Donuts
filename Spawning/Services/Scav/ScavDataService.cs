@@ -10,22 +10,23 @@ namespace Donuts.Spawning.Services;
 [UsedImplicitly]
 public sealed class ScavDataService : BotDataService
 {
+	public override DonutsSpawnType SpawnType { get; }
+	public override string GroupChance => DefaultPluginVars.scavGroupChance.Value;
+	
+	public override ReadOnlyCollection<BotDifficulty> BotDifficulties =>
+		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesSCAV.Value);
+	
 	public ScavDataService([NotNull] BotConfigService configService) : base(configService)
 	{
-		spawnType = DonutsSpawnType.Scav;
+		SpawnType = DonutsSpawnType.Scav;
 		string mapLocation = configService.GetMapLocation();
 		startingBotConfig = configService.GetAllMapsStartingBotConfigs()!.Maps[mapLocation].Scav;
 		botWaves = mapBotWaves.Scav;
 		botWavesByGroupNum = botWaves.ToLookup(wave => wave.GroupNum);
 		waveGroupSize = GetWaveMinMaxGroupSize(botWaves);
-		MaxBotLimit = configService.GetMaxBotLimit(spawnType);
+		MaxBotLimit = configService.GetMaxBotLimit(SpawnType);
 		startingSpawnPointsCache = new SpawnPointsCache(ZoneSpawnPoints, startingBotConfig.Zones);
 	}
-	
-	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties =>
-		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesSCAV.Value);
-	
-	protected override string GroupChance => DefaultPluginVars.scavGroupChance.Value;
 	
 	public override int GetAliveBotsCount() => configService.CalculateAliveBotsCount(IsScav);
 	public override BotDifficulty GetBotDifficulty() => GetBotDifficulty(DefaultPluginVars.botDifficultiesSCAV.Value);

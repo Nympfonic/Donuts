@@ -7,12 +7,13 @@ using JetBrains.Annotations;
 namespace Donuts.Spawning.Services;
 
 [UsedImplicitly]
-public class ScavSpawnService : BotSpawnService
+public sealed class ScavSpawnService : BotSpawnService
 {
+	public override DonutsSpawnType SpawnType { get; }
+	
 	public ScavSpawnService(BotConfigService configService, IBotDataService dataService) : base(configService, dataService)
 	{
-		spawnType = DonutsSpawnType.Scav;
-		
+		SpawnType = DonutsSpawnType.Scav;
 		string mapLocation = this.configService.GetMapLocation();
 		spawnCheckProcessor = new EntityVicinityCheck(mapLocation, dataService.AllAlivePlayers,
 			botTypesToIgnore: [WildSpawnType.assault, WildSpawnType.marksman, WildSpawnType.assaultGroup]);
@@ -33,7 +34,7 @@ public class ScavSpawnService : BotSpawnService
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat(
 				"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
-				spawnType.ToString(), activeBots.ToString(), dataService.MaxBotLimit.ToString());
+				SpawnType.Localized(), activeBots.ToString(), dataService.MaxBotLimit.ToString());
 			logger.LogDebugDetailed(sb.ToString(), nameof(ScavSpawnService), nameof(HasReachedHardCap));
 		}
 		

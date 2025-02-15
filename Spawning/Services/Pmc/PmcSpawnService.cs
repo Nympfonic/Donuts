@@ -6,12 +6,13 @@ using JetBrains.Annotations;
 namespace Donuts.Spawning.Services;
 
 [UsedImplicitly]
-public class PmcSpawnService : BotSpawnService
+public sealed class PmcSpawnService : BotSpawnService
 {
+	public override DonutsSpawnType SpawnType { get; }
+	
 	public PmcSpawnService(BotConfigService configService, IBotDataService dataService) : base(configService, dataService)
 	{
-		spawnType = DonutsSpawnType.Pmc;
-		
+		SpawnType = DonutsSpawnType.Pmc;
 		string mapLocation = this.configService.GetMapLocation();
 		spawnCheckProcessor = new EntityVicinityCheck(mapLocation, dataService.AllAlivePlayers);
 		spawnCheckProcessor.SetNext(new WallCollisionCheck())
@@ -30,8 +31,8 @@ public class PmcSpawnService : BotSpawnService
 		{
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat(
-				"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0}s: {1}, {0} Bot Limit: {2}",
-				spawnType.ToString(), activeBots.ToString(), dataService.MaxBotLimit.ToString());
+				"{0} spawn not allowed due to {0} bot limit - skipping this spawn. Active {0} bots: {1}, {0} bot limit: {2}",
+				SpawnType.Localized(), activeBots.ToString(), dataService.MaxBotLimit.ToString());
 			logger.LogDebugDetailed(sb.ToString(), nameof(PmcSpawnService), nameof(HasReachedHardCap));
 		}
 		

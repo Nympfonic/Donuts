@@ -4,9 +4,11 @@ using JetBrains.Annotations;
 namespace Donuts.Spawning.Services;
 
 [UsedImplicitly]
-public class ScavDespawnService(BotConfigService configService, IBotDataService dataService)
+public sealed class ScavDespawnService(BotConfigService configService, IBotDataService dataService)
 	: BotDespawnService(configService, dataService)
 {
+	public override DonutsSpawnType SpawnType { get; } = DonutsSpawnType.Scav;
+	
 	protected override bool IsDespawnBotEnabled() => DefaultPluginVars.DespawnEnabledSCAV.Value;
 	protected override bool IsCorrectSpawnType(WildSpawnType role) => IsScav(role);
 	

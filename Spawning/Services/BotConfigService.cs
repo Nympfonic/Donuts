@@ -257,7 +257,7 @@ public class BotConfigService
 		}
 		
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.AppendFormat("Donuts: Failed to retrieve {0} max bot cap value. Report this to the author!", spawnType.ToString());
+		sb.AppendFormat("Donuts: Failed to retrieve {0} max bot cap value. Report this to the author!", spawnType.Localized());
 		DonutsHelper.NotifyLogError(sb.ToString());
 		return -1;
 	}

@@ -13,7 +13,7 @@ using UnityToolkit.Extensions;
 
 namespace Donuts.Spawning.Services;
 
-public interface IBotDespawnService
+public interface IBotDespawnService : IServiceSpawnType
 {
 	UniTask DespawnExcessBots(CancellationToken cancellationToken);
 }
@@ -28,6 +28,8 @@ public abstract class BotDespawnService(
 	
 	private readonly List<Player> _botsToDespawn = new(20);
 	private float _despawnCooldownTime;
+	
+	public abstract DonutsSpawnType SpawnType { get; }
 
 	protected abstract bool IsDespawnBotEnabled();
 	

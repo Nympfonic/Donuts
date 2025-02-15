@@ -19,7 +19,7 @@ using UnityToolkit.Structures.EventBus;
 
 namespace Donuts.Spawning.Services;
 
-public interface IBotSpawnService
+public interface IBotSpawnService : IServiceSpawnType
 {
 	UniTask<bool> SpawnStartingBots(CancellationToken cancellationToken);
 	UniTask<bool> TrySpawnBotWave(CancellationToken cancellationToken);
@@ -44,7 +44,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	protected SpawnCheckProcessorBase spawnCheckProcessor;
 	
-	protected DonutsSpawnType spawnType;
+	public abstract DonutsSpawnType SpawnType { get; }
 	
 	protected BotSpawnService(BotConfigService configService, IBotDataService dataService)
 	{
@@ -266,7 +266,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("Donuts: No zones specified in {0} bot wave for GroupNum {1}. Check your scenario wave patterns are set up correctly!",
-				spawnType.ToString(), wave.GroupNum.ToString());
+				SpawnType.Localized(), wave.GroupNum.ToString());
 			DonutsHelper.NotifyLogError(sb.ToString());
 			return false;
 		}
@@ -592,7 +592,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				logger.LogDebugDetailed($"Max {spawnType.ToString()} respawns reached, skipping this spawn",
+				logger.LogDebugDetailed($"Max {SpawnType.Localized()} respawns reached, skipping this spawn",
 					GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
 			}
 			
@@ -604,8 +604,8 @@ public abstract class BotSpawnService : IBotSpawnService
 			if (DefaultPluginVars.debugLogging.Value)
 			{
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Max {0} respawn limit reached: {1}. Current {2} respawns this raid: {3}",
-					spawnType.ToString(), DefaultPluginVars.maxRespawnsPMC.Value.ToString(),
+				sb.AppendFormat("Max {0} respawn limit reached: {1}. Current {0} respawns this raid: {2}",
+					SpawnType.Localized(), DefaultPluginVars.maxRespawnsPMC.Value.ToString(),
 					(_currentRespawnCount + groupSize).ToString());
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
 			}

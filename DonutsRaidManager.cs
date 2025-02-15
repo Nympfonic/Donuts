@@ -2,6 +2,7 @@
 using Comfort.Common;
 using Cysharp.Threading.Tasks;
 using Cysharp.Threading.Tasks.Linq;
+using Donuts.Spawning;
 using Donuts.Spawning.Processors;
 using Donuts.Spawning.Services;
 using Donuts.Tools;
@@ -264,7 +265,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		UniTaskAsyncEnumerable.EveryUpdate()
 			// Updates are skipped while a task is being awaited within ForEachAwaitAsync()
-			// TODO: Use 'await foreach' instead once we get C# 8.0 with Unity 2022 update
+			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
 			.ForEachAwaitAsync(async _ => await UpdateAsync(), _onDestroyToken)
 			.Forget();
 	}

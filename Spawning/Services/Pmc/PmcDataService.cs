@@ -12,22 +12,23 @@ namespace Donuts.Spawning.Services;
 [UsedImplicitly]
 public sealed class PmcDataService : BotDataService
 {
+	public override DonutsSpawnType SpawnType { get; }
+	public override string GroupChance => DefaultPluginVars.pmcGroupChance.Value;
+	
+	public override ReadOnlyCollection<BotDifficulty> BotDifficulties =>
+		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value);
+	
 	public PmcDataService([NotNull] BotConfigService configService) : base(configService)
 	{
-		spawnType = DonutsSpawnType.Pmc;
+		SpawnType = DonutsSpawnType.Pmc;
 		string mapLocation = configService.GetMapLocation();
 		startingBotConfig = configService.GetAllMapsStartingBotConfigs()!.Maps[mapLocation].Pmc;
 		botWaves = mapBotWaves.Pmc;
 		botWavesByGroupNum = botWaves.ToLookup(wave => wave.GroupNum);
 		waveGroupSize = GetWaveMinMaxGroupSize(botWaves);
-		MaxBotLimit = configService.GetMaxBotLimit(spawnType);
+		MaxBotLimit = configService.GetMaxBotLimit(SpawnType);
 		startingSpawnPointsCache = new SpawnPointsCache(ZoneSpawnPoints, startingBotConfig.Zones);
 	}
-	
-	protected override ReadOnlyCollection<BotDifficulty> BotDifficulties =>
-		BotHelper.GetSettingDifficulties(DefaultPluginVars.botDifficultiesPMC.Value);
-	
-	protected override string GroupChance => DefaultPluginVars.pmcGroupChance.Value;
 	
 	public override int GetAliveBotsCount() => configService.CalculateAliveBotsCount(IsPmc);
 	public override BotDifficulty GetBotDifficulty() => GetBotDifficulty(DefaultPluginVars.botDifficultiesPMC.Value);

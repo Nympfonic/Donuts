@@ -18,14 +18,16 @@ using Random = UnityEngine.Random;
 
 namespace Donuts.Spawning.Services;
 
-public interface IBotDataService
+public interface IBotDataService : IServiceSpawnType
 {
 	public Queue<PrepBotInfo> StartingBotsCache { get; }
 	public ZoneSpawnPoints ZoneSpawnPoints { get; }
 	public int MaxBotLimit { get; }
 	public ReadOnlyCollection<Player> AllAlivePlayers { get; }
-
-	UniTask SetupStartingBotCache(CancellationToken cancellationToken);
+	public string GroupChance { get; }
+	public ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
+	
+	IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(CancellationToken cancellationToken);
 	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryGenerateBotProfiles(BotDifficulty difficulty, int groupSize,
 		bool saveToCache = true, CancellationToken cancellationToken = default);
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
@@ -69,8 +71,6 @@ public abstract class BotDataService : IBotDataService
 	
 	private readonly Queue<BotWave> _cachedBotWavesToSpawn = new(10);
 	
-	protected DonutsSpawnType spawnType;
-	
 	protected BotWave[] botWaves;
 	protected ILookup<int, BotWave> botWavesByGroupNum;
 	protected (int min, int max) waveGroupSize;
@@ -79,13 +79,13 @@ public abstract class BotDataService : IBotDataService
 	// TODO: Figure out how to implement remembering used spawn points for individual bot waves
 	//protected SpawnPointsCache waveSpawnPointsCache;
 	
+	public abstract DonutsSpawnType SpawnType { get; }
 	public Queue<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
 	public ZoneSpawnPoints ZoneSpawnPoints { get; }
 	public int MaxBotLimit { get; protected set; }
 	public ReadOnlyCollection<Player> AllAlivePlayers { get; }
-	
-	protected abstract string GroupChance { get; }
-	protected abstract ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
+	public abstract string GroupChance { get; }
+	public abstract ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
 	protected BotDataService([NotNull] BotConfigService configService)
 	{
@@ -145,7 +145,8 @@ public abstract class BotDataService : IBotDataService
 	/// <summary>
 	/// Initializes the starting bot cache.
 	/// </summary>
-	public async UniTask SetupStartingBotCache(CancellationToken cancellationToken)
+	public IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(
+		CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -158,27 +159,16 @@ public abstract class BotDataService : IBotDataService
 				logger.LogDebugDetailed($"Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			}
 			
-			var currentBotCount = 0;
-			while (currentBotCount < maxBots && !cancellationToken.IsCancellationRequested)
-			{
-				int groupSize = BotHelper.GetBotGroupSize(GroupChance, minGroupSize, maxGroupSize, maxBots - currentBotCount);
-				
-				(bool success, PrepBotInfo prepBotInfo) = await TryGenerateBotProfiles(BotDifficulties.PickRandomElement(),
-					groupSize, saveToCache: false, cancellationToken: cancellationToken);
-				if (cancellationToken.IsCancellationRequested) return;
-				
-				if (success)
-				{
-					StartingBotsCache.Enqueue(prepBotInfo);
-					currentBotCount += groupSize;
-				}
-			}
+			return new GenerateBotProfilesAsyncEnumerable(dataService: this, maxBots, minGroupSize, maxGroupSize,
+				cancellationToken);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
 			logger.LogException(GetType().Name, nameof(SetupStartingBotCache), ex);
 		}
 		catch (OperationCanceledException) {}
+		
+		return null;
 	}
 	
 	protected static (int min, int max) GetWaveMinMaxGroupSize(IReadOnlyList<BotWave> waves)
