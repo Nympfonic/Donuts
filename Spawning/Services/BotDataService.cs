@@ -27,7 +27,7 @@ public interface IBotDataService : IServiceSpawnType
 	public string GroupChance { get; }
 	public ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
-	IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(CancellationToken cancellationToken);
+	[CanBeNull] IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(CancellationToken cancellationToken);
 	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryGenerateBotProfiles(BotDifficulty difficulty, int groupSize,
 		bool saveToCache = true, CancellationToken cancellationToken = default);
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
@@ -59,7 +59,7 @@ public abstract class BotDataService : IBotDataService
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
 	private const int FRAME_DELAY_BETWEEN_REPLENISH = 5;
 	
-	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(3);
+	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(5);
 	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
 	private readonly BotSpawner _eftBotSpawner;
@@ -145,8 +145,7 @@ public abstract class BotDataService : IBotDataService
 	/// <summary>
 	/// Initializes the starting bot cache.
 	/// </summary>
-	public IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(
-		CancellationToken cancellationToken)
+	public IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> SetupStartingBotCache(CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -159,8 +158,32 @@ public abstract class BotDataService : IBotDataService
 				logger.LogDebugDetailed($"Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			}
 			
-			return new GenerateBotProfilesAsyncEnumerable(dataService: this, maxBots, minGroupSize, maxGroupSize,
-				cancellationToken);
+			return new GenerateBotProfilesAsyncEnumerable(this, maxBots, minGroupSize, maxGroupSize, cancellationToken);
+			// game.SetMatchmakerStatus(message, 0);
+			//
+			// var botsGenerated = 0;
+			// while (botsGenerated < maxBots && !cancellationToken.IsCancellationRequested)
+			// {
+			// 	int groupSize = BotHelper.GetBotGroupSize(GroupChance, minGroupSize, maxGroupSize, maxBots - botsGenerated);
+			// 	
+			// 	(bool success, PrepBotInfo prepBotInfo) = await TryGenerateBotProfiles(
+			// 		BotDifficulties.PickRandomElement(),
+			// 		groupSize,
+			// 		saveToCache: false,
+			// 		cancellationToken: cancellationToken);
+			//
+			// 	if (cancellationToken.IsCancellationRequested) return;
+			// 	
+			// 	if (success)
+			// 	{
+			// 		StartingBotsCache.Enqueue(prepBotInfo);
+			// 		botsGenerated += groupSize;
+			// 		float progress = botsGenerated / (float)maxBots;
+			// 		game.SetMatchmakerStatus(message, progress);
+			// 	}
+			// }
+			//
+			// game.SetMatchmakerStatus(message, 1);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
@@ -226,6 +249,8 @@ public abstract class BotDataService : IBotDataService
 					.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner)
 					.AsUniTask()
 					.AttachExternalCancellation(timeout.Token);
+				
+				await UniTask.SwitchToMainThread(timeout.Token);
 				
 				if (timeout.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
 				{

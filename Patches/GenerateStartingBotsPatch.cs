@@ -7,6 +7,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 using UnityEngine;
+using UnityToolkit.Extensions;
 
 namespace Donuts.Patches;
 
@@ -33,24 +34,18 @@ internal class GenerateStartingBotsPatch : ModulePatch
 	
 	private static IEnumerator AddIterationsToWaitForBotGenerators(IEnumerator originalTask)
 	{
-		// Now also wait for all bots to be fully initialized
+		DonutsRaidManager raidManager = Singleton<DonutsRaidManager>.Instance;
+		
 		Logger.LogWarning("Donuts is waiting for bot preparation to complete...");
 		float startTime = Time.time;
 		float lastLogTime = startTime;
-		float maxWaitTime = DefaultPluginVars.maxRaidDelay.Value;
-		WaitForEndOfFrame waitInterval = new();
-
-		while (!DonutsRaidManager.CanStartRaid)
+		var waitInterval = new WaitForEndOfFrame();
+		
+		while (raidManager.OrNull()?.CanStartRaid == false)
 		{
 			yield return waitInterval; // Check at end of every frame
 			
 			float currentTime = Time.time;
-			if (currentTime - startTime >= maxWaitTime)
-			{
-				DonutsRaidManager.Logger.LogWarning(
-					"Max raid delay time reached. Proceeding with raid start, some bots might spawn late!");
-				break;
-			}
 			
 			// Log every 2 seconds instead of every second to avoid spamming logs
 			if (currentTime - lastLogTime >= 2f)

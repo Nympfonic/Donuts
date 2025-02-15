@@ -23,43 +23,6 @@ namespace Donuts;
 
 public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 {
-	// private readonly Dictionary<WildSpawnType, EPlayerSide> _spawnTypeToSideMapping = new()
-	// {
-	// 	{ WildSpawnType.arenaFighterEvent, EPlayerSide.Savage },
-	// 	{ WildSpawnType.assault, EPlayerSide.Savage },
-	// 	{ WildSpawnType.assaultGroup, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossBoar, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossBoarSniper, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossBully, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossGluhar, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossKilla, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossKojaniy, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossSanitar, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossTagilla, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossZryachiy, EPlayerSide.Savage },
-	// 	{ WildSpawnType.crazyAssaultEvent, EPlayerSide.Savage },
-	// 	{ WildSpawnType.cursedAssault, EPlayerSide.Savage },
-	// 	{ WildSpawnType.exUsec, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerBoar, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerBully, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerGluharAssault, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerGluharScout, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerGluharSecurity, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerGluharSnipe, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerKojaniy, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerSanitar, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerTagilla, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerZryachiy, EPlayerSide.Savage },
-	// 	{ WildSpawnType.marksman, EPlayerSide.Savage },
-	// 	{ WildSpawnType.pmcBot, EPlayerSide.Savage },
-	// 	{ WildSpawnType.sectantPriest, EPlayerSide.Savage },
-	// 	{ WildSpawnType.sectantWarrior, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerBigPipe, EPlayerSide.Savage },
-	// 	{ WildSpawnType.followerBirdEye, EPlayerSide.Savage },
-	// 	{ WildSpawnType.bossKnight, EPlayerSide.Savage },
-	// };
-
-	private TarkovApplication _tarkovApplication;
 	private GameWorld _gameWorld;
 	private Player _mainPlayer;
 	private BotsController _botsController;
@@ -78,6 +41,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	internal const string PMC_SERVICE_KEY = "Pmc";
 	internal const string SCAV_SERVICE_KEY = "Scav";
 	
+	private static readonly TimeSpan _startingBotsTimeoutSeconds = TimeSpan.FromSeconds(30);
 	private bool _hasSpawnedStartingBots;
 	private bool _isStartingBotSpawnOngoing;
 	private float _startingSpawnPrevTime;
@@ -93,7 +57,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 
 	public BotConfigService BotConfigService { get; private set; }
 	
-	public static bool CanStartRaid { get; private set; }
+	public bool CanStartRaid { get; private set; }
 	
 	internal static ManualLogSource Logger { get; }
 	
@@ -131,10 +95,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
             Destroy(this);
 		}
 		
-		CanStartRaid = false;
 		base.Awake();
 		
-		_tarkovApplication = (TarkovApplication)Singleton<ClientApplication<ISession>>.Instance;
 		_gameWorld = Singleton<GameWorld>.Instance;
 		_mainPlayer = _gameWorld.MainPlayer;
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
@@ -147,6 +109,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_donutsGizmos = new DonutsGizmos(_onDestroyToken);
 		_eventBusInitializer = new EventBusInitializer(DonutsPlugin.CurrentAssembly);
 		_eventBusInitializer.Initialize();
+		
+		_gameWorld.OnPersonAdd += SubscribeHumanPlayerEventHandlers;
+		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
+		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
 		
 		BotConfigService = _dependencyContainer.Resolve<BotConfigService>();
 	}
@@ -169,10 +135,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	[UsedImplicitly]
 	private async UniTaskVoid Start()
 	{
-		_gameWorld.OnPersonAdd += SubscribeHumanPlayerEventHandlers;
-		_eftBotSpawner.OnBotCreated += EftBotSpawner_OnBotCreated;
-		_eftBotSpawner.OnBotRemoved += EftBotSpawner_OnBotRemoved;
-		
 		await Initialize();
 	}
 	
@@ -206,7 +168,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_eventBusInitializer.ClearAllBuses();
 		
 		base.OnDestroy();
-		CanStartRaid = false;
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -244,17 +205,17 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		{
 			DonutsHelper.NotifyLogError("Donuts: Failed to initialize Donuts Raid Manager, disabling Donuts for this raid.");
 			Destroy(this);
-			CanStartRaid = true;
 			return;
 		}
 		
 		CreateSpawnServices();
-		CanStartRaid = true;
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
 			Logger.LogDebugDetailed("Finished initializing raid manager", nameof(DonutsRaidManager), nameof(Initialize));
 		}
+		
+		CanStartRaid = true;
 	}
 	
 	public async UniTaskVoid StartBotSpawnController()
@@ -301,18 +262,77 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		if (forceAllBotType is "PMC" or "Disabled")
 		{
 			var pmcDataService = _dependencyContainer.Resolve<IBotDataService>(PMC_SERVICE_KEY);
-			await pmcDataService.SetupStartingBotCache(_onDestroyToken);
-			_botDataServices.Add(pmcDataService);
+			await SetupDataService(pmcDataService);
 		}
 		
 		if (forceAllBotType is "SCAV" or "Disabled")
 		{
 			var scavDataService = _dependencyContainer.Resolve<IBotDataService>(SCAV_SERVICE_KEY);
-			await scavDataService.SetupStartingBotCache(_onDestroyToken);
-			_botDataServices.Add(scavDataService);
+			await SetupDataService(scavDataService);
 		}
 		
 		return !_onDestroyToken.IsCancellationRequested && _botDataServices.Count > 0;
+	}
+	
+	private async UniTask SetupDataService(IBotDataService dataService)
+	{
+		AbstractGame game = Singleton<AbstractGame>.Instance;
+		string spawnTypeString = dataService.SpawnType.LocalizedPlural();
+		var message = $"Generating {spawnTypeString}...";
+		TimeSpan pauseTime = TimeSpan.FromSeconds(1);
+		
+		try
+		{
+			using var timeout = new CancellationTokenSource();
+			using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, _onDestroyToken);
+			cts.CancelAfter(_startingBotsTimeoutSeconds);
+			
+			IUniTaskAsyncEnumerable<(int botsGenerated, int maxBotsToGenerate)> stream =
+				dataService.SetupStartingBotCache(cts.Token);
+			if (stream == null)
+			{
+				var errorMessage =
+					$"Error creating the starting bot generation stream in {dataService.GetType().Name}!";
+				Logger.LogError(errorMessage);
+				return;
+			}
+			
+			game.SetMatchmakerStatus(message, 0);
+			
+			await UniTask.Delay(pauseTime, cancellationToken: _onDestroyToken);
+			await UniTask.SwitchToMainThread(cts.Token);
+			
+			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
+			await stream.ForEachAwaitAsync(async streamData =>
+			{
+				await UniTask.SwitchToMainThread(cts.Token);
+				
+				float? progress = streamData.maxBotsToGenerate > 0
+					? streamData.botsGenerated / (float)streamData.maxBotsToGenerate
+					: null;
+				
+				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(message, progress);
+			}, cts.Token);
+			
+			game.SetMatchmakerStatus(message, 1);
+			
+			_botDataServices.Add(dataService);
+			
+			await UniTask.Delay(pauseTime, cancellationToken: _onDestroyToken);
+		}
+		catch (Exception ex) when (ex is not OperationCanceledException)
+		{
+			Logger.LogException(nameof(DonutsRaidManager), nameof(SetupDataService), ex);
+		}
+		catch (OperationCanceledException)
+		{
+			var errorMessage =
+				$"{dataService.GetType().Name} timed out while generating starting bot profiles! Check your server logs for bot generation errors!";
+			Logger.LogError(errorMessage);
+			
+			game.SetMatchmakerStatus($"Generating {spawnTypeString} failed! Skipping...");
+			await UniTask.Delay(TimeSpan.FromSeconds(3), cancellationToken: _onDestroyToken);
+		}
 	}
 	
 	private void CreateSpawnServices()
