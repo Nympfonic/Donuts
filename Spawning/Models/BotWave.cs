@@ -6,7 +6,7 @@ namespace Donuts.Spawning.Models;
 [JsonObject]
 public class BotWave
 {
-	private float _timer;
+	private float _waveTimer;
 	private float _cooldownTimer;
 	private bool _onCooldown;
 	private int _timesSpawned;
@@ -40,7 +40,7 @@ public class BotWave
 	
 	public void UpdateTimer(float deltaTime, float coolDownDuration)
 	{
-		_timer += deltaTime;
+		_waveTimer += deltaTime;
 		if (!_onCooldown) return;
 		
 		_cooldownTimer += deltaTime;
@@ -62,11 +62,10 @@ public class BotWave
 		
 		if (IgnoreTimerFirstSpawn)
 		{
-			IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
 			return true;
 		}
 		
-		return _timer >= TriggerTimer;
+		return _waveTimer >= TriggerTimer;
 	}
 	
 	public void SpawnTriggered()
@@ -76,13 +75,24 @@ public class BotWave
 		{
 			TriggerCooldown();
 		}
+		
+		if (IgnoreTimerFirstSpawn)
+		{
+			IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
+		}
+	}
+	
+	private void TriggerCooldown()
+	{
+		_onCooldown = true;
+		_cooldownTimer = 0f;
 	}
 	
 	public void ResetTimer()
 	{
-		_timer = 0f;
+		_waveTimer = 0f;
 	}
-
+	
 	public void SetSpawnChance(int newChance)
 	{
 		if (newChance is < 0 or > 100)
@@ -91,11 +101,5 @@ public class BotWave
 		}
 		
 		SpawnChance = newChance;
-	}
-	
-	private void TriggerCooldown()
-	{
-		_onCooldown = true;
-		_cooldownTimer = 0f;
 	}
 }
