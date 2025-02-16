@@ -27,7 +27,7 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 	private readonly BotsController _botsController = Singleton<IBotGame>.Instance.BotsController;
 	private readonly FurthestBotComparer _furthestBotComparer = new();
 	
-	private static readonly FieldInfo _botLeaveDataOnLeaveField = AccessTools.Field(typeof(BotLeaveData), "OnLeave");
+	// private static readonly FieldInfo _botLeaveDataOnLeaveField = AccessTools.Field(typeof(BotLeaveData), "OnLeave");
 	
 	private const int FRAME_DELAY_BETWEEN_DESPAWNS = 20;
 	private readonly List<Player> _botsToDespawn = new(20);
@@ -57,7 +57,7 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 				continue;
 			}
 			
-			if (TryDespawnBot(furthestBot) && i < excessBots - 1)
+			if (await TryDespawnBot(furthestBot, cancellationToken) && i < excessBots - 1)
 			{
 				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_DESPAWNS, cancellationToken: cancellationToken);
 			}
@@ -151,10 +151,13 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 		return centroid;
 	}
 	
-	private bool TryDespawnBot([NotNull] Player furthestBot)
+	private async UniTask<bool> TryDespawnBot([NotNull] Player furthestBot, CancellationToken cancellationToken)
 	{
 		BotOwner botOwner = furthestBot.AIData?.BotOwner;
-		if (botOwner == null) return false;
+		if (botOwner == null)
+		{
+			return false;
+		}
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -169,11 +172,11 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 		// TODO: Call Fika's despawn method instead
 		if (DonutsPlugin.FikaEnabled)
 		{
-			Despawn(botOwner);
+			await Despawn(botOwner, cancellationToken);
 		}
 		else
 		{
-			Despawn(botOwner);
+			await Despawn(botOwner, cancellationToken);
 		}
         
 		// Update the cooldown
@@ -181,19 +184,20 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 		return true;
 	}
 	
-	protected virtual void Despawn(BotOwner botOwner)
+	protected virtual async UniTask Despawn(BotOwner botOwner, CancellationToken cancellationToken)
 	{
-		BotLeaveData leaveData = botOwner.LeaveData;
-		var onLeave = (Action<BotOwner>)_botLeaveDataOnLeaveField.GetValue(leaveData);
-		if (onLeave != null)
-		{
-			onLeave(botOwner);
-			_botLeaveDataOnLeaveField.SetValue(leaveData, null);
-		}
+		await UniTask.Yield(PlayerLoopTiming.PostLateUpdate, cancellationToken);
+		// BotLeaveData leaveData = botOwner.LeaveData;
+		// var onLeave = (Action<BotOwner>)_botLeaveDataOnLeaveField.GetValue(leaveData);
+		// if (onLeave != null)
+		// {
+		// 	onLeave(botOwner);
+		// 	_botLeaveDataOnLeaveField.SetValue(leaveData, null);
+		// }
 		
 		botOwner.Deactivate();
 		botOwner.Dispose();
-		leaveData.LeaveComplete = true;
+		// leaveData.LeaveComplete = true;
 		
 		_botsController.BotDied(botOwner);
 		_botsController.DestroyInfo(botOwner.GetPlayer);
