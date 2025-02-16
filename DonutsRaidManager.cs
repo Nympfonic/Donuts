@@ -279,7 +279,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		AbstractGame game = Singleton<AbstractGame>.Instance;
 		string spawnTypeString = dataService.SpawnType.LocalizedPlural();
-		var message = $"Generating {spawnTypeString}...";
+		var message = $"Donuts: Generating {spawnTypeString}...";
 		TimeSpan pauseTime = TimeSpan.FromSeconds(1);
 		
 		try
@@ -299,7 +299,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 			game.SetMatchmakerStatus(message, 0);
 			
-			await UniTask.Delay(pauseTime, cancellationToken: _onDestroyToken);
+			await UniTask.Delay(pauseTime, cancellationToken: cts.Token);
 			await UniTask.SwitchToMainThread(cts.Token);
 			
 			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
@@ -313,7 +313,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 			_botDataServices.Add(dataService);
 			
-			await UniTask.Delay(pauseTime, cancellationToken: _onDestroyToken);
+			await UniTask.Delay(pauseTime, cancellationToken: cts.Token);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
