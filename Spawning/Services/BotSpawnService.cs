@@ -96,13 +96,12 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	public async UniTask<bool> TrySpawnBotWave(CancellationToken cancellationToken)
 	{
-		Queue<BotWave> waveQueue = dataService.GetBotWavesToSpawn();
-		if (waveQueue.Count == 0)
+		BotWave wave = dataService.GetBotWaveToSpawn();
+		if (wave == null)
 		{
 			return false;
 		}
 		
-		BotWave wave = waveQueue.Dequeue();
 		int waveGroupNum = wave.GroupNum;
 		
 		if (!_waveSpawnProcessor.Process(wave))

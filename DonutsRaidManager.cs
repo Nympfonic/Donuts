@@ -403,7 +403,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				for (int i = _botSpawnServices.Count - 1; i >= 0; i--)
 				{
 					IBotSpawnService service = _botSpawnServices[i];
-					if (!await service.TrySpawnBotWave(_onDestroyToken) || _onDestroyToken.IsCancellationRequested)
+					if (_onDestroyToken.IsCancellationRequested || !await service.TrySpawnBotWave(_onDestroyToken))
 					{
 						continue;
 					}

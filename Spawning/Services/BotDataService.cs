@@ -57,7 +57,7 @@ public abstract class BotDataService : IBotDataService
 	
 	private const int INITIAL_BOT_CACHE_SIZE = 30;
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
-	private const int FRAME_DELAY_BETWEEN_REPLENISH = 5;
+	private const int FRAME_DELAY_BETWEEN_REPLENISH = 10;
 	
 	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(5);
 	
@@ -67,13 +67,13 @@ public abstract class BotDataService : IBotDataService
 	
 	private float _replenishBotCachePrevTime;
 	
-	private int _totalBots;
-	
-	private readonly Queue<BotWave> _cachedBotWavesToSpawn = new(10);
+	private int _totalBotsInCache;
 	
 	protected BotWave[] botWaves;
 	protected ILookup<int, BotWave> botWavesByGroupNum;
 	protected (int min, int max) waveGroupSize;
+
+	private readonly List<BotWave> _botWaveSpawnBuffer = new(10);
 	
 	protected SpawnPointsCache startingSpawnPointsCache;
 	// TODO: Figure out how to implement remembering used spawn points for individual bot waves
@@ -279,7 +279,7 @@ public abstract class BotDataService : IBotDataService
 			var generatedCount = 0;
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			while (generatedCount < NUMBER_OF_GROUPS_TO_REPLENISH &&
-				_totalBots < MaxBotLimit &&
+				_totalBotsInCache < MaxBotLimit &&
 				!cancellationToken.IsCancellationRequested)
 			{
 				BotDifficulty difficulty = BotDifficulties.PickRandomElement();
@@ -295,7 +295,7 @@ public abstract class BotDataService : IBotDataService
 				}
 				
 				generatedCount++;
-				_totalBots += groupSize;
+				_totalBotsInCache += groupSize;
 				
 				if (DefaultPluginVars.debugLogging.Value)
 				{
@@ -351,7 +351,7 @@ public abstract class BotDataService : IBotDataService
 	{
 		if (_botCache.TryDequeue(key, out PrepBotInfo prepBotInfo))
 		{
-			_totalBots -= prepBotInfo!.groupSize;
+			_totalBotsInCache -= prepBotInfo!.groupSize;
 			return;
 		}
 		
@@ -364,25 +364,27 @@ public abstract class BotDataService : IBotDataService
 	}
 	
 	/// <summary>
-	/// Gets a queue of bot waves which meet the time requirement to spawn.
+	/// Gets a random bot wave which meets the time requirement to spawn.
 	/// </summary>
-	/// <remarks>Caches bot waves to spawn until the queue count reaches zero.</remarks>
-	public Queue<BotWave> GetBotWavesToSpawn()
+	public BotWave GetBotWaveToSpawn()
 	{
-		if (botWaves.Length == 0 || _cachedBotWavesToSpawn.Count > 0)
+		if (botWaves.Length == 0)
 		{
-			return _cachedBotWavesToSpawn;
+			return null;
 		}
 		
-		foreach (BotWave wave in botWaves.ShuffleElements())
+		_botWaveSpawnBuffer.Clear();
+
+		for (int i = botWaves.Length - 1; i >= 0; i--)
 		{
+			BotWave wave = botWaves[i];
 			if (wave.ShouldSpawn())
 			{
-				_cachedBotWavesToSpawn.Enqueue(wave);
+				_botWaveSpawnBuffer.Add(wave);
 			}
 		}
-		
-		return _cachedBotWavesToSpawn;
+
+		return _botWaveSpawnBuffer.PickRandomElement();
 	}
 	
 	/// <summary>
