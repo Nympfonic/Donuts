@@ -117,7 +117,7 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 				for (var i = 0; i < _botsToDespawn.Count; i++)
 				{
 					Player bot = _botsToDespawn[i];
-					sb.AppendFormat("Furthest bot #{0}: {1}", i, bot.Profile.Info.Nickname);
+					sb.AppendFormat("Furthest bot #{0}: {1}", i + 1, bot.Profile.Info.Nickname);
 					if (i < _botsToDespawn.Count - 1)
 					{
 						sb.Append('\n');
@@ -187,6 +187,10 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 	protected virtual async UniTask Despawn(BotOwner botOwner, CancellationToken cancellationToken)
 	{
 		await UniTask.Yield(PlayerLoopTiming.PostLateUpdate, cancellationToken);
+		if (cancellationToken.IsCancellationRequested)
+		{
+			return;
+		}
 		// BotLeaveData leaveData = botOwner.LeaveData;
 		// var onLeave = (Action<BotOwner>)_botLeaveDataOnLeaveField.GetValue(leaveData);
 		// if (onLeave != null)
@@ -194,15 +198,21 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 		// 	onLeave(botOwner);
 		// 	_botLeaveDataOnLeaveField.SetValue(leaveData, null);
 		// }
+
+		Player botPlayer = botOwner.GetPlayer;
+		GameWorld gameWorld = Singleton<GameWorld>.Instance;
+		
+		gameWorld.RegisteredPlayers.Remove(botOwner);
+		gameWorld.AllAlivePlayersList.Remove(botPlayer);
 		
 		botOwner.Deactivate();
 		botOwner.Dispose();
 		// leaveData.LeaveComplete = true;
 		
 		_botsController.BotDied(botOwner);
-		_botsController.DestroyInfo(botOwner.GetPlayer);
+		_botsController.DestroyInfo(botPlayer);
 		
-		AssetPoolObject.ReturnToPool(botOwner.gameObject, false);
+		AssetPoolObject.ReturnToPool(botOwner.gameObject);
 	}
 	
 	private class FurthestBotComparer : Comparer<Player>
