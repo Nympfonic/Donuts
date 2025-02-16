@@ -172,8 +172,20 @@ public abstract class BotSpawnService : IBotSpawnService
 	private void IncrementBotSpawnerInProcessCounter(int value)
 	{
 		var currentInSpawnProcess = (int)ReflectionHelper.BotSpawner_inSpawnProcess_Field.GetValue(_eftBotSpawner);
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed($"BotSpawner._inSpawnProcess current value is {currentInSpawnProcess.ToString()}",
+				GetType().Name, nameof(IncrementBotSpawnerInProcessCounter));
+		}
+		
 		int newInSpawnProcess = currentInSpawnProcess + value;
 		ReflectionHelper.BotSpawner_inSpawnProcess_Field.SetValue(_eftBotSpawner, newInSpawnProcess);
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed($"BotSpawner._inSpawnProcess new value is {newInSpawnProcess.ToString()}",
+				GetType().Name, nameof(IncrementBotSpawnerInProcessCounter));
+		}
 	}
 	
 	[CanBeNull]
@@ -451,6 +463,18 @@ public abstract class BotSpawnService : IBotSpawnService
 		SpawnCheckProcessorBase spawnChecker = null,
 		CancellationToken cancellationToken = default)
 	{
+		Vector3? spawnPosition = await GetValidSpawnPosition(spawnPoint, spawnChecker, cancellationToken);
+		if (cancellationToken.IsCancellationRequested || !spawnPosition.HasValue)
+		{
+			if (!spawnPosition.HasValue && DefaultPluginVars.debugLogging.Value)
+			{
+				logger.LogDebugDetailed("No valid spawn position found after retries - skipping this spawn", GetType().Name,
+					nameof(SpawnBot));
+			}
+			
+			return false;
+		}
+		
 		BotDifficulty difficulty = dataService.GetBotDifficulty();
 		PrepBotInfo cachedPrepBotInfo = dataService.FindCachedBotData(difficulty, groupSize);
 		if (generateNew && cachedPrepBotInfo?.botCreationData == null)
@@ -464,33 +488,26 @@ public abstract class BotSpawnService : IBotSpawnService
 			
 			(bool success, cachedPrepBotInfo) =
 				await dataService.TryGenerateBotProfiles(difficulty, groupSize, cancellationToken: cancellationToken);
-			if (cancellationToken.IsCancellationRequested || !success) return false;
+			if (cancellationToken.IsCancellationRequested || !success)
+			{
+				return false;
+			}
 		}
 		
-		if (cachedPrepBotInfo?.botCreationData == null) return false;
+		if (cachedPrepBotInfo?.botCreationData == null)
+		{
+			return false;
+		}
+		
+		ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value, cancellationToken);
+		dataService.RemoveFromBotCache(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize));
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
 			logger.LogDebugDetailed("Found grouped cached bots, spawning them.", GetType().Name, nameof(SpawnBot));
 		}
 		
-		Vector3? spawnPosition = await GetValidSpawnPosition(spawnPoint, spawnChecker, cancellationToken);
-		if (cancellationToken.IsCancellationRequested) return false;
-		
-		if (spawnPosition.HasValue)
-		{
-			ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value, cancellationToken);
-			dataService.RemoveFromBotCache(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize));
-			return true;
-		}
-		
-		if (DefaultPluginVars.debugLogging.Value)
-		{
-			logger.LogDebugDetailed("No valid spawn position found after retries - skipping this spawn", GetType().Name,
-				nameof(SpawnBot));
-		}
-		
-		return false;
+		return true;
 	}
 	
 	private async UniTask<Vector3?> GetValidSpawnPosition(
