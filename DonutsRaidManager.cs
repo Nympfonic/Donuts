@@ -303,7 +303,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			await UniTask.SwitchToMainThread(cts.Token);
 			
 			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
-			await stream.ForEachAwaitWithCancellationAsync(async (generationProgress, token) =>
+			await stream.Queue().ForEachAwaitWithCancellationAsync(async (generationProgress, token) =>
 			{
 				await UniTask.SwitchToMainThread(token);
 				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(message, generationProgress.Progress);
