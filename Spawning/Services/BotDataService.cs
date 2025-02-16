@@ -40,7 +40,7 @@ public interface IBotDataService : IServiceSpawnType
 	BotDifficulty GetBotDifficulty();
 }
 
-public abstract class BotDataService : IBotDataService
+public abstract class BotDataService : IBotDataService, IDisposable
 {
 	public readonly struct ResetReplenishTimerEvent : IEvent;
 	
@@ -59,6 +59,7 @@ public abstract class BotDataService : IBotDataService
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
 	private const int FRAME_DELAY_BETWEEN_REPLENISH = 10;
 	
+	private readonly TimeoutController _timeoutController = new();
 	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(5);
 	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
@@ -122,6 +123,11 @@ public abstract class BotDataService : IBotDataService
 			DonutsHelper.NotifyLogError("Donuts: Failed to load bot waves. Donuts will not function properly.");
 			return;
 		}
+	}
+	
+	public void Dispose()
+	{
+		_timeoutController.Dispose();
 	}
 	
 	/// <summary>
@@ -216,22 +222,26 @@ public abstract class BotDataService : IBotDataService
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
 			}
 			
-			var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
-			BotCreationDataClass botCreationData;
-			using (var timeout = new CancellationTokenSource(_timeoutSeconds))
+			await UniTask.SwitchToMainThread(PlayerLoopTiming.Update, cancellationToken);
+			if (cancellationToken.IsCancellationRequested)
 			{
-				using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-				
-				await UniTask.SwitchToMainThread(PlayerLoopTiming.Update, cts.Token);
-				
+				return (false, null);
+			}
+
+			BotCreationDataClass botCreationData;
+			CancellationToken timeoutToken = _timeoutController.Timeout(_timeoutSeconds);
+			using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutToken))
+			{
+				var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
 				botCreationData = await BotCreationDataClass
 					.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner)
 					.AsUniTask()
 					.AttachExternalCancellation(cts.Token);
 				
-				if (timeout.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
+				if (cts.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
 				{
-					const string timedOutMessage = "Generating bot profiles timed out! Check server logs; there may be a bot generation error!";
+					const string timedOutMessage =
+						"Generating bot profiles canceled! Either the raid ended or there was a bot profile generation error!";
 					logger.LogDebugDetailed(timedOutMessage, GetType().Name, nameof(TryGenerateBotProfiles));
 				}
 			}
@@ -251,7 +261,8 @@ public abstract class BotDataService : IBotDataService
 			{
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 				sb.AppendFormat("Bot profiles generated and assigned successfully; {0} profiles loaded. IDs: {1}",
-					botCreationData.Profiles.Count.ToString(), string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
+					botCreationData.Profiles.Count.ToString(),
+					string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
 			}
 			
@@ -261,7 +272,13 @@ public abstract class BotDataService : IBotDataService
 		{
 			logger.LogException(GetType().Name, nameof(TryGenerateBotProfiles), ex);
 		}
-		catch (OperationCanceledException) {}
+		catch (OperationCanceledException)
+		{
+		}
+		finally
+		{
+			_timeoutController.Reset();
+		}
 		
 		return (false, null);
 	}

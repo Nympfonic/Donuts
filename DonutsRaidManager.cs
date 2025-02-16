@@ -171,8 +171,18 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		
 		_eventBusInitializer.ClearAllBuses();
+		
+		foreach (IBotDataService service in _botDataServices)
+		{
+			if (service is IDisposable disposableService)
+			{
+				disposableService.Dispose();
+			}
+		}
+		
 		_onDestroyTokenSource?.Cancel();
 		_onDestroyTokenSource?.Dispose();
+		_timeoutController.Dispose();
 		
 		base.OnDestroy();
 		
@@ -304,7 +314,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 			game.SetMatchmakerStatus(message, 0);
 			
-			IUniTaskAsyncEnumerator<BotGenerationProgress> enumerator = stream.GetAsyncEnumerator();
+			IUniTaskAsyncEnumerator<BotGenerationProgress> enumerator = stream.GetAsyncEnumerator(timeoutToken);
 			while (await enumerator.MoveNextAsync())
 			{
 				BotGenerationProgress generationProgress = enumerator.Current;
@@ -312,7 +322,6 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 			await enumerator.DisposeAsync();
 			
-			_timeoutController.Reset();
 			game.SetMatchmakerStatus(message, 1);
 			
 			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: _onDestroyToken);
