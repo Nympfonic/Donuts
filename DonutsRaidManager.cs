@@ -289,7 +289,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, _onDestroyToken);
 			cts.CancelAfter(_startingBotsTimeoutSeconds);
 			
-			IUniTaskAsyncEnumerable<BotGenerationProgress> stream = dataService.SetupStartingBotCache(cts.Token);
+			IUniTaskAsyncEnumerable<BotGenerationProgress> stream = dataService.SetupStartingBotCache(cts.Token).Queue();
 			if (stream == null)
 			{
 				var errorMessage =
@@ -304,8 +304,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			while (await enumerator.MoveNextAsync())
 			{
 				BotGenerationProgress generationProgress = enumerator.Current;
-				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(generationProgress.statusMessage, generationProgress.Progress);
+				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(message, generationProgress.Progress);
 			}
+			await enumerator.DisposeAsync();
 			
 			game.SetMatchmakerStatus(message, 1);
 			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: cts.Token);

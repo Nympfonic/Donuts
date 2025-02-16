@@ -20,31 +20,15 @@ public class GenerateBotProfilesAsyncEnumerable(
 		return new AsyncEnumerator(dataService, maxBotsToGenerate, minGroupSize, maxGroupSize, token);
 	}
 	
-	private class AsyncEnumerator : IUniTaskAsyncEnumerator<BotGenerationProgress>
+	private class AsyncEnumerator(
+		[NotNull] IBotDataService dataService,
+		int maxBotsToGenerate,
+		int minGroupSize,
+		int maxGroupSize,
+		CancellationToken token)
+		: IUniTaskAsyncEnumerator<BotGenerationProgress>
 	{
-		[NotNull] private readonly IBotDataService _dataService;
-		private readonly int _maxBotsToGenerate;
-		private readonly int _minGroupSize;
-		private readonly int _maxGroupSize;
-		private CancellationToken _token;
-		
-		public AsyncEnumerator([NotNull] IBotDataService dataService,
-			int maxBotsToGenerate,
-			int minGroupSize,
-			int maxGroupSize,
-			CancellationToken token)
-		{
-			_dataService = dataService;
-			_maxBotsToGenerate = maxBotsToGenerate;
-			_minGroupSize = minGroupSize;
-			_maxGroupSize = maxGroupSize;
-			_token = token;
-			
-			var statusMessage = $"Donuts: Generating {dataService.SpawnType.LocalizedPlural()}...";
-			Current = new BotGenerationProgress(maxBotsToGenerate, statusMessage);
-		}
-		
-		public BotGenerationProgress Current { get; }
+		public BotGenerationProgress Current { get; } = new(maxBotsToGenerate);
 		
 		public UniTask DisposeAsync()
 		{
@@ -53,28 +37,28 @@ public class GenerateBotProfilesAsyncEnumerable(
 		
 		public async UniTask<bool> MoveNextAsync()
 		{
-			if (_token.IsCancellationRequested || Current.TotalBotsGenerated >= _maxBotsToGenerate)
+			if (token.IsCancellationRequested || Current.TotalBotsGenerated >= maxBotsToGenerate)
 			{
 				return false;
 			}
 			
-			int groupSize = BotHelper.GetBotGroupSize(_dataService.GroupChance, _minGroupSize, _maxGroupSize,
+			int groupSize = BotHelper.GetBotGroupSize(dataService.GroupChance, minGroupSize, maxGroupSize,
 				Current.maxBotsToGenerate - Current.TotalBotsGenerated);
 			
-			(bool success, PrepBotInfo prepBotInfo) = await _dataService.TryGenerateBotProfiles(
-				_dataService.BotDifficulties.PickRandomElement(),
+			(bool success, PrepBotInfo prepBotInfo) = await dataService.TryGenerateBotProfiles(
+				dataService.BotDifficulties.PickRandomElement(),
 				groupSize,
 				saveToCache: false,
-				cancellationToken: _token);
+				cancellationToken: token);
 			
-			if (_token.IsCancellationRequested)
+			if (token.IsCancellationRequested)
 			{
 				return false;
 			}
 			
 			if (success)
 			{
-				_dataService.StartingBotsCache.Enqueue(prepBotInfo);
+				dataService.StartingBotsCache.Enqueue(prepBotInfo);
 				Current.Report(groupSize);
 			}
 			
