@@ -30,7 +30,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private BotSpawner _eftBotSpawner;
 	
 	private DiContainer _dependencyContainer;
+	private CancellationTokenSource _onDestroyTokenSource;
 	private CancellationToken _onDestroyToken;
+	private TimeoutController _timeoutController;
 	private DonutsGizmos _donutsGizmos;
 	private EventBusInitializer _eventBusInitializer;
 	
@@ -42,7 +44,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	internal const string PMC_SERVICE_KEY = "Pmc";
 	internal const string SCAV_SERVICE_KEY = "Scav";
 	
-	private static readonly TimeSpan _startingBotsTimeoutSeconds = TimeSpan.FromSeconds(30);
+	private static readonly TimeSpan _startingBotsTimeout = TimeSpan.FromSeconds(30);
 	private bool _hasSpawnedStartingBots;
 	private bool _isStartingBotSpawnOngoing;
 	private float _startingSpawnPrevTime;
@@ -106,7 +108,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_dependencyContainer = new DiContainer();
 		RegisterServices();
 		
-		_onDestroyToken = this.GetCancellationTokenOnDestroy();
+		_onDestroyTokenSource = new CancellationTokenSource();
+		_onDestroyToken = _onDestroyTokenSource.Token;
+		_timeoutController = new TimeoutController(_onDestroyTokenSource);
 		_donutsGizmos = new DonutsGizmos(_onDestroyToken);
 		_eventBusInitializer = new EventBusInitializer(DonutsPlugin.CurrentAssembly);
 		_eventBusInitializer.Initialize();
@@ -167,6 +171,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		
 		_eventBusInitializer.ClearAllBuses();
+		_onDestroyTokenSource?.Cancel();
+		_onDestroyTokenSource?.Dispose();
 		
 		base.OnDestroy();
 		
@@ -285,11 +291,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		try
 		{
-			using var timeout = new CancellationTokenSource();
-			using var cts = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, _onDestroyToken);
-			cts.CancelAfter(_startingBotsTimeoutSeconds);
+			CancellationToken timeoutToken = _timeoutController.Timeout(_startingBotsTimeout);
 			
-			IUniTaskAsyncEnumerable<BotGenerationProgress> stream = dataService.SetupStartingBotCache(cts.Token).Queue();
+			IUniTaskAsyncEnumerable<BotGenerationProgress> stream = dataService.SetupStartingBotCache(timeoutToken);
 			if (stream == null)
 			{
 				var errorMessage =
@@ -308,8 +312,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			}
 			await enumerator.DisposeAsync();
 			
+			_timeoutController.Reset();
 			game.SetMatchmakerStatus(message, 1);
-			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: cts.Token);
+			
+			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: _onDestroyToken);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
@@ -317,12 +323,19 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		catch (OperationCanceledException)
 		{
-			var errorMessage =
-				$"{dataService.GetType().Name} timed out while generating starting bot profiles! Check your server logs for bot generation errors!";
-			Logger.LogError(errorMessage);
-			
-			game.SetMatchmakerStatus($"Generating {spawnTypeString} failed! Skipping...");
-			await UniTask.Delay(TimeSpan.FromSeconds(3), cancellationToken: _onDestroyToken);
+			if (_timeoutController.IsTimeout())
+			{
+				var errorMessage =
+					$"{dataService.GetType().Name} timed out while generating starting bot profiles! Check your server logs for bot generation errors!";
+				Logger.LogError(errorMessage);
+				
+				game.SetMatchmakerStatus($"Generating {spawnTypeString} failed! Skipping...");
+				await UniTask.Delay(TimeSpan.FromSeconds(3), cancellationToken: _onDestroyToken);
+			}
+		}
+		finally
+		{
+			_timeoutController.Reset();
 		}
 	}
 	
