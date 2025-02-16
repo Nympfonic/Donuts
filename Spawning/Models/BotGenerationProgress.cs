@@ -3,9 +3,10 @@ using UnityEngine;
 
 namespace Donuts.Spawning.Models;
 
-public class BotGenerationProgress(int maxBotsToGenerate) : IProgress<int>
+public class BotGenerationProgress(int maxBotsToGenerate, string statusMessage) : IProgress<int>
 {
 	public readonly int maxBotsToGenerate = maxBotsToGenerate;
+	public readonly string statusMessage = statusMessage;
 	
 	public float Progress { get; private set; }
 	public int TotalBotsGenerated { get; private set; }

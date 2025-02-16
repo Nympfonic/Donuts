@@ -277,10 +277,11 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	
 	private async UniTask SetupDataService(IBotDataService dataService)
 	{
+		_botDataServices.Add(dataService);
+		
 		AbstractGame game = Singleton<AbstractGame>.Instance;
 		string spawnTypeString = dataService.SpawnType.LocalizedPlural();
 		var message = $"Donuts: Generating {spawnTypeString}...";
-		TimeSpan pauseTime = TimeSpan.FromSeconds(1);
 		
 		try
 		{
@@ -299,21 +300,15 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 			game.SetMatchmakerStatus(message, 0);
 			
-			await UniTask.Delay(pauseTime, cancellationToken: cts.Token);
-			await UniTask.SwitchToMainThread(cts.Token);
-			
 			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
 			await stream.Queue().ForEachAwaitWithCancellationAsync(async (generationProgress, token) =>
 			{
 				await UniTask.SwitchToMainThread(token);
-				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(message, generationProgress.Progress);
+				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(generationProgress.statusMessage, generationProgress.Progress);
 			}, cts.Token);
 			
 			game.SetMatchmakerStatus(message, 1);
-			
-			_botDataServices.Add(dataService);
-			
-			await UniTask.Delay(pauseTime, cancellationToken: cts.Token);
+			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: cts.Token);
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
