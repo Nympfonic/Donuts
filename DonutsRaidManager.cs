@@ -300,12 +300,12 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 			game.SetMatchmakerStatus(message, 0);
 			
-			// TODO: Use 'await foreach' instead once we get C# 8.0 in SPT 3.11
-			await stream.Queue().ForEachAwaitWithCancellationAsync(async (generationProgress, token) =>
+			IUniTaskAsyncEnumerator<BotGenerationProgress> enumerator = stream.GetAsyncEnumerator();
+			while (await enumerator.MoveNextAsync())
 			{
-				await UniTask.SwitchToMainThread(token);
+				BotGenerationProgress generationProgress = enumerator.Current;
 				Singleton<AbstractGame>.Instance.SetMatchmakerStatus(generationProgress.statusMessage, generationProgress.Progress);
-			}, cts.Token);
+			}
 			
 			game.SetMatchmakerStatus(message, 1);
 			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: cts.Token);
