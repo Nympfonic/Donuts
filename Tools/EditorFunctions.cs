@@ -233,7 +233,7 @@ internal static class EditorFunctions
 		{
 			await writer.WriteAsync(json);
 		}
-		await UniTask.SwitchToMainThread();
+		await UniTask.SwitchToMainThread(PlayerLoopTiming.Update);
 
 		DonutsHelper.DisplayNotification($"Donuts: Wrote Json File to: {jsonFilePath}", Color.yellow);
 	}

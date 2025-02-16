@@ -33,7 +33,7 @@ public interface IBotDataService : IServiceSpawnType
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
 	[CanBeNull] PrepBotInfo FindCachedBotData(BotDifficulty difficulty, int targetCount);
 	void RemoveFromBotCache(PrepBotInfo.GroupDifficultyKey key);
-	[NotNull] Queue<BotWave> GetBotWavesToSpawn();
+	[CanBeNull] BotWave GetBotWaveToSpawn();
 	[CanBeNull] Vector3? GetUnusedSpawnPoint(SpawnPointType spawnPointType = SpawnPointType.Standard);
 	void ResetGroupTimers(int groupNum);
 	int GetAliveBotsCount();
@@ -220,12 +220,12 @@ public abstract class BotDataService : IBotDataService
 			BotCreationDataClass botCreationData;
 			using (var timeout = new CancellationTokenSource(_timeoutSeconds))
 			{
+				await UniTask.SwitchToMainThread(PlayerLoopTiming.Update, timeout.Token);
+				
 				botCreationData = await BotCreationDataClass
 					.Create(botProfileData, _botCreator, groupSize, _eftBotSpawner)
 					.AsUniTask()
 					.AttachExternalCancellation(timeout.Token);
-				
-				await UniTask.SwitchToMainThread(timeout.Token);
 				
 				if (timeout.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
 				{
