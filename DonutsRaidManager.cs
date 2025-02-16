@@ -44,7 +44,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	internal const string PMC_SERVICE_KEY = "Pmc";
 	internal const string SCAV_SERVICE_KEY = "Scav";
 	
-	private static readonly TimeSpan _startingBotsTimeout = TimeSpan.FromSeconds(30);
+	private float _updateTimer;
+	
+	private static readonly TimeSpan _startingBotsTimeout = TimeSpan.FromSeconds(60);
 	private bool _hasSpawnedStartingBots;
 	private bool _isStartingBotSpawnOngoing;
 	private float _startingSpawnPrevTime;
@@ -146,8 +148,15 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private void Update()
 	{
 		float deltaTime = Time.deltaTime;
+		
 		_donutsGizmos.DisplayMarkerInformation(_mainPlayer.Transform);
-		EventBus.Raise(new BotDataService.UpdateWaveTimerEvent(deltaTime));
+		
+		_updateTimer += deltaTime;
+		if (_updateTimer >= 1f)
+		{
+			EventBus.Raise(new BotDataService.UpdateWaveTimerEvent(_updateTimer));
+			_updateTimer = 0f;
+		}
 	}
 	
 	private void OnGUI()
@@ -338,7 +347,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 					$"{dataService.GetType().Name} timed out while generating starting bot profiles! Check your server logs for bot generation errors!";
 				Logger.LogError(errorMessage);
 				
-				game.SetMatchmakerStatus($"Generating {spawnTypeString} failed! Skipping...");
+				game.SetMatchmakerStatus($"Donuts: Generating {spawnTypeString} timed out! Skipping...");
 				await UniTask.Delay(TimeSpan.FromSeconds(3), cancellationToken: _onDestroyToken);
 			}
 		}
