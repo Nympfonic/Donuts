@@ -70,7 +70,7 @@ internal static class DonutsHelper
 		[NotNull] string methodName)
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.AppendFormat("{0} {1}::{2}: {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
+		sb.AppendFormat("{0} [{1}::{2}] {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
 		logSource.LogWarning(sb.ToString());
 	}
 	
@@ -88,7 +88,7 @@ internal static class DonutsHelper
 		[NotNull] string methodName)
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.AppendFormat("{0} {1}::{2}: {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
+		sb.AppendFormat("{0} [{1}::{2}] {3}", DateTime.Now.ToLongTimeString(), typeName, methodName, message);
 		logSource.LogError(sb.ToString());
 	}
 	
@@ -105,7 +105,7 @@ internal static class DonutsHelper
 		[NotNull] string methodName,
 		[NotNull] Exception ex)
 	{
-		var msg = $"{DateTime.Now.ToLongTimeString()} {typeName}::{methodName}: {ex.Message}\n{ex.StackTrace}";
+		var msg = $"{DateTime.Now.ToLongTimeString()} [{typeName}::{methodName}] {ex.Message}\n{ex.StackTrace}";
 		logSource.LogError(msg);
 	}
 	
