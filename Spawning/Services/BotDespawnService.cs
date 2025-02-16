@@ -27,7 +27,7 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 	private readonly BotsController _botsController = Singleton<IBotGame>.Instance.BotsController;
 	private readonly FurthestBotComparer _furthestBotComparer = new();
 	
-	private static readonly FieldInfo _botLeaveDataOnLeaveField = AccessTools.Field(typeof(BotLeaveData), "onLeave");
+	private static readonly FieldInfo _botLeaveDataOnLeaveField = AccessTools.Field(typeof(BotLeaveData), "OnLeave");
 	
 	private const int FRAME_DELAY_BETWEEN_DESPAWNS = 20;
 	private readonly List<Player> _botsToDespawn = new(20);
@@ -194,7 +194,7 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 		botOwner.Deactivate();
 		botOwner.Dispose();
 		leaveData.LeaveComplete = true;
-
+		
 		_botsController.BotDied(botOwner);
 		_botsController.DestroyInfo(botOwner.GetPlayer);
 		
