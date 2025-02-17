@@ -28,7 +28,7 @@ public class PlayerCombatStateCheck : WaveSpawnProcessorBase
 		{
 			DonutsRaidManager.Logger.LogDebugDetailed(
 				$"Resetting timer for GroupNum {data.GroupNum.ToString()}, reason: A player is in combat.",
-				nameof(WaveSpawnChanceCheck), nameof(Process));
+				nameof(PlayerCombatStateCheck), nameof(Process));
 		}
 		
 		return false;
@@ -41,6 +41,12 @@ public class PlayerCombatStateCheck : WaveSpawnProcessorBase
 	
 	private void ResetTimer()
 	{
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			DonutsRaidManager.Logger.LogDebugDetailed("A player was hit, resetting combat state timer",
+				nameof(PlayerCombatStateCheck), nameof(ResetTimer));
+		}
+		
 		_lastTimePlayerHit = Time.time;
 	}
 }
