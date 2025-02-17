@@ -38,18 +38,6 @@ public class BotCreationDataClassPatches
 		[PatchPrefix]
 		private static bool PatchPrefix(ref SpawnPointData __result, List<SpawnPointData> ___list_0)
 		{
-			int count = ___list_0.Count;
-			if (count == 0)
-			{
-				__result = null;
-				return false;
-			}
-			else if (count == 1)
-			{
-				__result = ___list_0[0];
-				return false;
-			}
-			
 			__result = ___list_0.PickRandomElement();
 			return false;
 		}
