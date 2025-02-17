@@ -62,6 +62,7 @@ public class BotWave
 		
 		if (IgnoreTimerFirstSpawn)
 		{
+			IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
 			return true;
 		}
 		
@@ -74,11 +75,6 @@ public class BotWave
 		if (_timesSpawned >= MaxTriggersBeforeCooldown)
 		{
 			TriggerCooldown();
-		}
-		
-		if (IgnoreTimerFirstSpawn)
-		{
-			IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
 		}
 	}
 	
