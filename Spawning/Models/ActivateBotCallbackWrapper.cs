@@ -16,6 +16,7 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 	private static readonly FieldInfo _deadBodiesControllerField = AccessTools.Field(typeof(BotSpawner), "_deadBodiesController");
 	private static readonly FieldInfo _allPlayersField = AccessTools.Field(typeof(BotSpawner), "_allPlayers");
 	private static readonly FieldInfo _freeForAllField = AccessTools.Field(typeof(BotSpawner), "_freeForAll");
+	// (BotOwner bot, BotCreationDataClass data, Action<BotOwner> callback, bool shallBeGroup, Stopwatch stopWatch)
 	private static readonly MethodInfo _spawnBotMethod = AccessTools.Method(typeof(BotSpawner), "method_11");
 	
 	private static readonly Stopwatch _stopwatch = new();
