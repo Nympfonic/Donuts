@@ -16,9 +16,9 @@ public class WaveSpawnChanceCheck : WaveSpawnProcessorBase
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			DonutsRaidManager.Logger.LogDebugDetailed(
-				$"Resetting timer for GroupNum {data.GroupNum.ToString()}, reason: Spawn chance check failed.",
-				nameof(WaveSpawnChanceCheck), nameof(Process));
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: Spawn chance check failed.", data.GroupNum.ToString());
+			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(WaveSpawnChanceCheck), nameof(Process));
 		}
 		
 		return false;
@@ -26,8 +26,8 @@ public class WaveSpawnChanceCheck : WaveSpawnProcessorBase
 	
 	private static bool IsSpawnChanceSuccessful(int spawnChance)
 	{
-		int randomValue = Random.Range(0, 100);
-		bool canSpawn = randomValue < spawnChance;
+		int randomValue = Random.Range(1, 101);
+		bool canSpawn = randomValue <= spawnChance;
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
