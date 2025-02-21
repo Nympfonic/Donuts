@@ -1,64 +1,55 @@
 ﻿using UnityEngine;
 
-namespace Donuts.Models
+namespace Donuts.Models;
+
+// TODO: Currently unused - implement Hotspot timer into Donuts logic
+public class HotspotTimer(Entry hotspot)
 {
-    internal class HotspotTimer
-    {
-        private Entry hotspot;
-        private float timer;
-        public bool inCooldown;
-        public int timesSpawned;
-        private float cooldownTimer;
-        public Entry Hotspot => hotspot;
+	private float _timer = 0f;
+	private float _cooldownTimer = 0f;
 
-        public HotspotTimer(Entry hotspot)
-        {
-            this.hotspot = hotspot;
-            this.timer = 0f;
-            this.inCooldown = false;
-            this.timesSpawned = 0;
-            this.cooldownTimer = 0f;
-        }
+	public Entry Hotspot => hotspot;
+	public bool OnCooldown { get; private set; } = false;
+	public int TimesSpawned { get; private set; } = 0;
 
-        public void UpdateTimer()
-        {
-            timer += Time.deltaTime;
-            if (inCooldown)
-            {
-                cooldownTimer += Time.deltaTime;
-                if (cooldownTimer >= DefaultPluginVars.coolDownTimer.Value)
-                {
-                    inCooldown = false;
-                    cooldownTimer = 0f;
-                    timesSpawned = 0;
-                }
-            }
-        }
+	public void UpdateTimer()
+	{
+		_timer += Time.deltaTime;
+		if (OnCooldown)
+		{
+			_cooldownTimer += Time.deltaTime;
+			if (_cooldownTimer >= DefaultPluginVars.coolDownTimer.Value)
+			{
+				OnCooldown = false;
+				_cooldownTimer = 0f;
+				TimesSpawned = 0;
+			}
+		}
+	}
 
-        public float GetTimer() => timer;
+	public float GetTimer() => _timer;
 
-        public bool ShouldSpawn()
-        {
-            if (inCooldown)
-            {
-                return false;
-            }
+	public bool ShouldSpawn()
+	{
+		if (OnCooldown)
+		{
+			return false;
+		}
 
-            if (hotspot.IgnoreTimerFirstSpawn)
-            {
-                hotspot.IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
-                return true;
-            }
+		if (hotspot.IgnoreTimerFirstSpawn)
+		{
+			hotspot.IgnoreTimerFirstSpawn = false; // Ensure this is only true for the first spawn
+			return true;
+		}
 
-            return timer >= hotspot.BotTimerTrigger;
-        }
+		return _timer >= hotspot.BotTimerTrigger;
+	}
 
-        public void ResetTimer() => timer = 0f;
+	public void ResetTimer() => _timer = 0f;
 
-        public void TriggerCooldown()
-        {
-            inCooldown = true;
-            cooldownTimer = 0f;
-        }
-    }
+	public void TriggerCooldown()
+	{
+		OnCooldown = true;
+		_cooldownTimer = 0f;
+	}
 }

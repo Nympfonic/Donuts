@@ -1,52 +1,53 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using Donuts;
+﻿using EFT;
 using HarmonyLib;
+using JetBrains.Annotations;
 using SPT.Reflection.Patching;
+using System;
+using System.Reflection;
 
-namespace dvize.Donuts.Patches
+namespace Donuts.Patches;
+
+/// <summary>
+/// Patch <see cref="Player.FirearmController.IsTriggerPressed"/> to prevent player from shooting while in Donuts' F9 menu.
+/// </summary>
+[UsedImplicitly]
+internal class PlayerFireControlPatchGetter : ModulePatch
 {
-    internal class PlayerFireControlPatchGetter : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
-            var playerType = typeof(EFT.Player.FirearmController);
-            return AccessTools.PropertyGetter(playerType, "IsTriggerPressed");
-        }
+	protected override MethodBase GetTargetMethod()
+	{
+		Type playerType = typeof(Player.FirearmController);
+		return AccessTools.PropertyGetter(playerType, nameof(Player.FirearmController.IsTriggerPressed));
+	}
+	
+	[PatchPrefix]
+	private static bool PatchPrefix(ref bool __result)
+	{
+		if (DefaultPluginVars.ShowGUI)
+		{
+			__result = false;
+			return false;
+		}
+		return true; // Continue with the original getter
+	}
+}
 
-        [PatchPrefix]
-        public static bool PrefixGet(ref bool __result)
-        {
-            if (DefaultPluginVars.showGUI)
-            {
-                __result = false;
-                return false;
-            }
-            return true; // Continue with the original getter
-        }
-    }
-
-    internal class PlayerFireControlPatchSetter : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
-            var playerType = typeof(EFT.Player.FirearmController);
-            return AccessTools.PropertySetter(playerType, "IsTriggerPressed");
-        }
-
-        [PatchPrefix]
-        public static bool PrefixSet(ref bool value)
-        {
-            if (DefaultPluginVars.showGUI)
-            {
-                value = false;
-                return false;
-            }
-            return true; // Continue with the original setter
-        }
-    }
+[UsedImplicitly]
+internal class PlayerFireControlPatchSetter : ModulePatch
+{
+	protected override MethodBase GetTargetMethod()
+	{
+		Type playerType = typeof(Player.FirearmController);
+		return AccessTools.PropertySetter(playerType, nameof(Player.FirearmController.IsTriggerPressed));
+	}
+	
+	[PatchPrefix]
+	private static bool PatchPrefix(ref bool value)
+	{
+		if (DefaultPluginVars.ShowGUI)
+		{
+			value = false;
+			return false;
+		}
+		return true; // Continue with the original setter
+	}
 }
