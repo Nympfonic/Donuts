@@ -52,7 +52,7 @@ public sealed class PmcDataService : BotDataService
 	
 	private static bool IsPmc(WildSpawnType role) => role is WildSpawnType.pmcUSEC or WildSpawnType.pmcBEAR;
 	private static WildSpawnType GetPmcFactionBasedOnRatio() =>
-		Random.Range(0, 100) < DefaultPluginVars.pmcFactionRatio.Value
+		Random.Range(1, 101) <= DefaultPluginVars.pmcFactionRatio.Value
 			? WildSpawnType.pmcUSEC
 			: WildSpawnType.pmcBEAR;
 }

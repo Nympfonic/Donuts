@@ -55,6 +55,9 @@
     <Reference Include="BepInEx">
       <HintPath>E:\SPT-3.10\BepInEx\core\BepInEx.dll</HintPath>
     </Reference>
+    <Reference Include="bsg.console.core">
+      <HintPath>E:\SPT-3.10\EscapeFromTarkov_Data\Managed\bsg.console.core.dll</HintPath>
+    </Reference>
     <Reference Include="Comfort">
       <HintPath>E:\SPT-3.10\EscapeFromTarkov_Data\Managed\Comfort.dll</HintPath>
     </Reference>

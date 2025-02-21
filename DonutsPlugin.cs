@@ -5,8 +5,10 @@ using BepInEx.Logging;
 using Cysharp.Threading.Tasks;
 using Donuts.Models;
 using Donuts.PluginGUI;
+using Donuts.Spawning.Utils;
 using Donuts.Tools;
 using Donuts.Utils;
+using EFT.UI;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using System.Collections.Generic;
@@ -46,6 +48,8 @@ public class DonutsPlugin : BaseUnityPlugin
 		string assemblyPath = CurrentAssembly.Location;
 		DirectoryPath = Path.GetDirectoryName(assemblyPath);
 		
+		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
+		
 		DonutsConfiguration.ImportConfig(DirectoryPath);
 		
 		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
@@ -54,7 +58,7 @@ public class DonutsPlugin : BaseUnityPlugin
 		ModulePatchManager = new ModulePatchManager(CurrentAssembly);
 		ModulePatchManager.EnableAllPatches();
 		
-		FikaEnabled = Chainloader.PluginInfos.Keys.Contains("com.fika.core");
+		ConsoleScreen.Processor.RegisterCommandGroup<SpawnCommands>();
 	}
 	
 	// ReSharper disable once Unity.IncorrectMethodSignature

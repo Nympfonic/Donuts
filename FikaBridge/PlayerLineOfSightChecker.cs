@@ -1,4 +1,5 @@
 ﻿using Comfort.Common;
+using Donuts.Utils;
 using EFT;
 using Fika.Core.Coop.Utils;
 using Fika.Core.Networking;
@@ -26,7 +27,7 @@ public class PlayerLineOfSightChecker
 	public bool CheckLineOfSightToPlayer(string profileId)
 	{
 		_gameWorld.allAlivePlayersByID.TryGetValue(profileId, out Player player);
-		if (player == null || player.IsYourPlayer || player.HealthController == null || !player.HealthController.IsAlive)
+		if (player == null || player.IsYourPlayer || !player.IsAlive())
 		{
 			return false;
 		}

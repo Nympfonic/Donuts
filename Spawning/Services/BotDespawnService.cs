@@ -3,17 +3,14 @@ using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using Donuts.Utils;
 using EFT;
-using EFT.AssetsManager;
-using HarmonyLib;
 using JetBrains.Annotations;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Reflection;
 using System.Threading;
 using Systems.Effects;
 using UnityEngine;
 using UnityToolkit.Extensions;
+using UnityToolkit.Structures.EventBus;
 
 namespace Donuts.Spawning.Services;
 
@@ -22,16 +19,32 @@ public interface IBotDespawnService : IServiceSpawnType
 	UniTask DespawnExcessBots(CancellationToken cancellationToken);
 }
 
-public abstract class BotDespawnService(BotConfigService configService, IBotDataService dataService) : IBotDespawnService
+public abstract class BotDespawnService : IBotDespawnService
 {
 	private readonly BotsController _botsController = Singleton<IBotGame>.Instance.BotsController;
 	private readonly FurthestBotComparer _furthestBotComparer = new();
+	private readonly List<BotOwner> _aliveBots = [];
 	
-	// private static readonly FieldInfo _botLeaveDataOnLeaveField = AccessTools.Field(typeof(BotLeaveData), "OnLeave");
+	private const int MIN_BOT_ACTIVE_TIME_SECONDS = 3;
 	
 	private const int FRAME_DELAY_BETWEEN_DESPAWNS = 20;
 	private readonly List<Player> _botsToDespawn = new(20);
 	private float _despawnCooldownTime;
+	
+	private readonly BotConfigService _configService;
+	private readonly IBotDataService _dataService;
+	
+	protected BotDespawnService(BotConfigService configService, IBotDataService dataService)
+	{
+		_configService = configService;
+		_dataService = dataService;
+		
+		var registerBotBinding = new EventBinding<RegisterBotEvent>(RegisterBot);
+		EventBus.Register(registerBotBinding);
+		
+		var playerEnteredCombatBinding = new EventBinding<PlayerEnteredCombatEvent>(ResetDespawnTimer);
+		EventBus.Register(playerEnteredCombatBinding);
+	}
 	
 	public abstract DonutsSpawnType SpawnType { get; }
 
@@ -43,31 +56,37 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 		
 		float timeSinceLastDespawn = Time.time - _despawnCooldownTime;
 		bool hasReachedTimeToDespawn = timeSinceLastDespawn >= DefaultPluginVars.despawnInterval.Value;
-		if (!IsOverBotLimit(out int excessBots) || excessBots <= 0 || !hasReachedTimeToDespawn)
+		if (!hasReachedTimeToDespawn || !IsOverBotLimit(out int excessBots) || excessBots <= 0)
 		{
 			return;
 		}
 		
+		_despawnCooldownTime = Time.time;
+		
 		IReadOnlyList<Player> furthestBots = FindFurthestBots();
+		excessBots = Mathf.Min(furthestBots.Count, excessBots);
+		
 		for (var i = 0; i < excessBots; i++)
 		{
 			Player furthestBot = furthestBots[i];
-			if (furthestBot == null || furthestBot.HealthController == null || !furthestBot.HealthController.IsAlive)
+			if (furthestBot == null || !furthestBot.IsAlive())
 			{
 				continue;
 			}
 			
-			if (await TryDespawnBot(furthestBot, cancellationToken) && i < excessBots - 1)
+			bool success = await TryDespawnBot(furthestBot, cancellationToken);
+			if (success && i < excessBots - 1)
 			{
 				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_DESPAWNS, cancellationToken: cancellationToken);
+				if (cancellationToken.IsCancellationRequested) return;
 			}
 		}
 	}
 	
 	private bool IsOverBotLimit(out int excess)
 	{
-		int aliveBots = dataService.GetAliveBotsCount();
-		int botLimit = dataService.MaxBotLimit;
+		int aliveBots = _dataService.GetAliveBotsCount();
+		int botLimit = _dataService.MaxBotLimit;
 		
 		if (aliveBots <= botLimit)
 		{
@@ -80,23 +99,18 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 	}
 	
 	/// <summary>
-	/// Finds the furthest bots away from all human players
+	/// Finds the furthest bots away from all human players that are ready to despawn.
 	/// </summary>
 	[NotNull]
 	private IReadOnlyList<Player> FindFurthestBots()
 	{
 		_botsToDespawn.Clear();
-		
-		ReadOnlyCollection<Player> allAlivePlayers = dataService.AllAlivePlayers;
-		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
+		_aliveBots.RemoveAll(b => b == null || !b.GetPlayer.IsAlive());
+		foreach (BotOwner bot in _aliveBots)
 		{
-			Player player = allAlivePlayers[i];
-			// Ignore players that aren't the correct bot spawn type
-			if (player.OrNull()?.IsAI == true &&
-				player.HealthController?.IsAlive == true &&
-				IsCorrectSpawnType(player.Profile.Info.Settings.Role))
+			if (Time.time >= bot.ActivateTime + MIN_BOT_ACTIVE_TIME_SECONDS)
 			{
-				_botsToDespawn.Add(player);
+				_botsToDespawn.Add(bot.GetPlayer);
 			}
 		}
 		
@@ -109,21 +123,23 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			if (_botsToDespawn.Count == 0)
 			{
-				sb.Append("No bots to despawn.");
+				sb.Append("No alive bots that can be despawned, aborting despawn process.");
 			}
 			else
 			{
-				sb.AppendFormat("{0} bots to despawn: \n", _botsToDespawn.Count);
+				sb.AppendFormat("{0} alive bots found that can be despawned: \n", _botsToDespawn.Count);
 				for (var i = 0; i < _botsToDespawn.Count; i++)
 				{
 					Player bot = _botsToDespawn[i];
-					sb.AppendFormat("Furthest bot #{0}: {1}", i + 1, bot.Profile.Info.Nickname);
+					sb.AppendFormat("Furthest bot #{0}: {1} ({2}), {3}m away from center position {4} between human players",
+						i + 1, bot.Profile.Info.Nickname, bot.ProfileId, (centroid - bot.Transform.position).magnitude, centroid);
 					if (i < _botsToDespawn.Count - 1)
 					{
 						sb.Append('\n');
 					}
 				}
 			}
+			
 			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(FindFurthestBots));
 		}
 		
@@ -134,14 +150,14 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 	
 	private Vector3 GetCenterPointBetweenHumanPlayers()
 	{
-		ReadOnlyCollection<Player> humanPlayers = configService.GetHumanPlayerList();
+		ReadOnlyCollection<Player> humanPlayers = _configService.GetHumanPlayerList();
 		int humanCount = humanPlayers.Count;
 		Vector3 centroid = Vector3.zero;
 		
 		for (int i = humanCount - 1; i >= 0; i--)
 		{
 			Player humanPlayer = humanPlayers[i];
-			if (humanPlayer.OrNull()?.HealthController?.IsAlive == true)
+			if (humanPlayer.OrNull()?.IsAlive() == true)
 			{
 				centroid += humanPlayer.Transform.position;
 			}
@@ -166,53 +182,35 @@ public abstract class BotDespawnService(BotConfigService configService, IBotData
 			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryDespawnBot));
 		}
 		
+		// Not sure what exactly fixed the error spam with SAIN but don't change this shit EVER
 		Player botPlayer = botOwner.GetPlayer;
 		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botPlayer);
-		
-		// TODO: Call Fika's despawn method instead
-		if (DonutsPlugin.FikaEnabled)
-		{
-			await Despawn(botOwner, cancellationToken);
-		}
-		else
-		{
-			await Despawn(botOwner, cancellationToken);
-		}
-        
-		// Update the cooldown
-		_despawnCooldownTime = Time.time;
-		return true;
-	}
-	
-	protected virtual async UniTask Despawn(BotOwner botOwner, CancellationToken cancellationToken)
-	{
-		await UniTask.Yield(PlayerLoopTiming.PostLateUpdate, cancellationToken);
-		if (cancellationToken.IsCancellationRequested)
-		{
-			return;
-		}
-		// BotLeaveData leaveData = botOwner.LeaveData;
-		// var onLeave = (Action<BotOwner>)_botLeaveDataOnLeaveField.GetValue(leaveData);
-		// if (onLeave != null)
-		// {
-		// 	onLeave(botOwner);
-		// 	_botLeaveDataOnLeaveField.SetValue(leaveData, null);
-		// }
-
-		Player botPlayer = botOwner.GetPlayer;
-		GameWorld gameWorld = Singleton<GameWorld>.Instance;
-		
-		gameWorld.RegisteredPlayers.Remove(botOwner);
-		gameWorld.AllAlivePlayersList.Remove(botPlayer);
-		
 		botOwner.Deactivate();
 		botOwner.Dispose();
-		// leaveData.LeaveComplete = true;
-		
 		_botsController.BotDied(botOwner);
 		_botsController.DestroyInfo(botPlayer);
 		
-		AssetPoolObject.ReturnToPool(botOwner.gameObject);
+		await UniTask.NextFrame(PlayerLoopTiming.LastPreUpdate, cancellationToken);
+		if (cancellationToken.IsCancellationRequested) return false;
+		
+		Object.DestroyImmediate(botOwner.gameObject);
+		Object.Destroy(botOwner);
+        
+		return true;
+	}
+	
+	private void RegisterBot(RegisterBotEvent data)
+	{
+		WildSpawnType role = data.bot.Profile.Info.Settings.Role;
+		if (IsCorrectSpawnType(role) && !_aliveBots.Contains(data.bot))
+		{
+			_aliveBots.Add(data.bot);
+		}
+	}
+
+	private void ResetDespawnTimer()
+	{
+		_despawnCooldownTime = Time.time;
 	}
 	
 	private class FurthestBotComparer : Comparer<Player>

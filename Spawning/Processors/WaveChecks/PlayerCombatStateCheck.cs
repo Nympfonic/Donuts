@@ -1,3 +1,4 @@
+using Cysharp.Text;
 using Donuts.Spawning.Models;
 using Donuts.Utils;
 using UnityEngine;
@@ -7,14 +8,12 @@ namespace Donuts.Spawning.Processors;
 
 public class PlayerCombatStateCheck : WaveSpawnProcessorBase
 {
-	public readonly struct ResetTimerEvent : IEvent;
-	
 	private float _lastTimePlayerHit;
 	
 	public PlayerCombatStateCheck()
 	{
-		var binding = new EventBinding<ResetTimerEvent>(ResetTimer);
-		EventBus<ResetTimerEvent>.Register(binding);
+		var binding = new EventBinding<PlayerEnteredCombatEvent>(ResetTimer);
+		EventBus<PlayerEnteredCombatEvent>.Register(binding);
 	}
 	
 	public override bool Process(BotWave data)

@@ -14,6 +14,7 @@ namespace Donuts.Spawning.Models;
 public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNull] BotCreationDataClass botData)
 {
 	private static readonly FieldInfo _deadBodiesControllerField = AccessTools.Field(typeof(BotSpawner), "_deadBodiesController");
+	private static readonly FieldInfo _botsField = AccessTools.Field(typeof(BotSpawner), "_bots");
 	private static readonly FieldInfo _allPlayersField = AccessTools.Field(typeof(BotSpawner), "_allPlayers");
 	private static readonly FieldInfo _freeForAllField = AccessTools.Field(typeof(BotSpawner), "_freeForAll");
 	// (BotOwner bot, BotCreationDataClass data, Action<BotOwner> callback, bool shallBeGroup, Stopwatch stopWatch)
@@ -23,8 +24,9 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 	
 	private BotsGroup _group;
 	private int _membersCount;
-	private DeadBodiesController _deadBodiesController;
-	private bool? _freeForAll;
+	private DeadBodiesController _deadBodiesController = (DeadBodiesController)_deadBodiesControllerField.GetValue(botSpawner);
+	private BotsClass _bots = (BotsClass)_botsField.GetValue(botSpawner);
+	private bool _freeForAll = (bool)_freeForAllField.GetValue(botSpawner);
 	
 	internal static ActivateBotCallbackDelegate ActivateBotDelegate { get; set; }
 	
@@ -102,16 +104,22 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 	{
 		bool isBossOrFollower = bot.Profile.Info.Settings.IsBossOrFollower();
 		EPlayerSide side = bot.Profile.Side;
+		WildSpawnType role = bot.Profile.Info.Settings.Role;
+		
+		// if (isBossOrFollower &&
+		// 	botSpawner.Groups.TryGetValue(zone, side, role, out BotsGroup bossBotsGroup, isBossOrFollower: true) &&
+		// 	(bot.SpawnProfileData?.SpawnParams.ShallBeGroup == null || (!bot.Boss.IamBoss && !bossBotsGroup.IsFull)))
+		// {
+		// 	botSpawner.method_5(bot);
+		// 	return bossBotsGroup;
+		// }
 		
 		// Get a list of this bot's enemies
-		List<BotOwner> enemies = botSpawner.method_4(bot).ToList();
+		List<BotOwner> enemies = GetEnemies(bot);
 		// Check and add bot to other groups' allies or enemies list
 		botSpawner.method_5(bot);
 		
-		_deadBodiesController ??= (DeadBodiesController)_deadBodiesControllerField.GetValue(botSpawner);
-		_freeForAll ??= (bool)_freeForAllField.GetValue(botSpawner);
 		var allPlayers = (List<Player>)_allPlayersField.GetValue(botSpawner);
-		
 		var botsGroup = new BotsGroup(zone, botSpawner.BotGame, bot, enemies, _deadBodiesController, allPlayers,
 			forBoss: isBossOrFollower);
 		
@@ -126,17 +134,50 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 		}
 		else
 		{
-			if (_freeForAll.HasValue && _freeForAll.Value)
-			{
-				botSpawner.Groups.AddNoKey(botsGroup, zone);
-			}
-			else
-			{
-				botSpawner.Groups.Add(zone, side, botsGroup, isBossOrFollower: false);
-			}
+			botSpawner.Groups.AddNoKey(botsGroup, zone);
+			// if (_freeForAll.HasValue && _freeForAll.Value)
+			// {
+			// 	botSpawner.Groups.AddNoKey(botsGroup, zone);
+			// }
+			// else
+			// {
+			// 	botSpawner.Groups.Add(zone, side, botsGroup, isBossOrFollower: false);
+			// }
 		}
 		
 		botsGroup.Lock();
 		return botsGroup;
+	}
+	
+	private List<BotOwner> GetEnemies(BotOwner owner)
+	{
+		if (_freeForAll)
+		{
+			return _bots.BotOwners.ToList();
+		}
+		
+		var enemies = new List<BotOwner>(20);
+		foreach (BotOwner botToCheck in _bots.BotOwners)
+		{
+			WildSpawnType role = botToCheck.Profile.Info.Settings.Role;
+			if (owner.Settings.IsEnemyByChance(botToCheck))
+			{
+				enemies.Add(botToCheck);
+				continue;
+			}
+			
+			if (owner.Settings.GetFriendlyBotTypes().Contains(role) ||
+				owner.Settings.GetWarnBotTypes().Contains(role))
+			{
+				continue;
+			}
+			
+			if (owner.Settings.GetEnemyBotTypes().Contains(role))
+			{
+				enemies.Add(botToCheck);
+			}
+		}
+		
+		return enemies;
 	}
 }

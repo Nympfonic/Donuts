@@ -75,13 +75,16 @@ public abstract class BotSpawnService : IBotSpawnService
 			PrepBotInfo botSpawnInfo = startingBotsCache.Dequeue();
 			count--;
 			
-			IncrementBotSpawnerInProcessCounter(botSpawnInfo.groupSize);
+			bool success = await TrySpawnStartingBot(botSpawnInfo, cancellationToken);
+			if (cancellationToken.IsCancellationRequested || botSpawnInfo.botCreationData.SpawnStopped)
+			{
+				return false;
+			}
 			
-			bool success = await StartingBotsSpawnPointsCheck(botSpawnInfo, cancellationToken);
 			if (!success)
 			{
 				startingBotsCache.Enqueue(botSpawnInfo);
-				IncrementBotSpawnerInProcessCounter(-botSpawnInfo.groupSize);
+				continue;
 			}
 			
 			// Delay between spawns to improve performance
@@ -242,12 +245,13 @@ public abstract class BotSpawnService : IBotSpawnService
 		var groupAction = new Func<BotOwner, BotZone, BotsGroup>(activateBotCallbackWrapper.GetGroupAndSetEnemies);
 		var callback = new Action<BotOwner>(activateBotCallbackWrapper.CreateBotCallback);
 		
+		EventBus.Raise(BotSpawnedEvent.Create());
+		
 		// shallBeGroup doesn't matter at this stage, it only matters in the callback action
 		_botCreator.ActivateBot(botData, closestBotZone, false, groupAction, callback, cancellationToken);
-		EventBus.Raise(new BotDataService.ResetReplenishTimerEvent());
 	}
 	
-	private async UniTask<bool> StartingBotsSpawnPointsCheck(
+	private async UniTask<bool> TrySpawnStartingBot(
 		[NotNull] PrepBotInfo botSpawnInfo,
 		CancellationToken cancellationToken = default)
 	{
@@ -322,14 +326,15 @@ public abstract class BotSpawnService : IBotSpawnService
 			AdjustHotspotSpawnChance(wave, randomZone);
 		}
 		
-		return await TrySpawnBotIfValidZone(randomZone, wave, zoneSpawnPoints, isHotspot);
+		return await TrySpawnBotIfValidZone(randomZone, wave, zoneSpawnPoints, isHotspot, cancellationToken);
 	}
 
 	private async UniTask<bool> TrySpawnBotIfValidZone(
 		[NotNull] string zoneName,
 		[NotNull] BotWave wave,
 		[NotNull] ZoneSpawnPoints zoneSpawnPoints,
-		bool isHotspot)
+		bool isHotspot,
+		CancellationToken cancellationToken = default)
 	{
 		if (!zoneSpawnPoints.TryGetValue(zoneName, out HashSet<Vector3> spawnPoints))
 		{
@@ -339,19 +344,26 @@ public abstract class BotSpawnService : IBotSpawnService
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		foreach (Vector3 spawnPoint in spawnPoints.ShuffleElements())
 		{
-			if (IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) &&
-				await TrySpawnBot(wave, spawnPoint, isHotspot))
+			if (cancellationToken.IsCancellationRequested)
 			{
-				if (DefaultPluginVars.debugLogging.Value)
-				{
-					sb.Clear();
-					sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1}, {2}", wave.GroupNum, zoneName,
-						spawnPoint.ToString());
-					logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
-				}
-				
-				return true;
+				return false;
 			}
+			
+			if (!IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) ||
+				!await TrySpawnBot(wave, spawnPoint, isHotspot, cancellationToken))
+			{
+				continue;
+			}
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				sb.Clear();
+				sb.AppendFormat("Spawning bot wave for GroupNum {0} at {1}, {2}", wave.GroupNum, zoneName,
+					spawnPoint.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
+			}
+			
+			return true;
 		}
 		
 		sb.Clear();
@@ -377,6 +389,11 @@ public abstract class BotSpawnService : IBotSpawnService
 		KeyValuePair<string, HashSet<Vector3>> spawnPoints = keywordZones.PickRandomElement();
 		foreach (Vector3 spawnPoint in spawnPoints!.Value.ShuffleElements())
 		{
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return false;
+			}
+			
 			if (!IsHumanPlayerWithinTriggerDistance(wave.TriggerDistance, spawnPoint) ||
 				!await TrySpawnBot(wave, spawnPoint, isHotspot, cancellationToken))
 			{
@@ -430,7 +447,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		for (int i = humanPlayerList.Count - 1; i >= 0; i--)
 		{
 			Player player = humanPlayerList[i];
-			if (player == null || player.HealthController == null || player.HealthController.IsAlive == false)
+			if (player == null || !player.IsAlive())
 			{
 				continue;
 			}
@@ -480,12 +497,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			cancellationToken: cancellationToken);
 		if (cancellationToken.IsCancellationRequested) return false;
 		
-		else
-		{
-			IncrementBotSpawnerInProcessCounter(-groupSize);
-		}
-		
-		return !cancellationToken.IsCancellationRequested;
+		wave.SpawnTriggered();
 		return success;
 	}
 	
@@ -510,6 +522,8 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		BotDifficulty difficulty = dataService.GetBotDifficulty();
 		PrepBotInfo cachedPrepBotInfo = dataService.FindCachedBotData(difficulty, groupSize);
+		var generateNewSuccess = false;
+		
 		if (generateNew && cachedPrepBotInfo?.botCreationData == null)
 		{
 			if (DefaultPluginVars.debugLogging.Value)
@@ -521,8 +535,9 @@ public abstract class BotSpawnService : IBotSpawnService
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SpawnBot));
 			}
 			
-			(bool success, cachedPrepBotInfo) =
-				await dataService.TryGenerateBotProfiles(difficulty, groupSize, cancellationToken: cancellationToken);
+			(bool success, cachedPrepBotInfo) = await dataService.TryGenerateBotProfiles(difficulty, groupSize,
+				saveToCache: false, cancellationToken: cancellationToken);
+			
 			if (cancellationToken.IsCancellationRequested || !success)
 			{
 				if (DefaultPluginVars.debugLogging.Value)
@@ -560,11 +575,10 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 		
 		ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value, cancellationToken);
-		dataService.RemoveFromBotCache(new PrepBotInfo.GroupDifficultyKey(difficulty, groupSize));
 		
-		if (DefaultPluginVars.debugLogging.Value)
+		if (!generateNewSuccess)
 		{
-			logger.LogDebugDetailed("Found grouped cached bots, spawning them.", GetType().Name, nameof(SpawnBot));
+			dataService.RemoveFromBotCache(new PrepBotInfo.Key(difficulty, groupSize));
 		}
 		
 		return true;

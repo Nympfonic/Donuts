@@ -1,4 +1,6 @@
-﻿using EFT;
+﻿using Cysharp.Text;
+using Donuts.Utils;
+using EFT;
 using JetBrains.Annotations;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -25,7 +27,7 @@ public class EntityVicinityCheck(
 		for (int i = alivePlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = alivePlayers[i];
-			if (player == null || player.HealthController == null || !player.HealthController.IsAlive)
+			if (player == null || !player.IsAlive())
 			{
 				continue;
 			}
