@@ -159,10 +159,7 @@ public abstract class BotDataService : IBotDataService, IDisposable
 			int minGroupSize = Math.Max(startingBotConfig.MinGroupSize, 1);
 			int maxGroupSize = startingBotConfig.MaxGroupSize;
 			
-			if (DefaultPluginVars.debugLogging.Value)
-			{
-				logger.LogDebugDetailed($"Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
-			}
+			logger.LogDebugDetailed($"Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
 			
 			return new GenerateBotProfilesAsyncEnumerable(this, maxBots, minGroupSize, maxGroupSize, cancellationToken);
 		}
@@ -214,9 +211,8 @@ public abstract class BotDataService : IBotDataService, IDisposable
 			WildSpawnType wildSpawnType = GetWildSpawnType();
 			EPlayerSide side = GetPlayerSide(wildSpawnType);
 			
-			if (DefaultPluginVars.debugLogging.Value)
+			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 				sb.AppendFormat("Generating bot profiles: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
 					wildSpawnType.ToString(), difficulty.ToString(), side.ToString(), groupSize.ToString());
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
@@ -257,9 +253,8 @@ public abstract class BotDataService : IBotDataService, IDisposable
 				_botCache.Enqueue(prepBotInfo.groupDifficultyKey, prepBotInfo);
 			}
 			
-			if (DefaultPluginVars.debugLogging.Value)
+			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 				sb.AppendFormat("Bot profiles generated and assigned successfully; {0} profiles loaded. IDs: {1}",
 					botCreationData.Profiles.Count.ToString(),
 					string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
@@ -374,12 +369,7 @@ public abstract class BotDataService : IBotDataService, IDisposable
 			return;
 		}
 		
-		if (DefaultPluginVars.debugLogging.Value)
-		{
-			logger.LogDebugDetailed(
-				"Failure trying to dequeue PrepBotInfo from bot cache.",
-				GetType().Name, nameof(RemoveFromBotCache));
-		}
+		logger.LogDebugDetailed("Failure trying to dequeue PrepBotInfo from bot cache.", GetType().Name, nameof(RemoveFromBotCache));
 	}
 	
 	/// <summary>
@@ -393,7 +383,7 @@ public abstract class BotDataService : IBotDataService, IDisposable
 		}
 		
 		_botWaveSpawnBuffer.Clear();
-
+		
 		for (int i = botWaves.Length - 1; i >= 0; i--)
 		{
 			BotWave wave = botWaves[i];
@@ -402,8 +392,17 @@ public abstract class BotDataService : IBotDataService, IDisposable
 				_botWaveSpawnBuffer.Add(wave);
 			}
 		}
-
-		return _botWaveSpawnBuffer.PickRandomElement();
+		
+		BotWave chosenWave = _botWaveSpawnBuffer.PickRandomElement();
+		if (chosenWave != null && DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Selected wave GroupNum={0}, TriggerTime={1} to attempt spawning",
+				chosenWave.GroupNum.ToString(), chosenWave.TriggerTimer.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(GetBotWaveToSpawn));
+		}
+		
+		return chosenWave;
 	}
 	
 	/// <summary>

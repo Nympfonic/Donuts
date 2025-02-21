@@ -115,9 +115,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		dataService.ResetGroupTimers(waveGroupNum);
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			logger.LogDebugDetailed(
-				$"Resetting timer for GroupNum {waveGroupNum.ToString()}, reason: Bot wave spawn triggered",
-				GetType().Name, nameof(TrySpawnBotWave));
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: Bot wave spawn triggered", waveGroupNum.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotWave));
 		}
 		
 		return anySpawned;
@@ -167,24 +167,48 @@ public abstract class BotSpawnService : IBotSpawnService
 	/// Increment BotSpawner's _inSpawnProcess int field so the bot count is correct.
 	/// </summary>
 	/// <remarks>
-	/// Normally <c>BotSpawner::method_7()</c> handles this but we skip it to directly call <c>GClass888::ActivateBot()</c>.
+	/// <para>
+	/// Note 1: Normally <c>BotSpawner::method_7()</c> handles this but we skip it to directly call <c>GClass888::ActivateBot()</c>.
+	/// </para>
+	/// <para>
+	/// Note 2: For whatever reason, BSG increments by the number of spawn points (basically group member count)
+	/// before beginning the bot spawn logic, but only decrements by 1 if it fails.
+	/// The callback however correctly only decrements by 1 for each bot in the group.
+	/// </para>
 	/// </remarks>
-	private void IncrementBotSpawnerInProcessCounter(int value)
+	private void IncrementInProcessCounter(int value)
 	{
+		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+		
 		var currentInSpawnProcess = (int)ReflectionHelper.BotSpawner_inSpawnProcess_Field.GetValue(_eftBotSpawner);
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			logger.LogDebugDetailed($"BotSpawner._inSpawnProcess current value is {currentInSpawnProcess.ToString()}",
-				GetType().Name, nameof(IncrementBotSpawnerInProcessCounter));
+			sb.Clear();
+			sb.AppendFormat("BotSpawner._inSpawnProcess current value is {0}", currentInSpawnProcess.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(IncrementInProcessCounter));
 		}
 		
 		int newInSpawnProcess = currentInSpawnProcess + value;
+		if (newInSpawnProcess < 0)
+		{
+			newInSpawnProcess = 0;
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				sb.Clear();
+				sb.AppendFormat("Warning! BotSpawner._inSpawnProcess new value is below zero: {0}, clamping to zero!",
+					newInSpawnProcess.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(IncrementInProcessCounter));
+			}
+		}
+		
 		ReflectionHelper.BotSpawner_inSpawnProcess_Field.SetValue(_eftBotSpawner, newInSpawnProcess);
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			logger.LogDebugDetailed($"BotSpawner._inSpawnProcess new value is {newInSpawnProcess.ToString()}",
-				GetType().Name, nameof(IncrementBotSpawnerInProcessCounter));
+			sb.Clear();
+			sb.AppendFormat("BotSpawner._inSpawnProcess new value is {0}", newInSpawnProcess.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(IncrementInProcessCounter));
 		}
 	}
 	
@@ -230,19 +254,12 @@ public abstract class BotSpawnService : IBotSpawnService
 		// Iterate through unused zone spawn points
 		var failsafeCounter = 0;
 		const int maxFailsafeAttempts = 3;
-		while (failsafeCounter < maxFailsafeAttempts)
+		while (failsafeCounter < maxFailsafeAttempts && !cancellationToken.IsCancellationRequested)
 		{
-			if (cancellationToken.IsCancellationRequested) return false;
-			
 			Vector3? simulatedSpawnPoint = dataService.GetUnusedSpawnPoint(SpawnPointType.Starting);
 			if (!simulatedSpawnPoint.HasValue)
 			{
-				if (DefaultPluginVars.debugLogging.Value)
-				{
-					logger.LogDebugDetailed("No zone spawn points found, cancelling!", GetType().Name,
-						nameof(StartingBotsSpawnPointsCheck));
-				}
-				
+				logger.LogDebugDetailed("No zone spawn points found, cancelling!", GetType().Name, nameof(TrySpawnStartingBot));
 				break;
 			}
 			
@@ -256,13 +273,15 @@ public abstract class BotSpawnService : IBotSpawnService
 				continue;
 			}
 			
+			await UniTask.Yield(cancellationToken);
+			if (cancellationToken.IsCancellationRequested) return false;
 			ActivateBotAtPosition(botSpawnInfo.botCreationData, positionOnNavMesh.Value, cancellationToken);
 			return true;
 		}
 		
-		if (DefaultPluginVars.debugLogging.Value)
+		if (!cancellationToken.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
 		{
-			logger.LogDebugDetailed("Failed to spawn some starting bots!", GetType().Name, nameof(StartingBotsSpawnPointsCheck));
+			logger.LogDebugDetailed("Failed to spawn some starting bots!", GetType().Name, nameof(TrySpawnStartingBot));
 		}
 		
 		return false;
@@ -335,6 +354,9 @@ public abstract class BotSpawnService : IBotSpawnService
 			}
 		}
 		
+		sb.Clear();
+		sb.AppendFormat("Failed to find a valid spawn point for bot wave GroupNum {0}", wave.GroupNum);
+		logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
 		return false;
 	}
 	
@@ -368,10 +390,13 @@ public abstract class BotSpawnService : IBotSpawnService
 					spawnPoints.Key, keyword.ToString(), spawnPoint.ToString());
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
 			}
-				
+			
 			return true;
 		}
 		
+		sb.Clear();
+		sb.AppendFormat("Failed to find a valid spawn point for bot wave GroupNum {0}", wave.GroupNum);
+		logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TrySpawnBotIfValidZone));
 		return false;
 	}
 	
@@ -389,8 +414,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			logger.LogDebugDetailed($"{zoneName} is a hotspot; hotspot boost is enabled, setting spawn chance to 100",
-				GetType().Name, nameof(AdjustHotspotSpawnChance));
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("{0} is a hotspot; hotspot boost is enabled, setting spawn chance to 100", zoneName);
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustHotspotSpawnChance));
 		}
 		
 		wave.SetSpawnChance(100);
@@ -415,6 +441,7 @@ public abstract class BotSpawnService : IBotSpawnService
 				return true;
 			}
 		}
+		
 		return false;
 	}
 	
@@ -429,31 +456,37 @@ public abstract class BotSpawnService : IBotSpawnService
 		bool isHotspot,
 		CancellationToken cancellationToken = default)
 	{
-		if ((DefaultPluginVars.HardCapEnabled.Value && HasReachedHardCap(isHotspot)) || HasReachedHardStopTime())
+		if (DefaultPluginVars.HardCapEnabled.Value && HasReachedHardCap(isHotspot))
 		{
+			logger.LogDebugDetailed("Hard cap reached, aborting bot wave spawn!", GetType().Name, nameof(TrySpawnBot));
+			return false;
+		}
+		
+		if (HasReachedHardStopTime())
+		{
+			logger.LogDebugDetailed("Hard stop time reached, aborting bot wave spawn!", GetType().Name, nameof(TrySpawnBot));
 			return false;
 		}
 		
 		int groupSize = DetermineBotGroupSize(wave.MinGroupSize, wave.MaxGroupSize);
 		if (groupSize < 1)
 		{
+			logger.LogDebugDetailed("Bot group size is invalid (less than 1), aborting bot wave spawn!", GetType().Name,
+				nameof(TrySpawnBot));
 			return false;
 		}
 		
-		IncrementBotSpawnerInProcessCounter(groupSize);
 		bool success = await SpawnBot(groupSize, spawnPoint, spawnChecker: spawnCheckProcessor,
 			cancellationToken: cancellationToken);
+		if (cancellationToken.IsCancellationRequested) return false;
 		
-		if (success)
-		{
-			wave.SpawnTriggered();
-		}
 		else
 		{
 			IncrementBotSpawnerInProcessCounter(-groupSize);
 		}
 		
 		return !cancellationToken.IsCancellationRequested;
+		return success;
 	}
 	
 	private async UniTask<bool> SpawnBot(
@@ -481,22 +514,49 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				logger.LogDebugDetailed(
-					$"No cached bots found for this spawn, generating on the fly for {groupSize.ToString()} bots - this may take some time.",
-					GetType().Name, nameof(SpawnBot));
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat(
+					"No cached bots found for this spawn, generating new profiles for {0} bots - this may take some time...",
+					groupSize.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SpawnBot));
 			}
 			
 			(bool success, cachedPrepBotInfo) =
 				await dataService.TryGenerateBotProfiles(difficulty, groupSize, cancellationToken: cancellationToken);
 			if (cancellationToken.IsCancellationRequested || !success)
 			{
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					logger.LogDebugDetailed("Failed to generate new bot profiles! Aborting spawning for this wave!",
+						GetType().Name, nameof(SpawnBot));
+				}
+				
 				return false;
 			}
+			
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Successfully generated {0} new bot profiles", groupSize);
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(SpawnBot));
+			}
+			
+			generateNewSuccess = true;
 		}
 		
 		if (cachedPrepBotInfo?.botCreationData == null)
 		{
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				logger.LogDebugDetailed("Failed to find a cached bot to spawn! Aborting spawning for this wave!",
+					GetType().Name, nameof(SpawnBot));
+			}
 			return false;
+		}
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			logger.LogDebugDetailed("Found a cached bot to spawn! Preparing to spawn...", GetType().Name, nameof(SpawnBot));
 		}
 		
 		ActivateBotAtPosition(cachedPrepBotInfo.botCreationData, spawnPosition.Value, cancellationToken);
@@ -534,8 +594,9 @@ public abstract class BotSpawnService : IBotSpawnService
 			
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				logger.LogDebugDetailed($"Found spawn position at: {spawnPosition.ToString()}", GetType().Name,
-					nameof(GetValidSpawnPosition));
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Found spawn position at: {0}", spawnPosition.ToString());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(GetValidSpawnPosition));
 			}
 			
 			return spawnPosition;
@@ -608,8 +669,9 @@ public abstract class BotSpawnService : IBotSpawnService
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				logger.LogDebugDetailed($"Max {SpawnType.Localized()} respawns reached, skipping this spawn",
-					GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Max {0} respawns reached, skipping this spawn", SpawnType.Localized());
+				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(AdjustMaxCountForRespawnLimits));
 			}
 			
 			return -1;

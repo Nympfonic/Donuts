@@ -91,12 +91,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	{
 		if (!IsBotSpawningEnabled)
 		{
-			if (DefaultPluginVars.debugLogging.Value)
-			{
-				Logger.LogDebugDetailed("Bot spawning disabled, skipping DonutsRaidManager::Awake()",
-					nameof(DonutsRaidManager), nameof(Awake));
-			}
-			
+			Logger.LogDebugDetailed("Bot spawning disabled, skipping DonutsRaidManager::Awake()",
+				nameof(DonutsRaidManager), nameof(Awake));
             Destroy(this);
 		}
 		
@@ -195,10 +191,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		base.OnDestroy();
 		
-		if (DefaultPluginVars.debugLogging.Value)
-		{
-			Logger.LogDebugDetailed("Raid manager cleaned up and disabled.", nameof(DonutsRaidManager), nameof(OnDestroy));
-		}
+		Logger.LogDebugDetailed("Raid manager cleaned up and disabled.", nameof(DonutsRaidManager), nameof(OnDestroy));
 	}
 	
 	public static void Enable()
@@ -214,18 +207,12 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			new GameObject(nameof(DonutsRaidManager)).AddComponent<DonutsRaidManager>();
 		}
 		
-		if (DefaultPluginVars.debugLogging.Value)
-		{
-			Logger.LogDebugDetailed("Raid manager enabled", nameof(DonutsRaidManager), nameof(Enable));
-		}
+		Logger.LogDebugDetailed("Raid manager enabled", nameof(DonutsRaidManager), nameof(Enable));
 	}
 	
 	private async UniTask Initialize()
 	{
-		if (DefaultPluginVars.debugLogging.Value)
-		{
-			Logger.LogDebugDetailed("Started initializing raid manager", nameof(DonutsRaidManager), nameof(Initialize));
-		}
+		Logger.LogDebugDetailed("Started initializing raid manager", nameof(DonutsRaidManager), nameof(Initialize));
 		
 		if (!await TryCreateDataServices())
 		{
@@ -484,6 +471,13 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	
 	private static void DisposePlayerSubscriptions(Player player)
 	{
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Unsubscribed human player-related event handlers from player {0} ({1})'s events",
+				player.Profile.Nickname, player.ProfileId);
+			Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsRaidManager), nameof(DisposePlayerSubscriptions));
+		}
 		player.BeingHitAction -= TakingDamageCombatCooldown;
 		player.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
 	}
@@ -491,10 +485,14 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private static void EftBotSpawner_OnBotCreated(BotOwner bot)
 	{
 		bot.Memory.OnGoalEnemyChanged += Memory_OnGoalEnemyChanged;
-		// Remove these subscriptions since now it's confirmed this player is a bot and not a human player
-		Player botPlayer = bot.GetPlayer;
-		botPlayer.BeingHitAction -= TakingDamageCombatCooldown;
-		botPlayer.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Player {0} ({1}) now determined as bot, unsubscribing human player-related event handlers...",
+				bot.Profile.Nickname, bot.ProfileId);
+			Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsRaidManager), nameof(EftBotSpawner_OnBotCreated));
+		}
+		DisposePlayerSubscriptions(bot.GetPlayer);
 	}
 	
 	private static void EftBotSpawner_OnBotRemoved(BotOwner bot)

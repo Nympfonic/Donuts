@@ -42,6 +42,14 @@ public class EntityVicinityCheck(
 				
 				if (checkBotVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudeBot))
 				{
+					if (DefaultPluginVars.debugLogging.Value)
+					{
+						using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+						sb.AppendFormat("Bot \"{0}\" ({1}) is too close to the spawn point, aborting this wave spawn!",
+							player.Profile.Nickname, player.ProfileId);
+						DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(EntityVicinityCheck), nameof(Process));
+					}
+					
 					return false;
 				}
 				
@@ -49,8 +57,20 @@ public class EntityVicinityCheck(
 			}
 			
 			// If it's a player
-			if ((checkPlayerVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudePlayer)) ||
-				IsInPlayerLineOfSight(player, spawnPoint))
+			if (checkPlayerVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudePlayer))
+			{
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+					sb.AppendFormat("Human player \"{0}\" ({1}) is too close to the spawn point, aborting this wave spawn!",
+						player.Profile.Nickname, player.ProfileId);
+					DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(EntityVicinityCheck), nameof(Process));
+				}
+				
+				return false;
+			}
+			
+			if (IsInPlayerLineOfSight(player, spawnPoint))
 			{
 				return false;
 			}
@@ -69,9 +89,19 @@ public class EntityVicinityCheck(
 		EnemyPart playerHead = player.MainParts[BodyPartType.head];
 		Vector3 playerHeadDirection = playerHead.Position - spawnPosition;
 		
-		return Physics.Raycast(spawnPosition, playerHeadDirection, out RaycastHit hitInfo,
+		bool isInLineOfSight = Physics.Raycast(spawnPosition, playerHeadDirection, out RaycastHit hitInfo,
 				playerHeadDirection.magnitude, LayerMaskClass.HighPolyWithTerrainMask) &&
 			hitInfo.collider == playerHead.Collider.Collider;
+		
+		if (DefaultPluginVars.debugLogging.Value && isInLineOfSight)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Human player \"{0}\" ({1}) has line of sight to the spawn point, aborting this wave spawn!",
+				player.Profile.Nickname, player.ProfileId);
+			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(EntityVicinityCheck), nameof(Process));
+		}
+		
+		return isInLineOfSight;
 	}
 	
 	private static float GetMinDistanceFromPlayer(string mapLocation) =>

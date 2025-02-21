@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Donuts.Utils;
+using UnityEngine;
 
 namespace Donuts.Spawning.Processors;
 
@@ -23,6 +24,12 @@ public class WallCollisionCheck : SpawnCheckProcessorBase
 			Transform currentTransform = _spawnCheckColliderBuffer[i].transform;
 			if (RecursiveFindWallsGameObject(currentTransform))
 			{
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					DonutsRaidManager.Logger.LogDebugDetailed("Spawn point is too close to a wall, aborting wave spawn",
+						nameof(WallCollisionCheck), nameof(Process));
+				}
+				
 				return false;
 			}
 		}

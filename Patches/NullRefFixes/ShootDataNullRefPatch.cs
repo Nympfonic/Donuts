@@ -1,4 +1,6 @@
-﻿using EFT;
+﻿using Cysharp.Text;
+using Donuts.Utils;
+using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SPT.Reflection.Patching;
@@ -22,8 +24,9 @@ internal class ShootDataNullRefPatch : ModulePatch
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				DonutsPlugin.Logger.LogError(string.Format("BotOwner ID {0} -> ShootData.method_0(): _owner is null.",
-					____owner.Id.ToString()));
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("BotOwner ID {0} -> ShootData.method_0(): _owner is null.", ____owner.Id.ToString());
+				DonutsPlugin.Logger.LogErrorDetailed(sb.ToString(), nameof(ShootDataNullRefPatch), nameof(PatchPrefix));
 			}
 			
 			return false;
@@ -33,8 +36,9 @@ internal class ShootDataNullRefPatch : ModulePatch
 		{
 			if (DefaultPluginVars.debugLogging.Value)
 			{
-				DonutsPlugin.Logger.LogError(string.Format(
-					"BotOwner ID {0} -> ShootData.method_0(): _owner.WeaponRoot is null.", ____owner.Id.ToString()));
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("BotOwner ID {0} -> ShootData.method_0(): _owner.WeaponRoot is null.", ____owner.Id.ToString());
+				DonutsPlugin.Logger.LogErrorDetailed(sb.ToString(), nameof(ShootDataNullRefPatch), nameof(PatchPrefix));
 			}
 			
 			return false;

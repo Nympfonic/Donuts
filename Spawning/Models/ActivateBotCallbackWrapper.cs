@@ -48,6 +48,13 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 		// BSG wants a stopwatch, we'll give em a stopwatch
 		// TODO: transpile patch out the stopwatch
 		ActivateBotDelegate(bot, botData, null, shallBeGroup, _stopwatch);
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Successfully spawned {0} \"{1}\" ({2})", bot.name, bot.Profile.Nickname, bot.ProfileId);
+			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(ActivateBotCallbackWrapper), nameof(CreateBotCallback));
+		}
 	}
 	
 	/// <summary>

@@ -1,4 +1,5 @@
-﻿using Donuts.Models;
+﻿using Cysharp.Text;
+using Donuts.Models;
 using Donuts.Utils;
 using HarmonyLib;
 using Newtonsoft.Json;
@@ -87,10 +88,10 @@ internal static class DonutsConfiguration
 			if (field.Name == nameof(DefaultPluginVars.pmcScenarioSelection))
 			{
 				DefaultPluginVars.PmcScenarioSelectionValue = value.ToString();
-				if (DefaultPluginVars.debugLogging.Value)
-				{
-					DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.PmcScenarioSelectionValue)} to {value}");
-				}
+				
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Setting {0} to {1}", nameof(DefaultPluginVars.PmcScenarioSelectionValue), value);
+				DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsConfiguration), nameof(ImportConfigFromJson));
 				
 				continue;
 			}
@@ -98,10 +99,10 @@ internal static class DonutsConfiguration
 			if (field.Name == nameof(DefaultPluginVars.scavScenarioSelection))
 			{
 				DefaultPluginVars.ScavScenarioSelectionValue = value.ToString();
-				if (DefaultPluginVars.debugLogging.Value)
-				{
-					DonutsPlugin.Logger.LogDebug($"Setting {nameof(DefaultPluginVars.ScavScenarioSelectionValue)} to {value}");
-				}
+				
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+				sb.AppendFormat("Setting {0} to {1}", nameof(DefaultPluginVars.ScavScenarioSelectionValue), value);
+				DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsConfiguration), nameof(ImportConfigFromJson));
 				
 				continue;
 			}

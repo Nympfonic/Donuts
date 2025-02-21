@@ -240,6 +240,12 @@ public class BotConfigService
 		{
 			if (player != null && !player.IsAI && !_humanPlayerList.Contains(player))
 			{
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+					sb.AppendFormat("Adding player '{0}' (Profile ID: {1}) to Donuts' human player list", player.Profile.Nickname, player.ProfileId);
+					_logger.LogDebugDetailed(sb.ToString(), nameof(BotConfigService), nameof(GetHumanPlayerList));
+				}
 				_humanPlayerList.Add(player);
 			}
 		}

@@ -26,9 +26,9 @@ public class PlayerCombatStateCheck : WaveSpawnProcessorBase
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
-			DonutsRaidManager.Logger.LogDebugDetailed(
-				$"Resetting timer for GroupNum {data.GroupNum.ToString()}, reason: A player is in combat.",
-				nameof(PlayerCombatStateCheck), nameof(Process));
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Resetting timer for GroupNum {0}, reason: A player is in combat.", data.GroupNum.ToString());
+			DonutsRaidManager.Logger.LogDebugDetailed(sb.ToString(), nameof(PlayerCombatStateCheck), nameof(Process));
 		}
 		
 		return false;

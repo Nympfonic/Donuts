@@ -1,8 +1,6 @@
-using Cysharp.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using Random = UnityEngine.Random;
 
 namespace Donuts.Utils;
 
@@ -17,7 +15,7 @@ internal static class BotHelper
 	private static readonly List<BotDifficulty> _impossibleDifficulty = [BotDifficulty.impossible];
 	
 	private static readonly string[] _groupChances = ["None", "Low", "Default", "High", "Max"];
-
+	
 	internal static ReadOnlyCollection<BotDifficulty> GetSettingDifficulties(string difficultySetting)
 	{
 		List<BotDifficulty> difficulties;
@@ -47,7 +45,7 @@ internal static class BotHelper
 		}
 		return difficulties.AsReadOnly();
 	}
-
+	
 	internal static int GetBotGroupSize(string pluginGroupChance, int minGroupSize, int maxGroupSize, int maxCap = int.MaxValue)
 	{
 		if (maxGroupSize < minGroupSize)
@@ -59,19 +57,19 @@ internal static class BotHelper
 		{
 			pluginGroupChance = _groupChances.PickRandomElement();
 		}
-
+		
 		int groupSize = pluginGroupChance switch
 		{
 			"None" => minGroupSize,
 			"Max" => maxGroupSize,
-			_ => GetGroupChance(pluginGroupChance, minGroupSize, maxGroupSize)
+			_ => GetGroupSizeByProbability(pluginGroupChance, minGroupSize, maxGroupSize)
 		};
-
+		
 		int clampedValue = Math.Min(groupSize, maxCap);
 		return clampedValue;
 	}
-
-	private static int GetGroupChance(string pmcGroupChance, int minGroupSize, int maxGroupSize)
+	
+	private static int GetGroupSizeByProbability(string pmcGroupChance, int minGroupSize, int maxGroupSize)
 	{
 		if (maxGroupSize < minGroupSize)
 		{
