@@ -119,13 +119,21 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		// TODO: In future release, make services for Bosses, special bots, and event bots. SWAG will become obsolete.
 		_dependencyContainer.AddSingleton<BotConfigService, BotConfigService>();
 		
-		_dependencyContainer.AddSingleton<IBotDataService, PmcDataService>(PMC_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotSpawnService, PmcSpawnService>(PMC_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotDespawnService, PmcDespawnService>(PMC_SERVICE_KEY);
+		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
 		
-		_dependencyContainer.AddSingleton<IBotDataService, ScavDataService>(SCAV_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotSpawnService, ScavSpawnService>(SCAV_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotDespawnService, ScavDespawnService>(SCAV_SERVICE_KEY);
+		if (forceAllBotType is "PMC" or "Disabled")
+		{
+			_dependencyContainer.AddSingleton<IBotDataService, PmcDataService>(PMC_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotSpawnService, PmcSpawnService>(PMC_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotDespawnService, PmcDespawnService>(PMC_SERVICE_KEY);
+		}
+		
+		if (forceAllBotType is "SCAV" or "Disabled")
+		{
+			_dependencyContainer.AddSingleton<IBotDataService, ScavDataService>(SCAV_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotSpawnService, ScavSpawnService>(SCAV_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotDespawnService, ScavDespawnService>(SCAV_SERVICE_KEY);
+		}
 	}
 	
 	// ReSharper disable once Unity.IncorrectMethodSignature
@@ -175,7 +183,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		
 		_onDestroyTokenSource?.Cancel();
 		_onDestroyTokenSource?.Dispose();
-		_timeoutController.Dispose();
+		_timeoutController?.Dispose();
 		
 		base.OnDestroy();
 		

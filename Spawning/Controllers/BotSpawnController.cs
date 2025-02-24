@@ -40,18 +40,53 @@ public class BotSpawnController([NotNull] DiContainer container) : IBotSpawnCont
 			return;
 		}
 		
-		var pmcService = container.Resolve<IBotSpawnService>(DonutsRaidManager.PMC_SERVICE_KEY);
-		_spawnServices.Add(pmcService);
+		try
+		{
+			ResolveServices();
+		}
+		catch (OperationCanceledException) {}
+		catch (Exception ex)
+		{
+			DonutsRaidManager.Logger.LogException(nameof(BotSpawnController), nameof(Initialize), ex);
+		}
 		
-		var scavService = container.Resolve<IBotSpawnService>(DonutsRaidManager.SCAV_SERVICE_KEY);
-		_spawnServices.Add(scavService);
+		if (_spawnServices.Count == 0)
+		{
+			return;
+		}
 		
 		_initialized = true;
 	}
 	
+	private void ResolveServices()
+	{
+		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
+		
+		if (forceAllBotType is "PMC" or "Disabled")
+		{
+			var pmcService = container.Resolve<IBotSpawnService>(DonutsRaidManager.PMC_SERVICE_KEY);
+			if (!_spawnServices.Contains(pmcService))
+			{
+				_spawnServices.Add(pmcService);
+			}
+		}
+		
+		if (forceAllBotType is "SCAV" or "Disabled")
+		{
+			var scavService = container.Resolve<IBotSpawnService>(DonutsRaidManager.SCAV_SERVICE_KEY);
+			if (!_spawnServices.Contains(scavService))
+			{
+				_spawnServices.Add(scavService);
+			}
+		}
+	}
+	
 	public async UniTask SpawnStartingBots(CancellationToken cancellationToken)
 	{
-		if (_hasSpawnedStartingBots || _startingSpawnOngoing || Time.time < _startingSpawnPrevTime + SPAWN_INTERVAL_SECONDS)
+		if (!_initialized ||
+			_hasSpawnedStartingBots ||
+			_startingSpawnOngoing ||
+			Time.time < _startingSpawnPrevTime + SPAWN_INTERVAL_SECONDS)
 		{
 			return;
 		}
@@ -85,7 +120,9 @@ public class BotSpawnController([NotNull] DiContainer container) : IBotSpawnCont
 	
 	public async UniTask SpawnBotWaves(CancellationToken cancellationToken)
 	{
-		if (_waveSpawnOngoing || Time.time < _waveSpawnPrevTime + SPAWN_INTERVAL_SECONDS)
+		if (!_initialized ||
+			_waveSpawnOngoing ||
+			Time.time < _waveSpawnPrevTime + SPAWN_INTERVAL_SECONDS)
 		{
 			return;
 		}

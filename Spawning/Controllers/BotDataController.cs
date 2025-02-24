@@ -43,20 +43,14 @@ public class BotDataController(DiContainer container, TimeoutController timeoutC
 			return true;
 		}
 		
-		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
-		
-		if (forceAllBotType is "PMC" or "Disabled")
+		try
 		{
-			var pmcService = container.Resolve<IBotDataService>(DonutsRaidManager.PMC_SERVICE_KEY);
-			await SetupDataService(pmcService, cancellationToken);
-			if (cancellationToken.IsCancellationRequested) return false;
+			await ResolveServices(cancellationToken);
 		}
-		
-		if (forceAllBotType is "SCAV" or "Disabled")
+		catch (OperationCanceledException) {}
+		catch (Exception ex)
 		{
-			var scavService = container.Resolve<IBotDataService>(DonutsRaidManager.SCAV_SERVICE_KEY);
-			await SetupDataService(scavService, cancellationToken);
-			if (cancellationToken.IsCancellationRequested) return false;
+			DonutsRaidManager.Logger.LogException(nameof(BotDataController), nameof(Initialize), ex);
 		}
 		
 		if (_dataServices.Count == 0)
@@ -68,8 +62,32 @@ public class BotDataController(DiContainer container, TimeoutController timeoutC
 		return true;
 	}
 	
+	private async UniTask ResolveServices(CancellationToken cancellationToken)
+	{
+		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
+		
+		if (forceAllBotType is "PMC" or "Disabled")
+		{
+			var pmcService = container.Resolve<IBotDataService>(DonutsRaidManager.PMC_SERVICE_KEY);
+			await SetupDataService(pmcService, cancellationToken);
+			if (cancellationToken.IsCancellationRequested) return;
+		}
+		
+		if (forceAllBotType is "SCAV" or "Disabled")
+		{
+			var scavService = container.Resolve<IBotDataService>(DonutsRaidManager.SCAV_SERVICE_KEY);
+			await SetupDataService(scavService, cancellationToken);
+			if (cancellationToken.IsCancellationRequested) return;
+		}
+	}
+	
 	private async UniTask SetupDataService(IBotDataService dataService, CancellationToken cancellationToken)
 	{
+		if (_dataServices.Contains(dataService))
+		{
+			return;
+		}
+		
 		_dataServices.Add(dataService);
 		
 		string spawnTypeString = dataService.SpawnType.LocalizedPlural();
@@ -136,7 +154,7 @@ public class BotDataController(DiContainer container, TimeoutController timeoutC
 	
 	public async UniTask ReplenishBotCache(CancellationToken cancellationToken)
 	{
-		if (_replenishBotCacheOngoing)
+		if (!_initialized || _replenishBotCacheOngoing)
 		{
 			return;
 		}
