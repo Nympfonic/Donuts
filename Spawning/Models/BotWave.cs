@@ -12,15 +12,22 @@ public class BotWave
 	private int _timesSpawned;
 	
 	[JsonProperty("GroupNum")]
+	[JsonRequired]
 	public int GroupNum { get; private set; }
 	
 	[JsonProperty("TriggerTimer")]
+	[JsonRequired]
 	public int TriggerTimer { get; private set; }
 	
 	[JsonProperty("TriggerDistance")]
+	[JsonRequired]
 	public int TriggerDistance { get; private set; }
 	
+	[JsonProperty("OneTimeTrigger")]
+	public bool OneTimeTrigger { get; private set; }
+	
 	[JsonProperty("SpawnChance")]
+	[JsonRequired]
 	public int SpawnChance { get; private set; }
 	
 	[JsonProperty("MaxTriggersBeforeCooldown")]
@@ -30,12 +37,15 @@ public class BotWave
 	public bool IgnoreTimerFirstSpawn { get; private set; }
 	
 	[JsonProperty("MinGroupSize")]
+	[JsonRequired]
 	public int MinGroupSize { get; private set; }
 	
 	[JsonProperty("MaxGroupSize")]
+	[JsonRequired]
 	public int MaxGroupSize { get; private set; }
 	
 	[JsonProperty("Zones")]
+	[JsonRequired]
 	public string[] Zones { get; private set; }
 	
 	public void UpdateTimer(float deltaTime, float coolDownDuration)
@@ -55,7 +65,7 @@ public class BotWave
 	
 	public bool ShouldSpawn()
 	{
-		if (_onCooldown)
+		if (OneTimeTrigger && _timesSpawned >= 1 || _onCooldown)
 		{
 			return false;
 		}
@@ -72,7 +82,7 @@ public class BotWave
 	public void SpawnTriggered()
 	{
 		_timesSpawned++;
-		if (_timesSpawned >= MaxTriggersBeforeCooldown)
+		if (!OneTimeTrigger && _timesSpawned >= MaxTriggersBeforeCooldown)
 		{
 			TriggerCooldown();
 		}
