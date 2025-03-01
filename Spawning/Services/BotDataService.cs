@@ -187,6 +187,11 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	
 	protected static (int min, int max) GetWaveMinMaxGroupSize(IReadOnlyList<BotWave> waves)
 	{
+		if (waves.Count == 0)
+		{
+			return (min: 0, max: 0);
+		}
+		
 		var minGroupSize = 1;
 		var maxGroupSize = int.MaxValue;
 		
@@ -201,6 +206,11 @@ public abstract class BotDataService : IBotDataService, GInterface22
 			{
 				maxGroupSize = wave.MaxGroupSize;
 			}
+		}
+		
+		if (maxGroupSize < minGroupSize)
+		{
+			maxGroupSize = minGroupSize;
 		}
 		
 		return (minGroupSize, maxGroupSize);
