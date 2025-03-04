@@ -7,36 +7,76 @@ using EFT.InputSystem;
 using EFT.UI;
 using HarmonyLib;
 using JetBrains.Annotations;
+using SPT.Reflection.Patching;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using UnityEngine;
 
 namespace Donuts.Tools;
 
-[BepInPlugin("com.dvize.DonutsDependencyChecker", "Donuts Dependency Checker", "1.0.0")]
+[BepInPlugin("com.dvize.DonutsDependencyChecker", "Donuts Dependency Checker", "1.1.0")]
+[BepInDependency("com.SPT.core", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency("xyz.drakia.waypoints", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency("com.Arys.UnityToolkit", BepInDependency.DependencyFlags.SoftDependency)]
-public class DependencyCheckerPlugin : BaseUnityPlugin
+public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 {
 	private const float ERROR_WAITING_TIME = 60f;
-	
-	private readonly DependencyInfo[] _hardDependencies =
+	private readonly Version _targetSptVersion = new("3.10.0");
+	private DependencyInfo[] _hardDependencies =
 	[
 		new("xyz.drakia.waypoints", "Drakia's Waypoints", new Version("0.0.0")),
 		new("com.Arys.UnityToolkit", "UnityToolkit", new Version("1.2.0")),
 	];
 	
+	private static bool _canShowErrorDialog;
+	
+	internal static bool ValidationSuccess { get; private set; }
+	
 	private void Awake()
 	{
+		var menuPatch = new WaitUntilMenuReadyPatch();
+		menuPatch.Enable();
+		
+		if (!ValidateSptVersion(out string invalidSptError))
+		{
+			StartCoroutine(ShowErrorDialog(invalidSptError!));
+			throw new Exception("Donuts is not compatible with this version of SPT");
+		}
+		
 		if (!ValidateDependencies(Logger, _hardDependencies, Config, out List<string> missingDependencies))
 		{
-			StartCoroutine(ShowDependencyErrors(missingDependencies));
+			StartCoroutine(ShowErrorDialog(missingDependencies));
 			throw new Exception("Missing Donuts Dependencies");
 		}
+		
+		ValidationSuccess = true;
+		menuPatch.Disable();
+		_canShowErrorDialog = false;
+		_hardDependencies = null;
 	}
-
+	
+	private bool ValidateSptVersion([CanBeNull] out string invalidSptError)
+	{
+		if (!Chainloader.PluginInfos.TryGetValue("com.SPT.core", out PluginInfo pluginInfo)
+			|| pluginInfo == null
+			|| pluginInfo.Instance == null)
+		{
+			invalidSptError = "SPT is somehow not detected/installed. This mod is only for SPT.";
+			return false;
+		}
+		
+		bool isValidVersion = pluginInfo.Metadata.Version.Major == _targetSptVersion.Major
+			&& pluginInfo.Metadata.Version.Minor == _targetSptVersion.Minor;
+		
+		invalidSptError = isValidVersion
+			? null
+			: $"Donuts is only compatible with SPT {_targetSptVersion.Major.ToString()}.{_targetSptVersion.Minor.ToString()}.X";
+		return isValidVersion;
+	}
+	
 	/// <summary>
 	/// Check that all the BepInDependency entries for the given pluginType are available and instantiated. This allows a
 	/// plugin to validate that its dependent plugins weren't disabled post-dependency check (Such as for the wrong EFT version)
@@ -70,12 +110,10 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 			
 			if (!Chainloader.PluginInfos.TryGetValue(dependency.guid, out PluginInfo dependencyInfo) ||
 				dependencyInfo == null ||
-				dependencyInfo.Instance == null ||
-				!dependencyInfo.Instance.enabled)
+				dependencyInfo.Instance == null)
 			{
 				var notInstalledLogMessage = $"ERROR: {dependency.name} ({dependency.guid}) is not installed!";
-				logger.LogError(notInstalledLogMessage);
-				Chainloader.DependencyErrors.Add(notInstalledLogMessage);
+				LogDependencyError(notInstalledLogMessage, logger);
 				var notInstalledMessage =
 					$"- {dependency.name} -- Required:{dependencyVersion}, Current: Not installed/Failed to load";
 				missingDependencies.Add(notInstalledMessage);
@@ -90,8 +128,7 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 			
 			var outdatedLogMessage =
 				$"ERROR: Outdated version of {dependencyInfo.Metadata.Name} Required:{dependencyVersion}, Current: v{dependencyInfo.Metadata.Version}";
-			logger.LogError(outdatedLogMessage);
-			Chainloader.DependencyErrors.Add(outdatedLogMessage);
+			LogDependencyError(outdatedLogMessage, logger);
 			var outdatedMessage =
 				$"- {dependency.name} -- Required:{dependencyVersion}, Current: v{dependencyInfo.Metadata.Version}";
 			missingDependencies.Add(outdatedMessage);
@@ -100,21 +137,32 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 		
 		if (!validationSuccess)
 		{
-			// This results in a bogus config entry in the BepInEx config file for the plugin, but it shouldn't hurt anything
-			// We leave the "section" parameter empty so there's no section header drawn
-			config?.Bind("", "MissingDeps", "", new ConfigDescription(
-				"", null, new ConfigurationManagerAttributes
-				{
-					CustomDrawer = ErrorLabelDrawer,
-					ReadOnly = true,
-					HideDefaultButton = true,
-					HideSettingName = true,
-					Category = null
-				}
-			));
+			CreateEmptyConfig(config);
 		}
 		
 		return validationSuccess;
+	}
+	
+	private static void LogDependencyError([NotNull] string message, [NotNull] ManualLogSource logger)
+	{
+		logger.LogError(message);
+		Chainloader.DependencyErrors.Add(message);
+	}
+	
+	private static void CreateEmptyConfig([CanBeNull] ConfigFile config)
+	{
+		// This results in a bogus config entry in the BepInEx config file for the plugin, but it shouldn't hurt anything
+		// We leave the "section" parameter empty so there's no section header drawn
+		config?.Bind("", "MissingDeps", "", new ConfigDescription(
+			"", null, new ConfigurationManagerAttributes
+			{
+				CustomDrawer = ErrorLabelDrawer,
+				ReadOnly = true,
+				HideDefaultButton = true,
+				HideSettingName = true,
+				Category = null
+			}
+		));
 	}
 	
 	private static void ErrorLabelDrawer(ConfigEntryBase entry)
@@ -145,11 +193,11 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 		GUILayout.EndVertical();
 	}
 	
-	private static IEnumerator ShowDependencyErrors([NotNull] IReadOnlyList<string> missingDependencies)
+	private static IEnumerator ShowErrorDialog([NotNull] object data)
 	{
-		var waitUntilPreloaderUIReady = new WaitUntil(() =>
-			Singleton<PreloaderUI>.Instantiated && Singleton<PreloaderUI>.Instance.CanShowErrorScreen);
-		yield return waitUntilPreloaderUIReady;
+		var waitUntilMenuReady = new WaitUntil(() =>
+			Singleton<PreloaderUI>.Instantiated && Singleton<PreloaderUI>.Instance.CanShowErrorScreen && _canShowErrorDialog);
+		yield return waitUntilMenuReady;
 		
 		const string title = "Donuts";
 		Singleton<PreloaderUI>.Instance.ShowCriticalErrorScreen(
@@ -164,14 +212,8 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 			.Field("_children")
 			.GetValue<List<InputNode>>();
 		
-		var sb = new StringBuilder(100);
-		sb.AppendLine("Donuts is missing the following dependencies:\n");
+		string errorMessage = GenerateErrorMessage(data);
 		
-		foreach (string dependency in missingDependencies)
-		{
-			sb.AppendLine(dependency);
-		}
-
 		ErrorScreen errorScreenObj = null;
 		foreach (InputNode inputNode in errorScreenList)
 		{
@@ -186,7 +228,7 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 				
 				Traverse.Create(errorScreen)
 					.Field("string_1")
-					.SetValue(sb.ToString());
+					.SetValue(errorMessage);
 				break;
 			}
 		}
@@ -205,6 +247,40 @@ public class DependencyCheckerPlugin : BaseUnityPlugin
 			{
 				errorScreenObj.transform.SetAsLastSibling();
 			}
+		}
+	}
+	
+	[CanBeNull]
+	private static string GenerateErrorMessage([NotNull] object data)
+	{
+		switch (data)
+		{
+			case List<string> dependencies:
+				var sb = new StringBuilder(100);
+				sb.AppendLine("Donuts is missing the following dependencies:\n");
+				foreach (string dependency in dependencies)
+				{
+					sb.AppendLine(dependency);
+				}
+				return sb.ToString();
+			case string dependency:
+				return dependency;
+			default:
+				return null;
+		}
+	}
+	
+	private sealed class WaitUntilMenuReadyPatch : ModulePatch
+	{
+		protected override MethodBase GetTargetMethod()
+		{
+			return AccessTools.FirstMethod(typeof(MenuScreen), mi => mi.Name == nameof(MenuScreen.Show));
+		}
+		
+		[PatchPostfix]
+		private static void PatchPostfix()
+		{
+			_canShowErrorDialog = true;
 		}
 	}
 	

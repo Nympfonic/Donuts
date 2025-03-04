@@ -11,6 +11,7 @@ using Donuts.Utils;
 using EFT.UI;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,7 +22,6 @@ using UnityToolkit.Utils;
 namespace Donuts;
 
 [BepInPlugin("com.dvize.Donuts", "Donuts", "2.0.0")]
-[BepInDependency("com.SPT.core", "3.10.0")]
 [BepInDependency("com.dvize.DonutsDependencyChecker")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
@@ -30,6 +30,8 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	internal static PluginGUIComponent pluginGUIComponent;
 	internal static ConfigEntry<KeyboardShortcut> toggleGUIKey;
+
+	private bool _initComplete;
 	
 	private static readonly List<Folder> _emptyScenarioList = [];
 	
@@ -43,6 +45,17 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	private void Awake()
 	{
+		StartCoroutine(WaitForDependencyChecker());
+	}
+	
+	private IEnumerator WaitForDependencyChecker()
+	{
+		var waitForEndOfFrame = new WaitForEndOfFrame();
+		while (!DependencyCheckerPlugin.ValidationSuccess)
+		{
+			yield return waitForEndOfFrame;
+		}
+		
 		Logger = base.Logger;
 		CurrentAssembly = Assembly.GetExecutingAssembly();
 		string assemblyPath = CurrentAssembly.Location;
@@ -59,19 +72,18 @@ public class DonutsPlugin : BaseUnityPlugin
 		ModulePatchManager.EnableAllPatches();
 		
 		ConsoleScreen.Processor.RegisterCommandGroup<SpawnCommands>();
-	}
-	
-	// ReSharper disable once Unity.IncorrectMethodSignature
-	[UsedImplicitly]
-	private async UniTaskVoid Start()
-	{
-		await SetupScenariosUI();
+		
+		yield return SetupScenariosUI().ToCoroutine();
 		pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
 		DonutsConfiguration.ExportConfig();
+		
+		_initComplete = true;
 	}
 	
 	private void Update()
 	{
+		if (!_initComplete) return;
+		
 		// If setting a keybind, do not trigger functionality
 		if (ImGUIToolkit.IsSettingKeybind()) return;
 		
