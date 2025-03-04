@@ -31,9 +31,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	
 	private DiContainer _dependencyContainer;
 	
-	private CancellationTokenSource _onDestroyTokenSource;
 	private CancellationToken _onDestroyToken;
-	private TimeoutController _timeoutController;
 	
 	private DonutsGizmos _donutsGizmos;
 	private EventBusInitializer _eventBusInitializer;
@@ -53,6 +51,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private bool _canStartRaid;
 
 	public BotConfigService BotConfigService { get; private set; }
+	public CancellationTokenSource OnDestroyTokenSource { get; private set; }
 	
 	internal static ManualLogSource Logger { get; }
 	
@@ -93,13 +92,12 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_eftBotSpawner = _botsController.BotSpawner;
 		
-		_onDestroyTokenSource = new CancellationTokenSource();
-		_onDestroyToken = _onDestroyTokenSource.Token;
-		_timeoutController = new TimeoutController(_onDestroyTokenSource);
+		OnDestroyTokenSource = new CancellationTokenSource();
+		_onDestroyToken = OnDestroyTokenSource.Token;
 		
 		_dependencyContainer = new DiContainer();
 		RegisterServices();
-		_botDataController = new BotDataController(_dependencyContainer, _timeoutController);
+		_botDataController = new BotDataController(_dependencyContainer);
 		_botSpawnController = new BotSpawnController(_dependencyContainer);
 		_botDespawnController = new BotDespawnController(_dependencyContainer);
 		
@@ -181,9 +179,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_botDataController?.Dispose();
 		_eventBusInitializer?.ClearAllBuses();
 		
-		_onDestroyTokenSource?.Cancel();
-		_onDestroyTokenSource?.Dispose();
-		_timeoutController?.Dispose();
+		OnDestroyTokenSource?.Cancel();
+		OnDestroyTokenSource?.Dispose();
 		
 		base.OnDestroy();
 		
