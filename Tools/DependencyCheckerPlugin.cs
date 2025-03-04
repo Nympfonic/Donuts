@@ -52,6 +52,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 			throw new Exception("Missing Donuts Dependencies");
 		}
 		
+		Logger.LogInfo("Successfully validated Donuts' dependencies");
 		ValidationSuccess = true;
 		menuPatch.Disable();
 		_canShowErrorDialog = false;
