@@ -462,6 +462,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		return false;
 	}
 	
+	protected abstract bool ShouldIgnoreHardCap(bool isHotspot);
 	protected abstract bool HasReachedHardCap(bool isHotspot);
 	
 	/// <summary>
@@ -485,7 +486,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			return false;
 		}
 		
-		int groupSize = DetermineBotGroupSize(wave.MinGroupSize, wave.MaxGroupSize);
+		int groupSize = DetermineBotGroupSize(wave.MinGroupSize, wave.MaxGroupSize, isHotspot);
 		if (groupSize < 1)
 		{
 			logger.LogDebugDetailed("Bot group size is invalid (less than 1), aborting bot wave spawn!", GetType().Name,
@@ -621,7 +622,7 @@ public abstract class BotSpawnService : IBotSpawnService
 	
 	protected abstract int GetBotGroupSize(int minGroupSize, int maxGroupSize);
 	
-	private int DetermineBotGroupSize(int minGroupSize, int maxGroupSize)
+	private int DetermineBotGroupSize(int minGroupSize, int maxGroupSize, bool isHotspot)
 	{
 		int groupSize = GetBotGroupSize(minGroupSize, maxGroupSize);
 		if (groupSize < 1)
@@ -630,7 +631,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		}
 		
 		// Check if hard cap is enabled and adjust maxCount based on active bot counts and limits
-		if (DefaultPluginVars.HardCapEnabled.Value)
+		if (DefaultPluginVars.HardCapEnabled.Value && !ShouldIgnoreHardCap(isHotspot))
 		{
 			groupSize = AdjustGroupSizeForHardCap(groupSize);
 			if (groupSize < 1)

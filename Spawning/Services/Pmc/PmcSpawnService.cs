@@ -19,10 +19,15 @@ public sealed class PmcSpawnService : BotSpawnService
 			.SetNext(new GroundCheck());
 	}
 	
+	protected override bool ShouldIgnoreHardCap(bool isHotspot)
+	{
+		return isHotspot && DefaultPluginVars.hotspotIgnoreHardCapPMC.Value;
+	}
+	
 	protected override bool HasReachedHardCap(bool isHotspot)
 	{
 		int activeBots = dataService.GetAliveBotsCount();
-		if (activeBots < dataService.MaxBotLimit || (isHotspot && DefaultPluginVars.hotspotIgnoreHardCapPMC.Value))
+		if (activeBots < dataService.MaxBotLimit || ShouldIgnoreHardCap(isHotspot))
 		{
 			return false;
 		}
