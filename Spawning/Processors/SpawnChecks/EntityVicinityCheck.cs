@@ -15,11 +15,15 @@ public class EntityVicinityCheck(
 {
 	public override bool Process(Vector3 spawnPoint)
 	{
-		bool checkPlayerVicinity = DefaultPluginVars.globalMinSpawnDistanceFromPlayerBool.Value;
+		bool checkPlayerVicinityMin = DefaultPluginVars.globalMinSpawnDistanceFromPlayerBool.Value;
+		bool checkPlayerVicinityMax = DefaultPluginVars.globalMaxSpawnDistanceFromPlayerBool.Value;
 		bool checkBotVicinity = DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsBool.Value;
 		
 		float minDistancePlayer = GetMinDistanceFromPlayer(mapLocation);
 		float minSqrMagnitudePlayer = minDistancePlayer * minDistancePlayer;
+		
+		float maxDistancePlayer = GetMaxDistanceFromPlayer(mapLocation);
+		float maxSqrMagnitudePlayer = maxDistancePlayer * maxDistancePlayer;
 		
 		float minDistanceBot = GetMinDistanceFromOtherBots(mapLocation);
 		float minSqrMagnitudeBot = minDistanceBot * minDistanceBot;
@@ -59,7 +63,8 @@ public class EntityVicinityCheck(
 			}
 			
 			// If it's a player
-			if (checkPlayerVicinity && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudePlayer))
+			if (checkPlayerVicinityMin && IsEntityTooClose(actualSqrMagnitude, minSqrMagnitudePlayer) ||
+				checkPlayerVicinityMax && IsEntityTooFar(actualSqrMagnitude, maxSqrMagnitudePlayer))
 			{
 				if (DefaultPluginVars.debugLogging.Value)
 				{
@@ -84,6 +89,16 @@ public class EntityVicinityCheck(
 	private static bool IsEntityTooClose(float actualSqrMagnitude, float minSqrMagnitude)
 	{
 		return actualSqrMagnitude < minSqrMagnitude;
+	}
+	
+	private static bool IsEntityTooFar(float actualSqrMagnitude, float maxSqrMagnitude)
+	{
+		if (maxSqrMagnitude <= 0)
+		{
+			return false;
+		}
+		
+		return actualSqrMagnitude > maxSqrMagnitude;
 	}
 	
 	private static bool IsInPlayerLineOfSight(Player player, Vector3 spawnPosition)
@@ -119,7 +134,23 @@ public class EntityVicinityCheck(
 			"woods" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerWoods.Value,
 			"laboratory" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerLaboratory.Value,
 			"interchange" => DefaultPluginVars.globalMinSpawnDistanceFromPlayerInterchange.Value,
-			_ => 50f,
+			_ => 50f
+		};
+
+	private static float GetMaxDistanceFromPlayer(string mapLocation) =>
+		mapLocation switch
+		{
+			"bigmap" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerCustoms.Value,
+			"factory4_day" or "factory4_night" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerFactory.Value,
+			"tarkovstreets" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerStreets.Value,
+			"sandbox" or "sandbox_high" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerGroundZero.Value,
+			"rezervbase" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerReserve.Value,
+			"lighthouse" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerLighthouse.Value,
+			"shoreline" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerShoreline.Value,
+			"woods" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerWoods.Value,
+			"laboratory" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerLaboratory.Value,
+			"interchange" => DefaultPluginVars.globalMaxSpawnDistanceFromPlayerInterchange.Value,
+			_ => 0f
 		};
 	
 	private static float GetMinDistanceFromOtherBots(string mapLocation) =>
@@ -135,6 +166,6 @@ public class EntityVicinityCheck(
 			"woods" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsWoods.Value,
 			"laboratory" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsLaboratory.Value,
 			"interchange" => DefaultPluginVars.globalMinSpawnDistanceFromOtherBotsInterchange.Value,
-			_ => 0f,
+			_ => 0f
 		};
 }
