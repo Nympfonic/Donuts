@@ -3,7 +3,6 @@ using Donuts.Utils;
 using EFT;
 using HarmonyLib;
 using JetBrains.Annotations;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -13,43 +12,31 @@ namespace Donuts.Spawning.Models;
 
 public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNull] BotCreationDataClass botData)
 {
-	private static readonly FieldInfo _deadBodiesControllerField = AccessTools.Field(typeof(BotSpawner), "_deadBodiesController");
-	private static readonly FieldInfo _botsField = AccessTools.Field(typeof(BotSpawner), "_bots");
-	private static readonly FieldInfo _allPlayersField = AccessTools.Field(typeof(BotSpawner), "_allPlayers");
-	private static readonly FieldInfo _freeForAllField = AccessTools.Field(typeof(BotSpawner), "_freeForAll");
+	private static readonly FieldInfo s_deadBodiesControllerField = AccessTools.Field(typeof(BotSpawner), "_deadBodiesController");
+	private static readonly FieldInfo s_botsField = AccessTools.Field(typeof(BotSpawner), "_bots");
+	private static readonly FieldInfo s_allPlayersField = AccessTools.Field(typeof(BotSpawner), "_allPlayers");
+	private static readonly FieldInfo s_freeForAllField = AccessTools.Field(typeof(BotSpawner), "_freeForAll");
 	// (BotOwner bot, BotCreationDataClass data, Action<BotOwner> callback, bool shallBeGroup, Stopwatch stopWatch)
-	private static readonly MethodInfo _spawnBotMethod = AccessTools.Method(typeof(BotSpawner), "method_11");
 	
-	private static readonly Stopwatch _stopwatch = new();
+	private static readonly Stopwatch s_stopwatch = new();
 	
 	private BotsGroup _group;
 	private int _membersCount;
-	private DeadBodiesController _deadBodiesController = (DeadBodiesController)_deadBodiesControllerField.GetValue(botSpawner);
-	private BotsClass _bots = (BotsClass)_botsField.GetValue(botSpawner);
-	private bool _freeForAll = (bool)_freeForAllField.GetValue(botSpawner);
-	
-	internal static ActivateBotCallbackDelegate ActivateBotDelegate { get; set; }
-	
-	internal delegate void ActivateBotCallbackDelegate([NotNull] BotOwner botOwner, [NotNull] BotCreationDataClass data,
-		[CanBeNull] Action<BotOwner> callback, bool shallBeGroup, [NotNull] Stopwatch stopwatch);
+	private readonly DeadBodiesController _deadBodiesController = (DeadBodiesController)s_deadBodiesControllerField.GetValue(botSpawner);
+	private readonly BotsClass _bots = (BotsClass)s_botsField.GetValue(botSpawner);
+	private readonly bool _freeForAll = (bool)s_freeForAllField.GetValue(botSpawner);
 	
 	/// <summary>
 	/// Invoked when the bot is created. Ensures the bot has its group set.
 	/// </summary>
 	public void CreateBotCallback([NotNull] BotOwner bot)
 	{
-		// Create method delegate and cache it
-		if (ActivateBotDelegate == null || ActivateBotDelegate.Target != botSpawner)
-		{
-			ActivateBotDelegate = AccessTools.MethodDelegate<ActivateBotCallbackDelegate>(
-				_spawnBotMethod, botSpawner, false);
-		}
-		
 		bool shallBeGroup = botData.SpawnParams?.ShallBeGroup != null;
 		
 		// BSG wants a stopwatch, we'll give em a stopwatch
 		// TODO: transpile patch out the stopwatch
-		ActivateBotDelegate(bot, botData, null, shallBeGroup, _stopwatch);
+		// iirc SPT 3.11 patches out the stopwatch, needs double checking
+		botSpawner.method_11(bot, botData, null, shallBeGroup, s_stopwatch);
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -104,7 +91,7 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 	{
 		bool isBossOrFollower = bot.Profile.Info.Settings.IsBossOrFollower();
 		EPlayerSide side = bot.Profile.Side;
-		WildSpawnType role = bot.Profile.Info.Settings.Role;
+		//WildSpawnType role = bot.Profile.Info.Settings.Role;
 		
 		// if (isBossOrFollower &&
 		// 	botSpawner.Groups.TryGetValue(zone, side, role, out BotsGroup bossBotsGroup, isBossOrFollower: true) &&
@@ -119,7 +106,7 @@ public class ActivateBotCallbackWrapper([NotNull] BotSpawner botSpawner, [NotNul
 		// Check and add bot to other groups' allies or enemies list
 		botSpawner.method_5(bot);
 		
-		var allPlayers = (List<Player>)_allPlayersField.GetValue(botSpawner);
+		var allPlayers = (List<Player>)s_allPlayersField.GetValue(botSpawner);
 		var botsGroup = new BotsGroup(zone, botSpawner.BotGame, bot, enemies, _deadBodiesController, allPlayers,
 			forBoss: isBossOrFollower);
 		
