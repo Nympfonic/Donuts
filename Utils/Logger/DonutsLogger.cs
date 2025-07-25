@@ -7,36 +7,30 @@ public class DonutsLogger
 {
 	[NotNull] private readonly ManualLogSource _logSource = DonutsPlugin.Logger;
 	[CanBeNull] private LoggerProcessorBase _processor;
-
-	private LogLevel _logLevel = LogLevel.Info;
 	
 	public void SetProcessor([CanBeNull] LoggerProcessorBase processor)
 	{
 		_processor = processor;
 	}
 	
-	public void SetLoggingLevel(LogLevel level)
+	public void Log(string message, LogLevel logLevel = LogLevel.Info)
 	{
-		_logLevel = level;
-	}
-	
-	public void Log(LoggerMessage data)
-	{
-		switch (_logLevel)
+		switch (logLevel)
 		{
 			case LogLevel.Info:
-				_logSource.LogInfo(data.message);
+				_logSource.LogInfo(message);
 				break;
 			case LogLevel.Debug:
-				_logSource.LogDebug(data.message);
+				_logSource.LogDebug(message);
 				break;
 			case LogLevel.Warning:
-				_logSource.LogWarning(data.message);
+				_logSource.LogWarning(message);
 				break;
 			case LogLevel.Error:
-				_logSource.LogError(data.message);
+				_logSource.LogError(message);
 				break;
 		}
-		_processor?.Process(data);
+		
+		_processor?.Process(new LoggerMessage(message, logLevel));
 	}
 }

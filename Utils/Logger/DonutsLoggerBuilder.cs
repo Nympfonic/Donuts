@@ -61,7 +61,6 @@ public class DonutsLoggerBuilder
 	
 	public DonutsLogger Build()
 	{
-		_logger.SetLoggingLevel(_logLevel);
 		_logger.SetProcessor(_processor);
 		DonutsLogger logger = _logger;
 		Reset();

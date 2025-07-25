@@ -98,7 +98,7 @@ internal static class DonutsHelper
 	/// <param name="message">Text to be output.</param>
 	internal static void NotifyLogError([NotNull] string message)
 	{
-		_fullLogger.Log(new LoggerMessage(message));
+		_fullLogger.Log(message);
 	}
 	
 	/// <summary>
@@ -107,7 +107,7 @@ internal static class DonutsHelper
 	/// <inheritdoc cref="NotifyLogError"/>
 	internal static void NotifyModSettingsStatus([NotNull] string message)
 	{
-		_modNotificationLogger.Log(new LoggerMessage(message, LogLevel.Info));
+		_modNotificationLogger.Log(message, LogLevel.Info);
 	}
 	
 	/// <summary>
