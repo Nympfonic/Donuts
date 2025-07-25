@@ -170,7 +170,7 @@ public class DonutsPlugin : BaseUnityPlugin
 			return s_emptyScenarioList;
 		}
 		
-		string fileContent = await DonutsHelper.ReadAllTextAsync(filePath);
+		string fileContent = await File.ReadAllTextAsync(filePath);
 		var folders = JsonConvert.DeserializeObject<List<Folder>>(fileContent);
 		
 		if (folders == null || folders.Count == 0)
