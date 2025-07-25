@@ -1,10 +1,8 @@
-using Cysharp.Threading.Tasks;
 using Donuts.Spawning.Services;
 using Donuts.Utils;
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using UnityToolkit.Structures.DependencyInjection;
 
 namespace Donuts.Spawning.Controllers;
@@ -12,7 +10,7 @@ namespace Donuts.Spawning.Controllers;
 public interface IBotDespawnController
 {
 	void Initialize();
-	UniTask DespawnExcessBots(CancellationToken cancellationToken);
+	void DespawnExcessBots();
 }
 
 public class BotDespawnController(DiContainer container) : IBotDespawnController
@@ -20,8 +18,6 @@ public class BotDespawnController(DiContainer container) : IBotDespawnController
 	[NotNull] private readonly List<IBotDespawnService> _despawnServices = new(DonutsRaidManager.INITIAL_SERVICES_COUNT);
 	
 	private bool _initialized;
-	
-	private bool _despawnProcessOngoing;
 	
 	public void Initialize()
 	{
@@ -71,23 +67,17 @@ public class BotDespawnController(DiContainer container) : IBotDespawnController
 		}
 	}
 	
-	public async UniTask DespawnExcessBots(CancellationToken cancellationToken)
+	public void DespawnExcessBots()
 	{
-		if (!_initialized || _despawnProcessOngoing)
+		if (!_initialized)
 		{
 			return;
 		}
 		
-		_despawnProcessOngoing = true;
-		
 		for (int i = _despawnServices.Count - 1; i >= 0; i--)
 		{
 			IBotDespawnService service = _despawnServices[i];
-			
-			await service.DespawnExcessBots(cancellationToken);
-			if (cancellationToken.IsCancellationRequested) return;
+			service.DespawnExcessBots();
 		}
-		
-		_despawnProcessOngoing = false;
 	}
 }

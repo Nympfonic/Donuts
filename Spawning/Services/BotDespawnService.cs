@@ -1,12 +1,10 @@
 using Comfort.Common;
 using Cysharp.Text;
-using Cysharp.Threading.Tasks;
 using Donuts.Utils;
 using EFT;
 using JetBrains.Annotations;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Threading;
 using Systems.Effects;
 using UnityEngine;
 using UnityToolkit.Extensions;
@@ -16,18 +14,19 @@ namespace Donuts.Spawning.Services;
 
 public interface IBotDespawnService : IServiceSpawnType
 {
-	UniTask DespawnExcessBots(CancellationToken cancellationToken);
+	void DespawnExcessBots();
 }
 
 public abstract class BotDespawnService : IBotDespawnService
 {
+	private readonly GameWorld _gameWorld = Singleton<GameWorld>.Instance;
+	private readonly EffectsCommutator _effectsCommutator = Singleton<Effects>.Instance.EffectsCommutator;
 	private readonly BotsController _botsController = Singleton<IBotGame>.Instance.BotsController;
 	private readonly FurthestBotComparer _furthestBotComparer = new();
 	private readonly List<BotOwner> _aliveBots = [];
 	
 	private const int MIN_BOT_ACTIVE_TIME_SECONDS = 3;
 	
-	private const int FRAME_DELAY_BETWEEN_DESPAWNS = 20;
 	private readonly List<Player> _botsToDespawn = new(20);
 	private float _despawnCooldownTime;
 	
@@ -50,7 +49,7 @@ public abstract class BotDespawnService : IBotDespawnService
 
 	protected abstract bool IsDespawnBotEnabled();
 	
-	public async UniTask DespawnExcessBots(CancellationToken cancellationToken)
+	public void DespawnExcessBots()
 	{
 		if (!IsDespawnBotEnabled()) return;
 		
@@ -64,22 +63,20 @@ public abstract class BotDespawnService : IBotDespawnService
 		_despawnCooldownTime = Time.time;
 		
 		IReadOnlyList<Player> furthestBots = FindFurthestBots();
-		excessBots = Mathf.Min(furthestBots.Count, excessBots);
+		int furthestBotsCount = furthestBots.Count;
+		excessBots = Mathf.Min(furthestBotsCount, excessBots);
 		
-		for (var i = 0; i < excessBots; i++)
+		var despawnedCount = 0;
+		var pointer = 0;
+		while (despawnedCount < excessBots && pointer < furthestBotsCount)
 		{
-			Player furthestBot = furthestBots[i];
-			if (furthestBot == null || !furthestBot.IsAlive())
+			Player furthestBot = furthestBots[pointer];
+			if (furthestBot.OrNull()?.IsAlive() == true && TryDespawnBot(furthestBot))
 			{
-				continue;
+				despawnedCount++;
 			}
 			
-			bool success = await TryDespawnBot(furthestBot, cancellationToken);
-			if (success && i < excessBots - 1)
-			{
-				await UniTask.DelayFrame(FRAME_DELAY_BETWEEN_DESPAWNS, cancellationToken: cancellationToken);
-				if (cancellationToken.IsCancellationRequested) return;
-			}
+			pointer++;
 		}
 	}
 	
@@ -154,6 +151,11 @@ public abstract class BotDespawnService : IBotDespawnService
 		int humanCount = humanPlayers.Count;
 		Vector3 centroid = Vector3.zero;
 		
+		if (humanCount == 0)
+		{
+			return centroid;
+		}
+		
 		for (int i = humanCount - 1; i >= 0; i--)
 		{
 			Player humanPlayer = humanPlayers[i];
@@ -167,7 +169,7 @@ public abstract class BotDespawnService : IBotDespawnService
 		return centroid;
 	}
 	
-	private async UniTask<bool> TryDespawnBot([NotNull] Player furthestBot, CancellationToken cancellationToken)
+	private bool TryDespawnBot([NotNull] Player furthestBot)
 	{
 		BotOwner botOwner = furthestBot.AIData?.BotOwner;
 		if (botOwner == null)
@@ -184,14 +186,16 @@ public abstract class BotDespawnService : IBotDespawnService
 		
 		// Not sure what exactly fixed the error spam with SAIN but don't change this shit EVER
 		Player botPlayer = botOwner.GetPlayer;
-		Singleton<Effects>.Instance.EffectsCommutator.StopBleedingForPlayer(botPlayer);
+		_effectsCommutator.StopBleedingForPlayer(botPlayer);
+		// _gameWorld.RegisteredPlayers.Remove(botOwner);
+		// _gameWorld.AllAlivePlayersList.Remove(botPlayer);
+		_gameWorld.UnregisterPlayer(botOwner);
+		_gameWorld.UnregisterPlayer(botPlayer);
+		
 		botOwner.Deactivate();
 		botOwner.Dispose();
 		_botsController.BotDied(botOwner);
 		_botsController.DestroyInfo(botPlayer);
-		
-		await UniTask.NextFrame(PlayerLoopTiming.LastPreUpdate, cancellationToken);
-		if (cancellationToken.IsCancellationRequested) return false;
 		
 		Object.DestroyImmediate(botOwner.gameObject);
 		Object.Destroy(botOwner);

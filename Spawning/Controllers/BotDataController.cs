@@ -18,17 +18,14 @@ public interface IBotDataController : IDisposable
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
 }
 
-public class BotDataController(DiContainer container, TimeoutController timeoutController) : IBotDataController
+public class BotDataController(DiContainer container) : IBotDataController
 {
 	[NotNull] private readonly List<IBotDataService> _dataServices = new(DonutsRaidManager.INITIAL_SERVICES_COUNT);
 	
 	private bool _initialized;
-	
 	private bool _replenishBotCacheOngoing;
 	
-	private static readonly TimeSpan _startingBotsTimeoutSeconds = TimeSpan.FromSeconds(60);
-	
-	public void Dispose()
+	void IDisposable.Dispose()
 	{
 		foreach (IBotDataService service in _dataServices)
 		{
@@ -70,76 +67,84 @@ public class BotDataController(DiContainer container, TimeoutController timeoutC
 		{
 			var pmcService = container.Resolve<IBotDataService>(DonutsRaidManager.PMC_SERVICE_KEY);
 			await SetupDataService(pmcService, cancellationToken);
-			if (cancellationToken.IsCancellationRequested) return;
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return;
+			}
 		}
 		
 		if (forceAllBotType is "SCAV" or "Disabled")
 		{
 			var scavService = container.Resolve<IBotDataService>(DonutsRaidManager.SCAV_SERVICE_KEY);
 			await SetupDataService(scavService, cancellationToken);
-			if (cancellationToken.IsCancellationRequested) return;
+			if (cancellationToken.IsCancellationRequested)
+			{
+				return;
+			}
 		}
 	}
 	
 	private async UniTask SetupDataService(IBotDataService dataService, CancellationToken cancellationToken)
 	{
-		if (_dataServices.Contains(dataService))
+		if (!_dataServices.Contains(dataService))
 		{
-			return;
+			_dataServices.Add(dataService);
+			await ProcessStartingBotGeneration(dataService, cancellationToken);
 		}
-		
-		_dataServices.Add(dataService);
-		
+	}
+	
+	private static async UniTask ProcessStartingBotGeneration(IBotDataService dataService, CancellationToken cancellationToken)
+	{
 		string spawnTypeString = dataService.SpawnType.LocalizedPlural();
 		var message = $"Donuts: Generating {spawnTypeString}...";
 		
+		EventBus.Raise(BotGenStatusChangeEvent.Create(message, progress: 0));
+		
+		while (true)
+		{
+			bool finishedGeneration = await GenerateStartingBots(message, spawnTypeString, dataService, cancellationToken);
+			if (finishedGeneration)
+			{
+				break;
+			}
+		}
+		
+		EventBus.Raise(BotGenStatusChangeEvent.Create(message, progress: 1));
+		await UniTask.Delay(1500, cancellationToken: cancellationToken);
+	}
+	
+	private static async UniTask<bool> GenerateStartingBots(
+		string statusMessage,
+		string spawnType,
+		IBotDataService dataService,
+		CancellationToken cancellationToken)
+	{
+		IUniTaskAsyncEnumerator<BotGenerationProgress> enumerator = dataService
+			.CreateStartingBotGenerationStream(cancellationToken)
+			.GetAsyncEnumerator(cancellationToken);
+		
 		try
 		{
-			CancellationToken timeoutToken = timeoutController.Timeout(_startingBotsTimeoutSeconds);
-			
-			IUniTaskAsyncEnumerable<BotGenerationProgress> stream = dataService.SetupStartingBotCache(timeoutToken);
-			if (stream == null)
-			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Error creating the starting bot generation stream in {0}!", dataService.GetType().Name);
-				DonutsRaidManager.Logger.LogError(sb.ToString());
-				return;
-			}
-			
-			EventBus.Raise(BotGenStatusChangeEvent.Create(message, 0));
-			
-			IUniTaskAsyncEnumerator<BotGenerationProgress> enumerator = stream.GetAsyncEnumerator(timeoutToken);
 			while (await enumerator.MoveNextAsync())
 			{
 				BotGenerationProgress generationProgress = enumerator.Current;
-				EventBus.Raise(BotGenStatusChangeEvent.Create(message, generationProgress.Progress));
+				EventBus.Raise(BotGenStatusChangeEvent.Create(statusMessage, generationProgress.Progress));
 			}
-			await enumerator.DisposeAsync();
-			timeoutController.Reset();
 			
-			EventBus.Raise(BotGenStatusChangeEvent.Create(message, 1));
-			
-			await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: cancellationToken);
+			return true;
 		}
-		catch (OperationCanceledException)
+		catch (OperationCanceledException) {}
+		catch (TimeoutException)
 		{
-			if (timeoutController.IsTimeout())
+			DonutsRaidManager.Logger.LogError(
+				"Timed out while requesting bot profile data! Check your server log for bot generation errors!");
+			
+			for (var i = 3; i > 0; i--)
 			{
 				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat(
-					"{0} timed out while generating starting bot profiles! Check your server logs for bot generation errors!",
-					dataService.GetType().Name);
-				DonutsRaidManager.Logger.LogError(sb.ToString());
-				
-				TimeSpan oneSecond = TimeSpan.FromSeconds(1);
-				
-				for (var i = 3; i > 0; i--)
-				{
-					sb.Clear();
-					sb.AppendFormat("Donuts: Generating {0} timed out! Skipping in {1}...", spawnTypeString, i);
-					EventBus.Raise(BotGenStatusChangeEvent.Create(sb.ToString()));
-					await UniTask.Delay(oneSecond, cancellationToken: cancellationToken);
-				}
+				sb.AppendFormat("Donuts: Generating {0} timed out! Skipping in {1}...", spawnType, i);
+				EventBus.Raise(BotGenStatusChangeEvent.Create(sb.ToString()));
+				await UniTask.Delay(1000, cancellationToken: cancellationToken);
 			}
 		}
 		catch (Exception ex)
@@ -148,8 +153,10 @@ public class BotDataController(DiContainer container, TimeoutController timeoutC
 		}
 		finally
 		{
-			timeoutController.Reset();
+			await enumerator.DisposeAsync();
 		}
+		
+		return false;
 	}
 	
 	public async UniTask ReplenishBotCache(CancellationToken cancellationToken)

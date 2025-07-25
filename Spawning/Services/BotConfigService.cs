@@ -11,7 +11,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
 using UnityEngine;
 
 namespace Donuts.Spawning.Services;
@@ -23,7 +22,6 @@ public class BotConfigService
 	
 	private readonly Dictionary<DonutsSpawnType, int> _botCountLimits = [];
 	
-	private static readonly ReadOnlyCollection<Player> _emptyPlayerList = new(Array.Empty<Player>());
 	private readonly List<Player> _humanPlayerList;
 	private readonly ReadOnlyCollection<Player> _humanPlayerListReadOnly;
 	
@@ -200,7 +198,7 @@ public class BotConfigService
 		if (!Directory.Exists(patternFolderPath))
 		{
 			Directory.CreateDirectory(patternFolderPath);
-			//DonutsHelper.NotifyLogError($"Donuts Plugin: Folder from ScenarioConfig.json does not actually exist: {patternFolderPath}\nDisabling the donuts plugin for this raid.");
+			//DonutsHelper.NotifyLogError($"Donuts: Folder from ScenarioConfig.json does not exist: {patternFolderPath}\nDisabling the Donuts plugin for this raid.");
 			//filesLoaded = false;
 		}
 		
@@ -225,28 +223,32 @@ public class BotConfigService
 	[NotNull]
 	public ReadOnlyCollection<Player> GetHumanPlayerList()
 	{
-		if (_gameWorld.RegisteredPlayers.Count == 0)
-		{
-			return _emptyPlayerList;
-		}
-		
-		if (_lastFrameUpdatedHumanPlayerList == Time.frameCount)
+		if (_gameWorld.RegisteredPlayers.Count == 0 || _lastFrameUpdatedHumanPlayerList == Time.frameCount)
 		{
 			return _humanPlayerListReadOnly;
 		}
 		
-		List<Player> allPlayers = _gameWorld.AllPlayersEverExisted.ToList();
-		foreach (Player player in allPlayers)
+		foreach (Player player in _gameWorld.AllPlayersEverExisted)
 		{
-			if (player != null && !player.IsAI && !_humanPlayerList.Contains(player))
+			if (player == null)
+			{
+				continue;
+			}
+			
+			if (!player.IsAI && !_humanPlayerList.Contains(player))
 			{
 				if (DefaultPluginVars.debugLogging.Value)
 				{
 					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-					sb.AppendFormat("Adding player '{0}' (Profile ID: {1}) to Donuts' human player list", player.Profile.Nickname, player.ProfileId);
+					sb.AppendFormat("Adding player '{0}' (Profile ID: {1}) to Donuts' human player list",
+						player.Profile.Nickname, player.ProfileId);
 					_logger.LogDebugDetailed(sb.ToString(), nameof(BotConfigService), nameof(GetHumanPlayerList));
 				}
 				_humanPlayerList.Add(player);
+			}
+			else if (player.IsAI && _humanPlayerList.Contains(player))
+			{
+				_humanPlayerList.Remove(player);
 			}
 		}
 		
@@ -263,7 +265,7 @@ public class BotConfigService
 		}
 		
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-		sb.AppendFormat("Donuts: Failed to retrieve {0} max bot cap value. Report this to the author!", spawnType.Localized());
+		sb.AppendFormat("Donuts: Failed to retrieve {0} max bot cap value. Report this to the mod developer!", spawnType.Localized());
 		DonutsHelper.NotifyLogError(sb.ToString());
 		return -1;
 	}
@@ -275,10 +277,14 @@ public class BotConfigService
 	{
 		var count = 0;
 		List<Player> allAlivePlayers = _gameWorld.AllAlivePlayersList;
+		
 		for (int i = allAlivePlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = allAlivePlayers[i];
-			if (player == null || !player.IsAI) continue;
+			if (player == null || !player.IsAI)
+			{
+				continue;
+			}
 			
 			WildSpawnType role = player.Profile.Info.Settings.Role;
 			if (predicate == null || predicate(role))
