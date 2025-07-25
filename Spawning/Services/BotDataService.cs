@@ -53,8 +53,8 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
 	private const int FRAME_DELAY_BETWEEN_REPLENISH = 10;
 	
-	private readonly TimeoutController _timeoutController = new();
-	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(5);
+	private readonly TimeoutController _timeoutController;
+	private static readonly TimeSpan s_timeout = TimeSpan.FromSeconds(5);
 	private CancellationToken _sharedToken;
 	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
@@ -298,6 +298,7 @@ public abstract class BotDataService : IBotDataService, GInterface22
 					_timeoutSeconds.ToString());
 				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
 			}
+						s_timeout.Seconds.ToString());
 		}
 		finally
 		{

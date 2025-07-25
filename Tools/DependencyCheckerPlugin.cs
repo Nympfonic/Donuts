@@ -31,7 +31,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 		new("com.Arys.UnityToolkit", "UnityToolkit", new Version("1.2.0")),
 	];
 	
-	private static bool _canShowErrorDialog;
+	private static bool s_canShowErrorDialog;
 	
 	internal static bool ValidationSuccess { get; private set; }
 	
@@ -55,7 +55,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 		Logger.LogInfo("Successfully validated Donuts' dependencies");
 		ValidationSuccess = true;
 		menuPatch.Disable();
-		_canShowErrorDialog = false;
+		s_canShowErrorDialog = false;
 		_hardDependencies = null;
 	}
 	
@@ -65,7 +65,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 			|| pluginInfo == null
 			|| pluginInfo.Instance == null)
 		{
-			invalidSptError = "SPT is somehow not detected/installed. This mod is only for SPT.";
+			invalidSptError = "SPT not detected/installed. This mod is only for SPT.";
 			return false;
 		}
 		
@@ -197,7 +197,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 	private static IEnumerator ShowErrorDialog([NotNull] object data)
 	{
 		var waitUntilMenuReady = new WaitUntil(() =>
-			Singleton<PreloaderUI>.Instantiated && Singleton<PreloaderUI>.Instance.CanShowErrorScreen && _canShowErrorDialog);
+			Singleton<PreloaderUI>.Instantiated && Singleton<PreloaderUI>.Instance.CanShowErrorScreen && s_canShowErrorDialog);
 		yield return waitUntilMenuReady;
 		
 		const string title = "Donuts";
@@ -281,7 +281,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 		[PatchPostfix]
 		private static void PatchPostfix()
 		{
-			_canShowErrorDialog = true;
+			s_canShowErrorDialog = true;
 		}
 	}
 	
