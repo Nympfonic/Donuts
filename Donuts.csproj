@@ -73,6 +73,9 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>E:\SPT-3.11\EscapeFromTarkov_Data\Managed\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>E:\SPT-3.11\EscapeFromTarkov_Data\Managed\Sirenix.Serialization.dll</HintPath>
+    </Reference>
     <Reference Include="spt-common">
       <HintPath>E:\SPT-3.11\BepInEx\plugins\spt\spt-common.dll</HintPath>
     </Reference>
