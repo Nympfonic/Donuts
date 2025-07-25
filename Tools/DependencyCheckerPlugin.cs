@@ -204,9 +204,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 		Singleton<PreloaderUI>.Instance.ShowCriticalErrorScreen(
 			header: title, message: string.Empty,
 			buttonType: ErrorScreen.EButtonType.QuitButton,
-			waitingTime: ERROR_WAITING_TIME,
-			acceptCallback: Application.Quit,
-			endTimeCallback: Application.Quit);
+			waitingTime: ERROR_WAITING_TIME);
 		
 		var errorScreenList = Traverse.Create(Singleton<PreloaderUI>.Instance)
 			.Field("_criticalErrorScreenContainer")

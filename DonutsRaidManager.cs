@@ -42,7 +42,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private IBotDespawnController _botDespawnController;
 	
 	private static readonly Action<DamageInfoStruct, EBodyPart, float> s_takingDamageCombatCooldownAction = TakingDamageCombatCooldown;
-	private static readonly GDelegate67 s_disposePlayerSubscriptionsAction = DisposePlayerSubscriptions;
+	private static readonly GDelegate70 s_disposePlayerSubscriptionsAction = DisposePlayerSubscriptions;
 	
 	internal const int INITIAL_SERVICES_COUNT = 3;
 	private const int MS_DELAY_BEFORE_STARTING_BOTS_SPAWN = 2000;

@@ -5,14 +5,14 @@ using SPT.Reflection.Patching;
 using System;
 using System.Reflection;
 
-using BotZoneGroupData = GClass539;
+using BotZoneGroupData = GClass555;
 
 namespace Donuts.Patches.BotGroupFixes;
 
 [UsedImplicitly]
 public class BotZoneGroupsDictionaryPatches
 {
-	private static readonly Type _targetType = typeof(BotZoneGroupsDictionary);
+	private static readonly Type s_targetType = typeof(BotZoneGroupsDictionary);
 	
 	/// <summary>
 	/// Patches <see cref="BotZoneGroupsDictionary.TryGetValue(BotZone, EPlayerSide, WildSpawnType, out BotsGroup, bool)"/>
@@ -23,7 +23,7 @@ public class BotZoneGroupsDictionaryPatches
 	{
 		protected override MethodBase GetTargetMethod()
 		{
-			return AccessTools.FirstMethod(_targetType, IsTargetMethod);
+			return AccessTools.FirstMethod(s_targetType, IsTargetMethod);
 		}
 		
 		private static bool IsTargetMethod(MethodInfo mi) => mi.Name == "TryGetValue" && mi.GetParameters().Length == 5;
@@ -40,7 +40,7 @@ public class BotZoneGroupsDictionaryPatches
 		{
 			if (__instance.TryGetValue(zone, out BotZoneGroupData botZoneGroupData))
 			{
-				BotsGroup botsGroup = botZoneGroupData.Group(side, isBossOrFollower, spawnType);
+				BotsGroup botsGroup = botZoneGroupData.Group(isBossOrFollower, spawnType);
 				if (botsGroup != null && !botsGroup.Locked)
 				{
 					group = botsGroup;

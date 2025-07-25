@@ -13,10 +13,12 @@ using System.Linq;
 using System.Threading;
 using UnityEngine;
 using UnityToolkit.Structures.EventBus;
-using BotProfileData = GClass652; // Class implements IGetProfileData
-using BotCreator = GClass888; // Class implements IBotCreator
-using ICancellable = GInterface22;
+
 using Random = UnityEngine.Random;
+
+using BotProfileData = GClass663; // Class implements IGetProfileData
+using BotCreator = GClass898; // Class implements IBotCreator
+using ICancellable = GInterface22; // Interface has method signature "CancellationToken GetCancelToken()"
 
 namespace Donuts.Spawning.Services;
 
