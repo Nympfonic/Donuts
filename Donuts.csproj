@@ -142,9 +142,6 @@
     <Reference Include="UnityEngine.PhysicsModule">
       <HintPath>E:\SPT-3.11\EscapeFromTarkov_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.TextCoreModule">
-      <HintPath>E:\SPT-3.11\EscapeFromTarkov_Data\Managed\UnityEngine.TextCoreModule.dll</HintPath>
-    </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>E:\SPT-3.11\EscapeFromTarkov_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
