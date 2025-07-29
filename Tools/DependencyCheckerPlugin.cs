@@ -24,11 +24,11 @@ namespace Donuts.Tools;
 public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 {
 	private const float ERROR_WAITING_TIME = 60f;
-	private readonly Version _targetSptVersion = new("3.10.0");
+	private readonly Version _targetSptVersion = new("3.11.0");
 	private DependencyInfo[] _hardDependencies =
 	[
 		new("xyz.drakia.waypoints", "Drakia's Waypoints", new Version("0.0.0")),
-		new("com.Arys.UnityToolkit", "UnityToolkit", new Version("1.2.0")),
+		new("com.Arys.UnityToolkit", "UnityToolkit", new Version("1.3.0")),
 	];
 	
 	private static bool s_canShowErrorDialog;
@@ -106,8 +106,8 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 		foreach (DependencyInfo dependency in hardDependencies)
 		{
 			string dependencyVersion = dependency.version > noVersion
-				? $" v{dependency.version}"
-				: " Any version";
+				? $"v{dependency.version}"
+				: "Any version";
 			
 			if (!Chainloader.PluginInfos.TryGetValue(dependency.guid, out PluginInfo dependencyInfo) ||
 				dependencyInfo == null ||
@@ -116,7 +116,7 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 				var notInstalledLogMessage = $"ERROR: {dependency.name} ({dependency.guid}) is not installed!";
 				LogDependencyError(notInstalledLogMessage, logger);
 				var notInstalledMessage =
-					$"- {dependency.name} -- Required:{dependencyVersion}, Current: Not installed/Failed to load";
+					$"- {dependency.name} -- Required: {dependencyVersion}, Current: Not installed/Failed to load";
 				missingDependencies.Add(notInstalledMessage);
 				validationSuccess = false;
 				continue;
@@ -128,10 +128,10 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 			}
 			
 			var outdatedLogMessage =
-				$"ERROR: Outdated version of {dependencyInfo.Metadata.Name} Required:{dependencyVersion}, Current: v{dependencyInfo.Metadata.Version}";
+				$"ERROR: Outdated version of {dependencyInfo.Metadata.Name}! Required: {dependencyVersion}, Current: v{dependencyInfo.Metadata.Version}";
 			LogDependencyError(outdatedLogMessage, logger);
 			var outdatedMessage =
-				$"- {dependency.name} -- Required:{dependencyVersion}, Current: v{dependencyInfo.Metadata.Version}";
+				$"- {dependency.name} -- Required: {dependencyVersion}, Current: v{dependencyInfo.Metadata.Version}";
 			missingDependencies.Add(outdatedMessage);
 			validationSuccess = false;
 		}
