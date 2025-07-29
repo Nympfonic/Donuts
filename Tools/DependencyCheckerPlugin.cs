@@ -228,6 +228,8 @@ public sealed class DependencyCheckerPlugin : BaseUnityPlugin
 				Traverse.Create(errorScreen)
 					.Field("string_1")
 					.SetValue(errorMessage);
+				
+				errorScreen.WindowContext.OnClose += Application.Quit;
 				break;
 			}
 		}
