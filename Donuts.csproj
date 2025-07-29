@@ -91,9 +91,6 @@
     <Reference Include="spt-singleplayer">
       <HintPath>E:\SPT-3.11\BepInEx\plugins\spt\spt-singleplayer.dll</HintPath>
     </Reference>
-    <Reference Include="System.Memory">
-      <HintPath>E:\SPT-3.11\EscapeFromTarkov_Data\Managed\System.Memory.dll</HintPath>
-    </Reference>
     <Reference Include="UniTask">
       <HintPath>E:\SPT-3.11\BepInEx\plugins\UnityToolkit\UniTask.dll</HintPath>
     </Reference>
