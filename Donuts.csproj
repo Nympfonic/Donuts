@@ -178,7 +178,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy &quot;$(TargetPath)&quot; &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).dll&quot;&#xA;&#xA;if &quot;$(ConfigurationName)&quot;==&quot;Debug&quot; (&#xA;    if exist &quot;$(TargetDir)$(TargetName).pdb&quot; (&#xA;        copy &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).pdb&quot;&#xA;    ) else (&#xA;        echo Debug symbols not found!&#xA;    )&#xA;) else (&#xA;    if exist &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).pdb&quot; (&#xA;        del &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).pdb&quot;&#xA;    )&#xA;)" />
+    <Exec Command="if not exist &quot;E:\SPT-3.11\BepInEx\plugins\Donuts&quot; (&#xA;    mkdir &quot;E:\SPT-3.11\BepInEx\plugins\Donuts&quot;&#xA;)&#xA;copy &quot;$(TargetPath)&quot; &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).dll&quot;&#xA;&#xA;if &quot;$(ConfigurationName)&quot;==&quot;Debug&quot; (&#xA;    if exist &quot;$(TargetDir)$(TargetName).pdb&quot; (&#xA;        copy &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).pdb&quot;&#xA;    ) else (&#xA;        echo Debug symbols not found!&#xA;    )&#xA;) else (&#xA;    if exist &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).pdb&quot; (&#xA;        del &quot;E:\SPT-3.11\BepInEx\plugins\Donuts\$(TargetName).pdb&quot;&#xA;    )&#xA;)" />
   </Target>
 
 </Project>
