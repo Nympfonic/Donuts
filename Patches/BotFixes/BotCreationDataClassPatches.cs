@@ -6,21 +6,21 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-using SpawnPointData = GClass649;
+using SpawnPointData = GClass660;
 
 namespace Donuts.Patches.BotFixes;
 
 [UsedImplicitly]
 public class BotCreationDataClassPatches
 {
-	private static readonly Type _targetType = typeof(BotCreationDataClass);
+	private static readonly Type s_targetType = typeof(BotCreationDataClass);
 	
 	/*
-	 * As of SPT 3.10.X
-	 * ___list_0 is a List<GClass649> where GClass649 has a constructor signature:
-	 * public GClass649(Vector3 pos, int corePointId, bool isUsed)
+	 * As of SPT 3.11.X
+	 * ___list_0 is a List<GClass660> where GClass660 has a constructor signature:
+	 * public GClass660(Vector3 pos, int corePointId, bool isUsed)
 	 *	
-	 * GClass649 also has 3 fields:
+	 * GClass660 also has 3 fields:
 	 * public Vector3 position;
 	 * public bool alreadyUsedToSpawn
 	 * public int CorePointId;
@@ -33,7 +33,7 @@ public class BotCreationDataClassPatches
 	public class GetPositionPatch : ModulePatch
 	{
 		protected override MethodBase GetTargetMethod() =>
-			AccessTools.Method(_targetType, nameof(BotCreationDataClass.GetPosition));
+			AccessTools.Method(s_targetType, nameof(BotCreationDataClass.GetPosition));
 
 		[PatchPrefix]
 		private static bool PatchPrefix(ref SpawnPointData __result, List<SpawnPointData> ___list_0)
