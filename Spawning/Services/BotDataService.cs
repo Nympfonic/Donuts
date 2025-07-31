@@ -61,7 +61,7 @@ public abstract class BotDataService : IBotDataService, ICancellable
 	private CancellationToken _sharedToken;
 	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
-	private readonly BotCreator _botCreator;
+	private readonly IBotCreator _botCreator;
 	
 	private float _replenishBotCachePrevTime;
 	
@@ -92,9 +92,7 @@ public abstract class BotDataService : IBotDataService, ICancellable
 		this.configService = configService;
 		logger = DonutsRaidManager.Logger;
 		_timeoutController = new TimeoutController(Singleton<DonutsRaidManager>.Instance.OnDestroyTokenSource);
-		
-		BotSpawner eftBotSpawner = Singleton<IBotGame>.Instance.BotsController.BotSpawner;
-		_botCreator = (BotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(eftBotSpawner);
+		_botCreator = Singleton<IBotGame>.Instance.BotsController.BotSpawner._botCreator;
 		
 		RegisterEventBindings();
 		

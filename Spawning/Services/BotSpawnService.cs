@@ -54,7 +54,7 @@ public abstract class BotSpawnService : IBotSpawnService
 		
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_eftBotSpawner = _botsController.BotSpawner;
-		_botCreator = (IBotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(_eftBotSpawner);
+		_botCreator = _eftBotSpawner._botCreator;
 		
 		_waveSpawnProcessor = new PlayerCombatStateCheck();
 		_waveSpawnProcessor.SetNext(new WaveSpawnChanceCheck());
@@ -167,23 +167,23 @@ public abstract class BotSpawnService : IBotSpawnService
 	}
 	
 	/// <summary>
-	/// Increment BotSpawner's _inSpawnProcess int field so the bot count is correct.
+	/// Increment BotSpawner's _inSpawnProcess int field, so the bot count is correct.
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// Note 1: Normally <c>BotSpawner::method_7()</c> handles this but we skip it to directly call <c>GClass888::ActivateBot()</c>.
+	/// Note 1: Normally <c>BotSpawner::method_7()</c> handles this, but we skip it to directly call <c>GClass888::ActivateBot()</c>.
 	/// </para>
 	/// <para>
 	/// Note 2: For whatever reason, BSG increments by the number of spawn points (basically group member count)
 	/// before beginning the bot spawn logic, but only decrements by 1 if it fails.
-	/// The callback however correctly only decrements by 1 for each bot in the group.
+	/// The callback, however, correctly only decrements by 1 for each bot in the group.
 	/// </para>
 	/// </remarks>
 	private void IncrementInProcessCounter(int value)
 	{
 		using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 		
-		var currentInSpawnProcess = (int)ReflectionHelper.BotSpawner_inSpawnProcess_Field.GetValue(_eftBotSpawner);
+		int currentInSpawnProcess = _eftBotSpawner._inSpawnProcess;
 		if (DefaultPluginVars.debugLogging.Value)
 		{
 			sb.Clear();
@@ -205,7 +205,7 @@ public abstract class BotSpawnService : IBotSpawnService
 			}
 		}
 		
-		ReflectionHelper.BotSpawner_inSpawnProcess_Field.SetValue(_eftBotSpawner, newInSpawnProcess);
+		_eftBotSpawner._inSpawnProcess = newInSpawnProcess;
 		
 		if (DefaultPluginVars.debugLogging.Value)
 		{
