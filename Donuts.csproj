@@ -7,6 +7,8 @@
     <Deterministic>true</Deterministic>
     <Configurations>Debug;Release;SPT Release;Fika Release</Configurations>
     <Platforms>AnyCPU</Platforms>
+    <AssemblyVersion>4.0.1.0</AssemblyVersion>
+    <FileVersion>4.0.1.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
