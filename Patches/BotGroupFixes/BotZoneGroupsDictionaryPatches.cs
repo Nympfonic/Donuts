@@ -5,8 +5,6 @@ using SPT.Reflection.Patching;
 using System;
 using System.Reflection;
 
-using BotZoneGroupData = GClass555;
-
 namespace Donuts.Patches.BotGroupFixes;
 
 [UsedImplicitly]

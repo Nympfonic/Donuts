@@ -13,12 +13,7 @@ using System.Linq;
 using System.Threading;
 using UnityEngine;
 using UnityToolkit.Structures.EventBus;
-
 using Random = UnityEngine.Random;
-
-using BotProfileData = GClass663; // Class implements IGetProfileData
-using BotCreator = GClass898; // Class implements IBotCreator
-using ICancellable = GInterface22; // Interface has method signature "CancellationToken GetCancelToken()"
 
 namespace Donuts.Spawning.Services;
 
@@ -250,7 +245,7 @@ public abstract class BotDataService : IBotDataService, ICancellable
 			CancellationToken timeoutToken = _timeoutController.Timeout(s_timeout);
 			_sharedToken = timeoutToken;
 			
-			var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
+			var botProfileData = new BotProfileRequestData(side, wildSpawnType, difficulty, 0f);
 			var botCreationData = await BotCreationDataClass.Create(botProfileData, _botCreator, groupSize, token: this);
 			
 			_sharedToken = cancellationToken;
