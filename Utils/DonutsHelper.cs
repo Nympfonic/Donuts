@@ -37,26 +37,6 @@ internal static class DonutsHelper
 	}
 	
 	/// <summary>
-	/// Custom implementation of ReadAllTextAsync since it isn't available on .NET Framework 4.7.1
-	/// </summary>
-	/// <param name="path">A relative or absolute path for the file to be read.</param>
-	/// <returns>A <c>UniTask</c> that represents the read file's entire contents as a single string.</returns>
-	/// <exception cref="ArgumentException"><c>path</c> is null or empty.</exception>
-	internal static async UniTask<string> ReadAllTextAsync(string path)
-	{
-		if (string.IsNullOrEmpty(path))
-			throw new ArgumentException("Empty path name is not legal.", nameof(path));
-		
-		using var sourceStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096,
-			useAsync: true);
-		using var streamReader = new StreamReader(sourceStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-		// detectEncodingFromByteOrderMarks allows you to handle files with BOM correctly,
-		// otherwise you may get chinese characters even when your text does not contain any
-		
-		return await streamReader.ReadToEndAsync();
-	}
-	
-	/// <summary>
 	/// <see cref="ManualLogSource.LogDebug"/> but also provides current time, executing type name and method name.
 	/// </summary>
 	/// <param name="logSource">The log source.</param>
@@ -118,7 +98,7 @@ internal static class DonutsHelper
 	/// <param name="message">Text to be output.</param>
 	internal static void NotifyLogError([NotNull] string message)
 	{
-		_fullLogger.Log(new LoggerMessage(message));
+		_fullLogger.Log(message);
 	}
 	
 	/// <summary>
@@ -127,7 +107,7 @@ internal static class DonutsHelper
 	/// <inheritdoc cref="NotifyLogError"/>
 	internal static void NotifyModSettingsStatus([NotNull] string message)
 	{
-		_modNotificationLogger.Log(new LoggerMessage(message, LogLevel.Info));
+		_modNotificationLogger.Log(message, LogLevel.Info);
 	}
 	
 	/// <summary>

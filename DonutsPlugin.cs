@@ -7,10 +7,10 @@ using Donuts.Models;
 using Donuts.PluginGUI;
 using Donuts.Spawning.Utils;
 using Donuts.Tools;
-using Donuts.Utils;
 using EFT.UI;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,18 +20,19 @@ using UnityToolkit.Utils;
 
 namespace Donuts;
 
-[BepInPlugin("com.dvize.Donuts", "Donuts", "2.0.0")]
-[BepInDependency("com.SPT.core", "3.10.0")]
+[BepInPlugin("com.dvize.Donuts", "Donuts", "4.0.1")]
 [BepInDependency("com.dvize.DonutsDependencyChecker")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
 {
 	private const KeyCode ESCAPE_KEY = KeyCode.Escape;
 	
-	internal static PluginGUIComponent pluginGUIComponent;
-	internal static ConfigEntry<KeyboardShortcut> toggleGUIKey;
+	internal static PluginGUIComponent s_pluginGUIComponent;
+	private static ConfigEntry<KeyboardShortcut> s_toggleGUIKey;
+
+	private bool _initComplete;
 	
-	private static readonly List<Folder> _emptyScenarioList = [];
+	private static readonly List<Folder> s_emptyScenarioList = [];
 	
 	private bool _isWritingToFile;
 	
@@ -43,6 +44,17 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	private void Awake()
 	{
+		StartCoroutine(WaitForDependencyChecker());
+	}
+	
+	private IEnumerator WaitForDependencyChecker()
+	{
+		var waitForEndOfFrame = new WaitForEndOfFrame();
+		while (!DependencyCheckerPlugin.ValidationSuccess)
+		{
+			yield return waitForEndOfFrame;
+		}
+		
 		Logger = base.Logger;
 		CurrentAssembly = Assembly.GetExecutingAssembly();
 		string assemblyPath = CurrentAssembly.Location;
@@ -52,26 +64,25 @@ public class DonutsPlugin : BaseUnityPlugin
 		
 		DonutsConfiguration.ImportConfig(DirectoryPath);
 		
-		toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
+		s_toggleGUIKey = Config.Bind("Config Settings", "Key To Enable/Disable Config Interface",
 			new KeyboardShortcut(KeyCode.F9), "Key to Enable/Disable Donuts Configuration Menu");
 		
 		ModulePatchManager = new ModulePatchManager(CurrentAssembly);
 		ModulePatchManager.EnableAllPatches();
 		
 		ConsoleScreen.Processor.RegisterCommandGroup<SpawnCommands>();
-	}
-	
-	// ReSharper disable once Unity.IncorrectMethodSignature
-	[UsedImplicitly]
-	private async UniTaskVoid Start()
-	{
-		await SetupScenariosUI();
-		pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
+		
+		yield return SetupScenariosUI().ToCoroutine();
+		s_pluginGUIComponent = gameObject.AddComponent<PluginGUIComponent>();
 		DonutsConfiguration.ExportConfig();
+		
+		_initComplete = true;
 	}
 	
 	private void Update()
 	{
+		if (!_initComplete) return;
+		
 		// If setting a keybind, do not trigger functionality
 		if (ImGUIToolkit.IsSettingKeybind()) return;
 		
@@ -96,7 +107,7 @@ public class DonutsPlugin : BaseUnityPlugin
 	
 	private static void ShowGuiInputCheck()
 	{
-		if (IsKeyPressed(toggleGUIKey.Value) || IsKeyPressed(ESCAPE_KEY))
+		if (IsKeyPressed(s_toggleGUIKey.Value) || IsKeyPressed(ESCAPE_KEY))
 		{
 			if (!IsKeyPressed(ESCAPE_KEY))
 			{
@@ -155,16 +166,16 @@ public class DonutsPlugin : BaseUnityPlugin
 		if (!File.Exists(filePath))
 		{
 			Logger.LogError($"File not found: {filePath}");
-			return _emptyScenarioList;
+			return s_emptyScenarioList;
 		}
 		
-		string fileContent = await DonutsHelper.ReadAllTextAsync(filePath);
+		string fileContent = await File.ReadAllTextAsync(filePath);
 		var folders = JsonConvert.DeserializeObject<List<Folder>>(fileContent);
 		
 		if (folders == null || folders.Count == 0)
 		{
 			Logger.LogError($"No Donuts Folders found in Scenario Config file at: {filePath}");
-			return _emptyScenarioList;
+			return s_emptyScenarioList;
 		}
 		
 		Logger.LogWarning($"Loaded {folders.Count.ToString()} Donuts Scenario Folders");

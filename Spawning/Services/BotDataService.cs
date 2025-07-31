@@ -13,8 +13,6 @@ using System.Linq;
 using System.Threading;
 using UnityEngine;
 using UnityToolkit.Structures.EventBus;
-using BotProfileData = GClass652; // Implements IGetProfileData
-using BotCreator = GClass888; // Implements IBotCreator
 using Random = UnityEngine.Random;
 
 namespace Donuts.Spawning.Services;
@@ -28,7 +26,7 @@ public interface IBotDataService : IServiceSpawnType, IDisposable
 	public string GroupChance { get; }
 	public ReadOnlyCollection<BotDifficulty> BotDifficulties { get; }
 	
-	[CanBeNull] IUniTaskAsyncEnumerable<BotGenerationProgress> SetupStartingBotCache(CancellationToken cancellationToken);
+	[NotNull] IUniTaskAsyncEnumerable<BotGenerationProgress> CreateStartingBotGenerationStream(CancellationToken cancellationToken);
 	UniTask<(bool success, PrepBotInfo prepBotInfo)> TryGenerateBotProfiles(BotDifficulty difficulty, int groupSize,
 		bool saveToCache = true, CancellationToken cancellationToken = default);
 	UniTask ReplenishBotCache(CancellationToken cancellationToken);
@@ -41,7 +39,7 @@ public interface IBotDataService : IServiceSpawnType, IDisposable
 	BotDifficulty GetBotDifficulty();
 }
 
-public abstract class BotDataService : IBotDataService, GInterface22
+public abstract class BotDataService : IBotDataService, ICancellable
 {
 	protected StartingBotConfig startingBotConfig;
 	protected readonly MapBotWaves mapBotWaves;
@@ -53,12 +51,12 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	private const int NUMBER_OF_GROUPS_TO_REPLENISH = 3;
 	private const int FRAME_DELAY_BETWEEN_REPLENISH = 10;
 	
-	private readonly TimeoutController _timeoutController = new();
-	private static readonly TimeSpan _timeoutSeconds = TimeSpan.FromSeconds(5);
+	private readonly TimeoutController _timeoutController;
+	private static readonly TimeSpan s_timeout = TimeSpan.FromSeconds(5);
 	private CancellationToken _sharedToken;
 	
 	private readonly BotCreationDataCache _botCache = new(INITIAL_BOT_CACHE_SIZE);
-	private readonly BotCreator _botCreator;
+	private readonly IBotCreator _botCreator;
 	
 	private float _replenishBotCachePrevTime;
 	
@@ -74,6 +72,8 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	// TODO: Figure out how to implement remembering used spawn points for individual bot waves
 	//protected SpawnPointsCache waveSpawnPointsCache;
 	
+	private int _startingBotsToGenerate = -1;
+	
 	public abstract DonutsSpawnType SpawnType { get; }
 	public Queue<PrepBotInfo> StartingBotsCache { get; } = new(INITIAL_BOT_CACHE_SIZE);
 	public ZoneSpawnPoints ZoneSpawnPoints { get; }
@@ -86,9 +86,8 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	{
 		this.configService = configService;
 		logger = DonutsRaidManager.Logger;
-		
-		BotSpawner eftBotSpawner = Singleton<IBotGame>.Instance.BotsController.BotSpawner;
-		_botCreator = (BotCreator)ReflectionHelper.BotSpawner_botCreator_Field.GetValue(eftBotSpawner);
+		_timeoutController = new TimeoutController(Singleton<DonutsRaidManager>.Instance.OnDestroyTokenSource);
+		_botCreator = Singleton<IBotGame>.Instance.BotsController.BotSpawner._botCreator;
 		
 		RegisterEventBindings();
 		
@@ -133,14 +132,14 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	/// <remarks>
 	/// Should only be used for BSG's bot profile generation!
 	/// </remarks>
-	public CancellationToken GetCancelToken()
+	CancellationToken ICancellable.GetCancelToken()
 	{
 		return _sharedToken;
 	}
 	
-	public void Dispose()
+	void IDisposable.Dispose()
 	{
-		_timeoutController.Dispose();
+		_timeoutController?.Dispose();
 	}
 	
 	/// <summary>
@@ -162,31 +161,36 @@ public abstract class BotDataService : IBotDataService, GInterface22
 	}
 	
 	/// <summary>
-	/// Initializes the starting bot cache.
+	/// Creates an asynchronous stream for generating the starting bots.
 	/// </summary>
-	public IUniTaskAsyncEnumerable<BotGenerationProgress> SetupStartingBotCache(CancellationToken cancellationToken)
+	public IUniTaskAsyncEnumerable<BotGenerationProgress> CreateStartingBotGenerationStream(CancellationToken cancellationToken)
 	{
-		try
+		if (_startingBotsToGenerate == -1)
 		{
-			int maxBots = Random.Range(startingBotConfig.MinCount, startingBotConfig.MaxCount + 1);
-			int minGroupSize = Math.Max(startingBotConfig.MinGroupSize, 1);
-			int maxGroupSize = startingBotConfig.MaxGroupSize;
-			
-			logger.LogDebugDetailed($"Max starting bots set to {maxBots.ToString()}", GetType().Name, nameof(SetupStartingBotCache));
-			
-			return new GenerateBotProfilesAsyncEnumerable(this, maxBots, minGroupSize, maxGroupSize, cancellationToken);
+			_startingBotsToGenerate = Random.Range(startingBotConfig.MinCount, startingBotConfig.MaxCount + 1);
+			if (DefaultPluginVars.debugLogging.Value)
+			{
+				logger.LogDebugDetailed($"Max starting bots set to {_startingBotsToGenerate.ToString()}", GetType().Name,
+					nameof(CreateStartingBotGenerationStream));
+			}
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
-		{
-			logger.LogException(GetType().Name, nameof(SetupStartingBotCache), ex);
-		}
-		catch (OperationCanceledException) {}
 		
-		return null;
+		int botsToGenerate = _startingBotsToGenerate - StartingBotsCache.Count;
+		
+		int minGroupSize = Math.Max(startingBotConfig.MinGroupSize, 1);
+		int maxGroupSize = startingBotConfig.MaxGroupSize;
+		
+		return new GenerateBotProfilesAsyncEnumerable(this, botsToGenerate, minGroupSize, maxGroupSize,
+			cancellationToken);
 	}
 	
 	protected static (int min, int max) GetWaveMinMaxGroupSize(IReadOnlyList<BotWave> waves)
 	{
+		if (waves.Count == 0)
+		{
+			return (min: 0, max: 0);
+		}
+		
 		var minGroupSize = 1;
 		var maxGroupSize = int.MaxValue;
 		
@@ -203,6 +207,11 @@ public abstract class BotDataService : IBotDataService, GInterface22
 			}
 		}
 		
+		if (maxGroupSize < minGroupSize)
+		{
+			maxGroupSize = minGroupSize;
+		}
+		
 		return (minGroupSize, maxGroupSize);
 	}
 	
@@ -214,43 +223,32 @@ public abstract class BotDataService : IBotDataService, GInterface22
 		bool saveToCache = true,
 		CancellationToken cancellationToken = default)
 	{
+		await UniTask.SwitchToMainThread(PlayerLoopTiming.Update, cancellationToken);
+		if (cancellationToken.IsCancellationRequested)
+		{
+			return (false, null);
+		}
+		
+		WildSpawnType wildSpawnType = GetWildSpawnType();
+		EPlayerSide side = GetPlayerSide(wildSpawnType);
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Generating bot profiles: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
+				wildSpawnType.ToString(), difficulty.ToString(), side.ToString(), groupSize.ToString());
+			logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
+		}
+		
 		try
 		{
-			await UniTask.SwitchToMainThread(PlayerLoopTiming.Update, cancellationToken);
-			if (cancellationToken.IsCancellationRequested)
-			{
-				return (false, null);
-			}
+			CancellationToken timeoutToken = _timeoutController.Timeout(s_timeout);
+			_sharedToken = timeoutToken;
 			
-			WildSpawnType wildSpawnType = GetWildSpawnType();
-			EPlayerSide side = GetPlayerSide(wildSpawnType);
+			var botProfileData = new BotProfileRequestData(side, wildSpawnType, difficulty, 0f);
+			var botCreationData = await BotCreationDataClass.Create(botProfileData, _botCreator, groupSize, token: this);
 			
-			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
-			{
-				sb.AppendFormat("Generating bot profiles: Type={0}, Difficulty={1}, Side={2}, GroupSize={3}",
-					wildSpawnType.ToString(), difficulty.ToString(), side.ToString(), groupSize.ToString());
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
-			}
-			
-			BotCreationDataClass botCreationData;
-			CancellationToken timeoutToken = _timeoutController.Timeout(_timeoutSeconds);
-			using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutToken))
-			{
-				_sharedToken = cts.Token;
-				
-				var botProfileData = new BotProfileData(side, wildSpawnType, difficulty, 0f);
-				botCreationData = await BotCreationDataClass.Create(botProfileData, _botCreator, groupSize, token: this);
-				
-				if (cts.IsCancellationRequested && DefaultPluginVars.debugLogging.Value)
-				{
-					const string timedOutMessage =
-						"Generating bot profiles canceled! Either the raid ended or there was a bot profile generation error!";
-					logger.LogDebugDetailed(timedOutMessage, GetType().Name, nameof(TryGenerateBotProfiles));
-				}
-
-				_sharedToken = cancellationToken;
-				_timeoutController.Reset();
-			}
+			_sharedToken = cancellationToken;
 			
 			if (botCreationData?.Profiles == null || botCreationData.Profiles.Count == 0)
 			{
@@ -264,8 +262,9 @@ public abstract class BotDataService : IBotDataService, GInterface22
 				_totalBotsInCache += groupSize;
 			}
 			
-			using (Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder())
+			if (DefaultPluginVars.debugLogging.Value)
 			{
+				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 				sb.AppendFormat("Bot profiles generated and assigned successfully; {0} profiles loaded. IDs: {1}",
 					botCreationData.Profiles.Count.ToString(),
 					string.Join(", ", botCreationData.Profiles.Select(p => p.Id)));
@@ -274,20 +273,26 @@ public abstract class BotDataService : IBotDataService, GInterface22
 			
 			return (true, prepBotInfo);
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
-		{
-			logger.LogException(GetType().Name, nameof(TryGenerateBotProfiles), ex);
-		}
 		catch (OperationCanceledException)
 		{
 			if (_timeoutController.IsTimeout())
 			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat(
-					"Generating bot profiles canceled! Timed out after {0}; there was probably a bot generation error!",
-					_timeoutSeconds.ToString());
-				logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
+				if (DefaultPluginVars.debugLogging.Value)
+				{
+					using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+					sb.AppendFormat(
+						"Generating bot profiles timed out after {0}s; there was probably a bot generation error!",
+						s_timeout.Seconds.ToString());
+					logger.LogDebugDetailed(sb.ToString(), GetType().Name, nameof(TryGenerateBotProfiles));
+				}
+				
+				// Throw TimeoutException to bubble up the call stack so the parent task knows it timed out instead of generic OperationCanceledException
+				throw new TimeoutException();
 			}
+		}
+		catch (Exception ex)
+		{
+			logger.LogException(GetType().Name, nameof(TryGenerateBotProfiles), ex);
 		}
 		finally
 		{
@@ -344,11 +349,11 @@ public abstract class BotDataService : IBotDataService, GInterface22
 			
 			ResetReplenishTimer();
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
+		catch (OperationCanceledException) {}
+		catch (Exception ex)
 		{
 			logger.LogException(GetType().Name, nameof(ReplenishBotCache), ex);
 		}
-		catch (OperationCanceledException) {}
 	}
 	
 	public PrepBotInfo FindCachedBotData(BotDifficulty difficulty, int groupSize)

@@ -1,5 +1,4 @@
 ﻿using Cysharp.Text;
-using Donuts.Utils;
 using UnityEngine;
 using static Donuts.DefaultPluginVars;
 using static Donuts.PluginGUI.ImGUIToolkit;
@@ -80,7 +79,7 @@ internal class MainSettingsGeneralPage : ISettingsPage
 			{
 				if (debugLogging.Value)
 				{
-					DonutsPlugin.Logger.LogWarning("Warning: pmcScenarioSelectionIndex not found, defaulting to 0");
+					DonutsPlugin.Logger.LogDebug("Warning: pmcScenarioSelectionIndex not found, defaulting to 0");
 				}
 				
 				_pmcScenarioSelectionIndex = 0;
@@ -95,7 +94,7 @@ internal class MainSettingsGeneralPage : ISettingsPage
 			{
 				if (debugLogging.Value)
 				{
-					DonutsPlugin.Logger.LogWarning("Warning: scavScenarioSelectionIndex not found, defaulting to 0");
+					DonutsPlugin.Logger.LogDebug("Warning: scavScenarioSelectionIndex not found, defaulting to 0");
 				}
 				
 				_scavScenarioSelectionIndex = 0;
@@ -108,7 +107,7 @@ internal class MainSettingsGeneralPage : ISettingsPage
 		{
 			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
 			sb.AppendFormat("{0}: {1}", nameof(_scenariosLoaded), _scenariosLoaded);
-			DonutsPlugin.Logger.LogDebugDetailed(sb.ToString(), nameof(MainSettingsGeneralPage), nameof(InitializeDropdownIndices));
+			DonutsPlugin.Logger.LogDebug(sb.ToString());
 		}
 	}
 	

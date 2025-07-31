@@ -10,7 +10,7 @@ public class PluginGUIComponent : MonoBehaviour
 {
 	private bool _currentGuiState = DefaultPluginVars.ShowGUI;
 	private ISettingsPage _settingsPage;
-	private static bool _stylesInitialized;
+	private static bool s_stylesInitialized;
 
 	// InitializeStyles static properties
 	internal static GUIStyle WindowStyle { get; private set; }
@@ -52,11 +52,11 @@ public class PluginGUIComponent : MonoBehaviour
 
 	private void OnGUI()
 	{
-		if (!_stylesInitialized)
+		if (!s_stylesInitialized)
 		{
 			InitializeStyles();
 			_settingsPage = new DonutsSettingsPage();
-			_stylesInitialized = true;
+			s_stylesInitialized = true;
 		}
 		
 		if (!GuiEnabled)
@@ -225,10 +225,10 @@ public class PluginGUIComponent : MonoBehaviour
 
 	internal static void RestartPluginGUI()
 	{
-		if (DonutsPlugin.pluginGUIComponent == null) return;
+		if (DonutsPlugin.s_pluginGUIComponent == null) return;
 			
-		DonutsPlugin.pluginGUIComponent.enabled = false;
-		DonutsPlugin.pluginGUIComponent.enabled = true;
+		DonutsPlugin.s_pluginGUIComponent.enabled = false;
+		DonutsPlugin.s_pluginGUIComponent.enabled = true;
 	}
 
 	internal static void ResetSettingsToDefaults()

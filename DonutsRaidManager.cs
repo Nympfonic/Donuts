@@ -11,6 +11,7 @@ using Donuts.Utils;
 using EFT;
 using EFT.UI;
 using JetBrains.Annotations;
+using System;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Threading;
@@ -31,9 +32,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	
 	private DiContainer _dependencyContainer;
 	
-	private CancellationTokenSource _onDestroyTokenSource;
 	private CancellationToken _onDestroyToken;
-	private TimeoutController _timeoutController;
 	
 	private DonutsGizmos _donutsGizmos;
 	private EventBusInitializer _eventBusInitializer;
@@ -41,6 +40,9 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private IBotDataController _botDataController;
 	private IBotSpawnController _botSpawnController;
 	private IBotDespawnController _botDespawnController;
+	
+	private static readonly Action<DamageInfoStruct, EBodyPart, float> s_takingDamageCombatCooldownAction = TakingDamageCombatCooldown;
+	private static readonly GDelegate70 s_disposePlayerSubscriptionsAction = DisposePlayerSubscriptions;
 	
 	internal const int INITIAL_SERVICES_COUNT = 3;
 	private const int MS_DELAY_BEFORE_STARTING_BOTS_SPAWN = 2000;
@@ -53,6 +55,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private bool _canStartRaid;
 
 	public BotConfigService BotConfigService { get; private set; }
+	public CancellationTokenSource OnDestroyTokenSource { get; private set; }
 	
 	internal static ManualLogSource Logger { get; }
 	
@@ -93,13 +96,12 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_botsController = Singleton<IBotGame>.Instance.BotsController;
 		_eftBotSpawner = _botsController.BotSpawner;
 		
-		_onDestroyTokenSource = new CancellationTokenSource();
-		_onDestroyToken = _onDestroyTokenSource.Token;
-		_timeoutController = new TimeoutController(_onDestroyTokenSource);
+		OnDestroyTokenSource = new CancellationTokenSource();
+		_onDestroyToken = OnDestroyTokenSource.Token;
 		
 		_dependencyContainer = new DiContainer();
 		RegisterServices();
-		_botDataController = new BotDataController(_dependencyContainer, _timeoutController);
+		_botDataController = new BotDataController(_dependencyContainer);
 		_botSpawnController = new BotSpawnController(_dependencyContainer);
 		_botDespawnController = new BotDespawnController(_dependencyContainer);
 		
@@ -119,13 +121,21 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		// TODO: In future release, make services for Bosses, special bots, and event bots. SWAG will become obsolete.
 		_dependencyContainer.AddSingleton<BotConfigService, BotConfigService>();
 		
-		_dependencyContainer.AddSingleton<IBotDataService, PmcDataService>(PMC_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotSpawnService, PmcSpawnService>(PMC_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotDespawnService, PmcDespawnService>(PMC_SERVICE_KEY);
+		string forceAllBotType = DefaultPluginVars.forceAllBotType.Value;
 		
-		_dependencyContainer.AddSingleton<IBotDataService, ScavDataService>(SCAV_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotSpawnService, ScavSpawnService>(SCAV_SERVICE_KEY);
-		_dependencyContainer.AddSingleton<IBotDespawnService, ScavDespawnService>(SCAV_SERVICE_KEY);
+		if (forceAllBotType is "PMC" or "Disabled")
+		{
+			_dependencyContainer.AddSingleton<IBotDataService, PmcDataService>(PMC_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotSpawnService, PmcSpawnService>(PMC_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotDespawnService, PmcDespawnService>(PMC_SERVICE_KEY);
+		}
+		
+		if (forceAllBotType is "SCAV" or "Disabled")
+		{
+			_dependencyContainer.AddSingleton<IBotDataService, ScavDataService>(SCAV_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotSpawnService, ScavSpawnService>(SCAV_SERVICE_KEY);
+			_dependencyContainer.AddSingleton<IBotDespawnService, ScavDespawnService>(SCAV_SERVICE_KEY);
+		}
 	}
 	
 	// ReSharper disable once Unity.IncorrectMethodSignature
@@ -173,9 +183,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		_botDataController?.Dispose();
 		_eventBusInitializer?.ClearAllBuses();
 		
-		_onDestroyTokenSource?.Cancel();
-		_onDestroyTokenSource?.Dispose();
-		_timeoutController.Dispose();
+		OnDestroyTokenSource?.Cancel();
+		OnDestroyTokenSource?.Dispose();
 		
 		base.OnDestroy();
 		
@@ -222,7 +231,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		var botGenStatusEventBinding = new EventBinding<BotGenStatusChangeEvent>(SetMatchmakerStatus);
 		EventBus.Register(botGenStatusEventBinding);
 		
-		Logger.LogWarning("Donuts is waiting for bot preparation to complete...");
+		Logger.LogWarning("Donuts is requesting bot profile data from the server...");
 		
 		float startTime = Time.time;
 		float lastLogTime = startTime;
@@ -240,8 +249,8 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 			
 			float currentTime = Time.time;
 			
-			// Log every 2 seconds instead of every second to avoid spamming logs
-			if (currentTime - lastLogTime >= 2f)
+			// Log every 5 seconds instead of every second to avoid spamming logs
+			if (currentTime - lastLogTime >= 5f)
 			{
 				lastLogTime = currentTime;
 				Logger.LogWarning("Donuts still waiting...");
@@ -249,7 +258,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 		
 		EventBus.Deregister(botGenStatusEventBinding);
-		Logger.LogWarning("Donuts bot preparation is complete.");
+		Logger.LogWarning("Donuts has all the bot profile data needed for raid start.");
 		
 		yield return startGameTask;
 	}
@@ -269,7 +278,10 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	public async UniTaskVoid StartBotSpawning()
 	{
 		await UniTask.Delay(MS_DELAY_BEFORE_STARTING_BOTS_SPAWN, cancellationToken: _onDestroyToken);
-		if (_onDestroyToken.IsCancellationRequested) return;
+		if (_onDestroyToken.IsCancellationRequested)
+		{
+			return;
+		}
 		
 		UniTaskAsyncEnumerable.EveryUpdate()
 			// Updates are skipped while a task is being awaited within ForEachAwaitAsync()
@@ -281,33 +293,38 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	private static async UniTask UpdateAsync()
 	{
 		DonutsRaidManager raidManager = Instance;
-		if (raidManager == null) return;
+		if (raidManager == null)
+		{
+			return;
+		}
 		
 		await raidManager._botSpawnController.SpawnStartingBots(raidManager._onDestroyToken);
 		await raidManager._botDataController.ReplenishBotCache(raidManager._onDestroyToken);
 		await raidManager._botSpawnController.SpawnBotWaves(raidManager._onDestroyToken);
-		await raidManager._botDespawnController.DespawnExcessBots(raidManager._onDestroyToken);
+		raidManager._botDespawnController.DespawnExcessBots();
 	}
 	
 	private static void SubscribeHumanPlayerEventHandlers(IPlayer iPlayer)
 	{
 		var player = (Player)iPlayer;
-		
-		if (player)
+		if (player == null)
 		{
-			if (DefaultPluginVars.debugLogging.Value)
-			{
-				using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-				sb.AppendFormat("Subscribed human player-related event handlers to player {0} ({1})'s events",
-					player.Profile.Nickname, player.ProfileId);
-				Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsRaidManager), nameof(SubscribeHumanPlayerEventHandlers));
-			}
-			player.BeingHitAction += TakingDamageCombatCooldown;
-			player.OnPlayerDeadOrUnspawn += DisposePlayerSubscriptions;
+			return;
 		}
+		
+		if (DefaultPluginVars.debugLogging.Value)
+		{
+			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
+			sb.AppendFormat("Subscribed human player-related event handlers to player {0} ({1})'s events",
+				player.Profile.Nickname, player.ProfileId);
+			Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsRaidManager), nameof(SubscribeHumanPlayerEventHandlers));
+		}
+		
+		player.BeingHitAction += s_takingDamageCombatCooldownAction;
+		player.OnPlayerDeadOrUnspawn += s_disposePlayerSubscriptionsAction;
 	}
 	
-	private static void DisposePlayerSubscriptions(Player player)
+	internal static void DisposePlayerSubscriptions(Player player)
 	{
 		if (DefaultPluginVars.debugLogging.Value)
 		{
@@ -316,21 +333,14 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 				player.Profile.Nickname, player.ProfileId);
 			Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsRaidManager), nameof(DisposePlayerSubscriptions));
 		}
-		player.BeingHitAction -= TakingDamageCombatCooldown;
-		player.OnPlayerDeadOrUnspawn -= DisposePlayerSubscriptions;
+		
+		player.BeingHitAction -= s_takingDamageCombatCooldownAction;
+		player.OnPlayerDeadOrUnspawn -= s_disposePlayerSubscriptionsAction;
 	}
 	
 	private static void EftBotSpawner_OnBotCreated(BotOwner bot)
 	{
 		bot.Memory.OnGoalEnemyChanged += Memory_OnGoalEnemyChanged;
-		if (DefaultPluginVars.debugLogging.Value)
-		{
-			using Utf8ValueStringBuilder sb = ZString.CreateUtf8StringBuilder();
-			sb.AppendFormat("Player {0} ({1}) now determined as bot, unsubscribing human player-related event handlers...",
-				bot.Profile.Nickname, bot.ProfileId);
-			Logger.LogDebugDetailed(sb.ToString(), nameof(DonutsRaidManager), nameof(EftBotSpawner_OnBotCreated));
-		}
-		DisposePlayerSubscriptions(bot.GetPlayer);
 	}
 	
 	private static void EftBotSpawner_OnBotRemoved(BotOwner bot)
@@ -340,18 +350,24 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 	
 	private static void Memory_OnGoalEnemyChanged(BotOwner bot)
 	{
-		if (bot.Memory?.GoalEnemy == null) return;
+		if (bot.Memory?.GoalEnemy == null)
+		{
+			return;
+		}
 		
 		DonutsRaidManager raidManager = Instance;
-		if (raidManager == null) return;
-			
+		if (raidManager == null)
+		{
+			return;
+		}
+		
 		BotMemoryClass memory = bot.Memory;
 		EnemyInfo goalEnemy = memory.GoalEnemy;
 		ReadOnlyCollection<Player> humanPlayers = raidManager.BotConfigService.GetHumanPlayerList();
 		for (int i = humanPlayers.Count - 1; i >= 0; i--)
 		{
 			Player player = humanPlayers[i];
-			if (player == null && !player.IsAlive())
+			if (player == null || !player.IsAlive())
 			{
 				continue;
 			}
@@ -372,7 +388,7 @@ public class DonutsRaidManager : MonoBehaviourSingleton<DonutsRaidManager>
 		}
 	}
 	
-	private static void TakingDamageCombatCooldown(DamageInfoStruct info, EBodyPart part, float arg3)
+	internal static void TakingDamageCombatCooldown(DamageInfoStruct info, EBodyPart part, float arg3)
 	{
 		switch (info.DamageType)
 		{
