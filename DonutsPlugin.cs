@@ -7,7 +7,6 @@ using Donuts.Models;
 using Donuts.PluginGUI;
 using Donuts.Spawning.Utils;
 using Donuts.Tools;
-using Donuts.Utils;
 using EFT.UI;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
@@ -21,7 +20,7 @@ using UnityToolkit.Utils;
 
 namespace Donuts;
 
-[BepInPlugin("com.dvize.Donuts", "Donuts", "2.0.0")]
+[BepInPlugin("com.dvize.Donuts", "Donuts", "4.0.1")]
 [BepInDependency("com.dvize.DonutsDependencyChecker")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class DonutsPlugin : BaseUnityPlugin
