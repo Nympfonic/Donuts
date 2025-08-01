@@ -309,7 +309,9 @@ public abstract class BotDataService : IBotDataService, ICancellable
 	{
 		try
 		{
-			if (Time.time < _replenishBotCachePrevTime + DefaultPluginVars.replenishInterval.Value)
+			if (waveGroupSize.min < 1 ||
+				waveGroupSize.max < 1 ||
+				Time.time < _replenishBotCachePrevTime + DefaultPluginVars.replenishInterval.Value)
 			{
 				return;
 			}
